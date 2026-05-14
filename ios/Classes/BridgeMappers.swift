@@ -267,6 +267,51 @@ enum BridgeMappers {
         }
     }
 
+    // MARK: - CheckoutEvent (Swift -> Dart)
+
+    static func fromNative(_ native: CheckoutEvent) -> CheckoutEventDto {
+        switch native {
+        case .stateChanged(let state):
+            return CheckoutEventDto(kind: .stateChanged, state: fromNative(state))
+        case .checkoutStarted(let id):
+            return CheckoutEventDto(kind: .checkoutStarted, checkoutId: id)
+        case .loginRequired(let reqs):
+            return CheckoutEventDto(kind: .loginRequired, loginRequirements: reqs.map(fromNative))
+        case .readyToCheckout:
+            return CheckoutEventDto(kind: .readyToCheckout)
+        case .requirementSatisfied(let type):
+            return CheckoutEventDto(kind: .requirementSatisfied, requirementType: fromNative(type))
+        case .checkoutFinalized(let response):
+            let data = response.headlessCheckoutData
+            let renderCtx = RenderContextDto(
+                url: data.url,
+                renderType: fromNative(data.renderType),
+                paymentType: fromNative(data.checkoutPaymentType)
+            )
+            return CheckoutEventDto(
+                kind: .checkoutFinalized,
+                checkoutId: response.headlessCheckoutId,
+                renderContext: renderCtx
+            )
+        case .renderingStarted(let url, let renderType):
+            // The native `renderingStarted` event has no paymentType. We
+            // default to `.applePay` here since it is the most common path
+            // for hosted checkout URLs; revolutPay flows are typically
+            // handled via `checkoutFinalized` which carries the explicit
+            // type.
+            let renderCtx = RenderContextDto(
+                url: url.absoluteString,
+                renderType: fromNative(renderType),
+                paymentType: .applePay
+            )
+            return CheckoutEventDto(kind: .renderingStarted, renderContext: renderCtx)
+        case .completed(let checkoutId):
+            return CheckoutEventDto(kind: .completed, checkoutId: checkoutId)
+        case .failed(let err):
+            return CheckoutEventDto(kind: .failed, error: fromNative(err))
+        }
+    }
+
     // MARK: - OnramperError (Swift -> Dart)
     // Full coverage + tests live in the Error mapper commit; this stub keeps
     // the State/Event mappers compilable. The implementation here already

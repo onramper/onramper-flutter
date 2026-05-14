@@ -475,4 +475,98 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertNil(dto.renderContext)
         XCTAssertEqual(dto.failedError?.kind, .timeout)
     }
+
+    // MARK: - CheckoutEvent (Swift -> Dart)
+
+    func test_checkoutEvent_fromNative_stateChanged() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.stateChanged(.ready))
+
+        XCTAssertEqual(dto.kind, .stateChanged)
+        XCTAssertEqual(dto.state?.kind, .ready)
+        XCTAssertNil(dto.checkoutId)
+        XCTAssertNil(dto.loginRequirements)
+        XCTAssertNil(dto.requirementType)
+        XCTAssertNil(dto.renderContext)
+        XCTAssertNil(dto.error)
+    }
+
+    func test_checkoutEvent_fromNative_checkoutStarted() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutStarted("co_abc"))
+
+        XCTAssertEqual(dto.kind, .checkoutStarted)
+        XCTAssertEqual(dto.checkoutId, "co_abc")
+        XCTAssertNil(dto.state)
+    }
+
+    func test_checkoutEvent_fromNative_loginRequired() {
+        let reqs: [CheckoutRequirement] = [.userInfo(UserInfoRequirement(providerId: "p", fields: []))]
+
+        let dto = BridgeMappers.fromNative(CheckoutEvent.loginRequired(reqs))
+
+        XCTAssertEqual(dto.kind, .loginRequired)
+        XCTAssertEqual(dto.loginRequirements?.count, 1)
+        XCTAssertEqual(dto.loginRequirements?[0].type, .userInfo)
+    }
+
+    func test_checkoutEvent_fromNative_readyToCheckout() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.readyToCheckout)
+
+        XCTAssertEqual(dto.kind, .readyToCheckout)
+        XCTAssertNil(dto.state)
+        XCTAssertNil(dto.checkoutId)
+    }
+
+    func test_checkoutEvent_fromNative_requirementSatisfied() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.requirementSatisfied(.amountLimit))
+
+        XCTAssertEqual(dto.kind, .requirementSatisfied)
+        XCTAssertEqual(dto.requirementType, .amountLimit)
+    }
+
+    func test_checkoutEvent_fromNative_checkoutFinalized() {
+        let response = CheckoutFinalizeResponse(
+            headlessCheckoutId: "co_xyz",
+            headlessCheckoutData: HeadlessCheckoutData(
+                checkoutPaymentType: .revolutPay,
+                url: "https://pay.example.com",
+                renderType: .deeplink
+            )
+        )
+
+        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutFinalized(response))
+
+        XCTAssertEqual(dto.kind, .checkoutFinalized)
+        XCTAssertEqual(dto.checkoutId, "co_xyz")
+        XCTAssertEqual(dto.renderContext?.url, "https://pay.example.com")
+        XCTAssertEqual(dto.renderContext?.renderType, .deeplink)
+        XCTAssertEqual(dto.renderContext?.paymentType, .revolutPay)
+    }
+
+    func test_checkoutEvent_fromNative_renderingStarted_defaultsPaymentTypeApplePay() {
+        let dto = BridgeMappers.fromNative(
+            CheckoutEvent.renderingStarted(
+                url: URL(string: "https://render.example.com")!,
+                renderType: .webview
+            )
+        )
+
+        XCTAssertEqual(dto.kind, .renderingStarted)
+        XCTAssertEqual(dto.renderContext?.url, "https://render.example.com")
+        XCTAssertEqual(dto.renderContext?.renderType, .webview)
+        XCTAssertEqual(dto.renderContext?.paymentType, .applePay)
+    }
+
+    func test_checkoutEvent_fromNative_completed() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.completed(checkoutId: "co_done"))
+
+        XCTAssertEqual(dto.kind, .completed)
+        XCTAssertEqual(dto.checkoutId, "co_done")
+    }
+
+    func test_checkoutEvent_fromNative_failed() {
+        let dto = BridgeMappers.fromNative(CheckoutEvent.failed(.deviceBlocked))
+
+        XCTAssertEqual(dto.kind, .failed)
+        XCTAssertEqual(dto.error?.kind, .deviceBlocked)
+    }
 }
