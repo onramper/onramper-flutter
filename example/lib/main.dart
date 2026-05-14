@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:onramper_sdk/onramper_sdk.dart';
 
+import 'ios_diagnostics.dart';
 import 'session_token_service.dart';
 
 void main() => runApp(const ExampleApp());
@@ -30,6 +31,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   String? _statusMessage;
   String? _errorMessage;
   bool _busy = false;
+  IosAppIdentifiers? _appIdentifiers;
 
   static const _apiKey = String.fromEnvironment(
     'ONRAMPER_API_KEY',
@@ -62,6 +64,19 @@ class _ExampleHomeState extends State<ExampleHome> {
           SessionTokenService.fetch(authToken: _demoAuthToken),
     );
     _client.events.listen(_onEvent);
+    _loadAppIdentifiers();
+  }
+
+  Future<void> _loadAppIdentifiers() async {
+    try {
+      final ids = await IosDiagnostics.readAppIdentifiers();
+      debugPrint(
+        'App launched with bundleId=${ids.bundleId} teamId=${ids.teamId}',
+      );
+      if (mounted) setState(() => _appIdentifiers = ids);
+    } catch (e) {
+      debugPrint('readAppIdentifiers failed: $e');
+    }
   }
 
   @override
@@ -133,6 +148,9 @@ class _ExampleHomeState extends State<ExampleHome> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_appIdentifiers != null)
+                _IdentifiersBanner(identifiers: _appIdentifiers!),
+              if (_appIdentifiers != null) const SizedBox(height: 12),
               _buildHeader(),
               const SizedBox(height: 24),
               if (_requirements == null)
@@ -166,6 +184,36 @@ class _ExampleHomeState extends State<ExampleHome> {
       'Buy 100 USD of SOL via Apple Pay (sandbox). Tap "Prepare checkout" to '
       'mint a demo session and fetch requirements.',
       style: TextStyle(fontSize: 14),
+    );
+  }
+}
+
+class _IdentifiersBanner extends StatelessWidget {
+  const _IdentifiersBanner({required this.identifiers});
+
+  final IosAppIdentifiers identifiers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade50,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bundle: ${identifiers.bundleId}',
+            style: const TextStyle(fontSize: 12, fontFamily: 'Courier'),
+          ),
+          Text(
+            'Team:   ${identifiers.teamId}',
+            style: const TextStyle(fontSize: 12, fontFamily: 'Courier'),
+          ),
+        ],
+      ),
     );
   }
 }
