@@ -89,14 +89,14 @@ final class OnramperSdkPluginTests: XCTestCase {
         XCTAssertNil(plugin.testClient(), "expected dispose to release the native client")
     }
 
-    // MARK: - presentCheckout (Task 7 stub)
+    // MARK: - presentCheckout
 
-    func test_presentCheckout_returnsNotImplemented() async throws {
+    func test_presentCheckout_withoutConfigure_failsWithNotConfigured() async throws {
         let error = await callExpectingFailure { completion in
             plugin.presentCheckout(completion: completion)
         }
         let pigeon = try XCTUnwrap(error as? PigeonError)
-        XCTAssertEqual(pigeon.code, "not_implemented")
+        XCTAssertEqual(pigeon.code, "not_configured")
     }
 
     // MARK: - initialize before configure

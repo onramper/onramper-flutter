@@ -14,6 +14,9 @@ enum PluginError: Error {
     /// The native SDK produced no usable response (e.g. swallowed a
     /// `CheckoutIntentResponse` we needed to assemble a DTO).
     case missingResponse(String)
+    /// `presentCheckout()` could not locate a host `UIViewController` to
+    /// present the native modal from (no key window / no root).
+    case noRootViewController
 
     /// Maps to PigeonError so Dart receives a stable code/message pair
     /// instead of `String(describing:)` of the enum case.
@@ -27,6 +30,8 @@ enum PluginError: Error {
             return PigeonError(code: "not_implemented", message: "Method not yet implemented in this plugin version", details: nil)
         case .missingResponse(let detail):
             return PigeonError(code: "missing_response", message: "Native SDK produced no usable response", details: detail)
+        case .noRootViewController:
+            return PigeonError(code: "no_root_view_controller", message: "Cannot find a host view controller to present checkout from", details: nil)
         }
     }
 }
@@ -120,6 +125,11 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // on dispose / reconfigure.
     private var eventForwardingTask: Task<Void, Never>?
 
+    // Retains the currently-presented checkout modal so its event-observation
+    // Task is not deallocated. Cleared by the presenter's `onDismissed` hook
+    // (terminal event) or by `dispose(...)`.
+    var activeCheckoutPresenter: PluginCheckoutPresenter?
+
     // `FlutterPlugin.register(with:)` is invoked on the main thread by
     // Flutter's plugin registry. It's declared `nonisolated` because the
     // `FlutterPlugin` protocol comes from an `@objc` header without actor
@@ -150,6 +160,28 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     /// Cancels the event-forwarding task. Called on dispose / reconfigure.
     private func tearDownObservers() {
         eventForwardingTask?.cancel(); eventForwardingTask = nil
+    }
+
+    /// Locates the topmost presented view controller on the key window. Used
+    /// as the host for the native checkout modal. Returns `nil` in headless
+    /// contexts (unit tests without a UIWindow, app launch before scene
+    /// attachment, etc.) — callers must surface `noRootViewController` in
+    /// that case.
+    static func findRootViewController() -> UIViewController? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })?
+            .rootViewController?
+            .topMostPresentedViewController()
+    }
+}
+
+private extension UIViewController {
+    func topMostPresentedViewController() -> UIViewController {
+        var top: UIViewController = self
+        while let presented = top.presentedViewController { top = presented }
+        return top
     }
 }
 
@@ -290,10 +322,29 @@ extension OnramperSdkPlugin: OnramperHostApi {
     }
 
     func presentCheckout(completion: @escaping (Result<Void, Error>) -> Void) {
-        // Task 7 owns presenting the native checkout (UIKit webview). For
-        // now, an explicit not-implemented response keeps the wire contract
-        // discoverable from Dart.
-        completion(.failure(PluginError.notImplemented.asPigeonError))
+        guard let client else {
+            completion(.failure(PluginError.notConfigured.asPigeonError))
+            return
+        }
+        Task { @MainActor in
+            guard let root = Self.findRootViewController() else {
+                completion(.failure(PluginError.noRootViewController.asPigeonError))
+                return
+            }
+            let presenter = PluginCheckoutPresenter(client: client)
+            // Drop the strong reference once the modal dismisses (terminal
+            // event). Capture `self` weakly so an in-flight dismissal does
+            // not extend plugin lifetime.
+            presenter.onDismissed = { [weak self] in
+                guard let self else { return }
+                if self.activeCheckoutPresenter === presenter {
+                    self.activeCheckoutPresenter = nil
+                }
+            }
+            self.activeCheckoutPresenter = presenter
+            presenter.present(from: root)
+            completion(.success(()))
+        }
     }
 
     func reset(completion: @escaping (Result<Void, Error>) -> Void) {
@@ -311,6 +362,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
             self.tearDownObservers()
             self.client = nil
             self.inFlightRequirements = nil
+            self.activeCheckoutPresenter = nil
             completion(.success(()))
         }
     }
