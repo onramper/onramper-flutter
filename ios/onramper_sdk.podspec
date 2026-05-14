@@ -20,4 +20,9 @@ Pod::Spec.new do |s|
     'ENABLE_BITCODE'                       => 'NO',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
   }
+
+  s.test_spec 'Tests' do |test_spec|
+    test_spec.source_files = 'Tests/**/*.swift'
+    test_spec.frameworks   = 'XCTest'
+  end
 end
