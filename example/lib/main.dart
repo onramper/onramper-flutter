@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onramper_sdk/onramper_sdk.dart';
 
+import 'session_token_service.dart';
+
 void main() => runApp(const ExampleApp());
 
 class ExampleApp extends StatelessWidget {
@@ -29,13 +31,21 @@ class _ExampleHomeState extends State<ExampleHome> {
   String? _errorMessage;
   bool _busy = false;
 
-  static const _apiKey = String.fromEnvironment('ONRAMPER_API_KEY', defaultValue: '');
-  static const _clientId = String.fromEnvironment('ONRAMPER_CLIENT_ID', defaultValue: '');
-  static const _sessionId = String.fromEnvironment('ONRAMPER_SESSION_ID', defaultValue: '');
-  static const _sessionToken = String.fromEnvironment('ONRAMPER_SESSION_TOKEN', defaultValue: '');
+  static const _apiKey = String.fromEnvironment(
+    'ONRAMPER_API_KEY',
+    defaultValue: '',
+  );
+  static const _clientId = String.fromEnvironment(
+    'ONRAMPER_CLIENT_ID',
+    defaultValue: '',
+  );
+  static const _demoAuthToken = String.fromEnvironment(
+    'ONRAMPER_DEMO_AUTH_TOKEN',
+    defaultValue: '',
+  );
   static const _walletAddress = String.fromEnvironment(
     'ONRAMPER_WALLET_ADDRESS',
-    defaultValue: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
+    defaultValue: 'Br2jjHYskB1JJikv3Qw2QcmWVQGfZvkJFng4ZEwiGSjv',
   );
 
   @override
@@ -48,10 +58,8 @@ class _ExampleHomeState extends State<ExampleHome> {
         environment: OnramperEnvironment.development,
         logLevel: OnramperLogLevel.debug,
       ),
-      sessionExpirationHandler: () async => const SessionCredentials(
-        sessionId: _sessionId,
-        sessionToken: _sessionToken,
-      ),
+      sessionExpirationHandler: () =>
+          SessionTokenService.fetch(authToken: _demoAuthToken),
     );
     _client.events.listen(_onEvent);
   }
@@ -70,22 +78,29 @@ class _ExampleHomeState extends State<ExampleHome> {
     setState(() {
       _busy = true;
       _errorMessage = null;
-      _statusMessage = 'initializing…';
+      _statusMessage = 'minting session…';
     });
     try {
-      await _client.initialize(sessionId: _sessionId, sessionToken: _sessionToken);
+      final credentials =
+          await SessionTokenService.fetch(authToken: _demoAuthToken);
+      setState(() => _statusMessage = 'initializing…');
+      await _client.initialize(
+        sessionId: credentials.sessionId,
+        sessionToken: credentials.sessionToken,
+      );
       setState(() => _statusMessage = 'fetching checkout requirements…');
       final requirements = await _client.getCheckoutRequirements(
         const CheckoutIntentRequest(
           transactionData: OnramperTransactionData(
-            onramp: 'transak',
+            onramp: '',
             source: 'usd',
-            destination: 'btc',
+            destination: 'sol',
             amount: 100,
             type: TransactionType.buy,
             country: 'us',
-            paymentMethod: 'credit_debit_card',
-            wallet: WalletInfo(network: 'bitcoin', address: _walletAddress),
+            subdivision: 'us-ca',
+            paymentMethod: 'applepay',
+            wallet: WalletInfo(network: 'solana', address: _walletAddress),
           ),
         ),
       );
@@ -144,11 +159,12 @@ class _ExampleHomeState extends State<ExampleHome> {
   }
 
   Widget _buildHeader() {
-    if (_apiKey.isEmpty || _clientId.isEmpty || _sessionId.isEmpty || _sessionToken.isEmpty) {
+    if (_apiKey.isEmpty || _clientId.isEmpty || _demoAuthToken.isEmpty) {
       return const _MissingEnvBanner();
     }
     return const Text(
-      'Buy 100 USD of BTC via Transak (sandbox).',
+      'Buy 100 USD of SOL via Apple Pay (sandbox). Tap "Prepare checkout" to '
+      'mint a demo session and fetch requirements.',
       style: TextStyle(fontSize: 14),
     );
   }
@@ -166,8 +182,9 @@ class _MissingEnvBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: const Text(
-        'Set ONRAMPER_API_KEY, ONRAMPER_CLIENT_ID, ONRAMPER_SESSION_ID, '
-        'ONRAMPER_SESSION_TOKEN via --dart-define before running.',
+        'Pass ONRAMPER_API_KEY, ONRAMPER_CLIENT_ID, and ONRAMPER_DEMO_AUTH_TOKEN '
+        'via --dart-define before running. The demo auth token authorises the '
+        'session-minting endpoint at demo-stg.onramper.dev.',
         style: TextStyle(fontSize: 12),
       ),
     );

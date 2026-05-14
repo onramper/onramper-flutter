@@ -29,6 +29,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Used by SessionTokenService to mint demo sessionId/sessionToken pairs.
+  http: ^1.2.0
+
 dev_dependencies:
   integration_test:
     sdk: flutter
