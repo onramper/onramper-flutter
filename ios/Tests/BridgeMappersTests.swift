@@ -373,4 +373,106 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(dto.headlessCheckoutId, "co_456")
         XCTAssertTrue(dto.requirements.isEmpty)
     }
+
+    // MARK: - OnramperState (Swift -> Dart)
+
+    func test_renderType_fromNative() {
+        XCTAssertEqual(BridgeMappers.fromNative(RenderType.webview), .webview)
+        XCTAssertEqual(BridgeMappers.fromNative(RenderType.deeplink), .deeplink)
+    }
+
+    func test_checkoutPaymentType_fromNative() {
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutPaymentType.applePay), .applePay)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutPaymentType.revolutPay), .revolutPay)
+    }
+
+    func test_renderContext_fromNative_mapsAllFields() {
+        let native = OnramperState.RenderContext(
+            url: URL(string: "https://checkout.example.com/abc")!,
+            renderType: .webview,
+            paymentType: .applePay
+        )
+
+        let dto = BridgeMappers.fromNative(native)
+
+        XCTAssertEqual(dto.url, "https://checkout.example.com/abc")
+        XCTAssertEqual(dto.renderType, .webview)
+        XCTAssertEqual(dto.paymentType, .applePay)
+    }
+
+    func test_onramperState_fromNative_idle() {
+        let dto = BridgeMappers.fromNative(OnramperState.idle)
+        XCTAssertEqual(dto.kind, .idle)
+        XCTAssertNil(dto.requireLoginRequirements)
+        XCTAssertNil(dto.renderContext)
+        XCTAssertNil(dto.failedError)
+    }
+
+    func test_onramperState_fromNative_initializing() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.initializing).kind, .initializing)
+    }
+
+    func test_onramperState_fromNative_ready() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.ready).kind, .ready)
+    }
+
+    func test_onramperState_fromNative_checkoutPreparing() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.checkoutPreparing).kind, .checkoutPreparing)
+    }
+
+    func test_onramperState_fromNative_authenticating() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.authenticating).kind, .authenticating)
+    }
+
+    func test_onramperState_fromNative_readyToCheckout() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.readyToCheckout).kind, .readyToCheckout)
+    }
+
+    func test_onramperState_fromNative_finalizing() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.finalizing).kind, .finalizing)
+    }
+
+    func test_onramperState_fromNative_completed() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.completed).kind, .completed)
+    }
+
+    func test_onramperState_fromNative_requireLogin_populatesRequirements() {
+        let reqs: [CheckoutRequirement] = [
+            .tos(ToSRequirement(providerId: "p", items: [])),
+            .userInfo(UserInfoRequirement(providerId: "p", fields: [])),
+        ]
+
+        let dto = BridgeMappers.fromNative(OnramperState.requireLogin(reqs))
+
+        XCTAssertEqual(dto.kind, .requireLogin)
+        XCTAssertEqual(dto.requireLoginRequirements?.count, 2)
+        XCTAssertNil(dto.renderContext)
+        XCTAssertNil(dto.failedError)
+    }
+
+    func test_onramperState_fromNative_rendering_populatesRenderContext() {
+        let ctx = OnramperState.RenderContext(
+            url: URL(string: "https://x.example.com")!,
+            renderType: .deeplink,
+            paymentType: .revolutPay
+        )
+
+        let dto = BridgeMappers.fromNative(OnramperState.rendering(ctx))
+
+        XCTAssertEqual(dto.kind, .rendering)
+        XCTAssertNil(dto.requireLoginRequirements)
+        XCTAssertEqual(dto.renderContext?.url, "https://x.example.com")
+        XCTAssertEqual(dto.renderContext?.renderType, .deeplink)
+        XCTAssertEqual(dto.renderContext?.paymentType, .revolutPay)
+        XCTAssertNil(dto.failedError)
+    }
+
+    func test_onramperState_fromNative_failed_populatesFailedError() {
+        let dto = BridgeMappers.fromNative(OnramperState.failed(.timeout))
+
+        XCTAssertEqual(dto.kind, .failed)
+        XCTAssertNil(dto.requireLoginRequirements)
+        XCTAssertNil(dto.renderContext)
+        XCTAssertEqual(dto.failedError?.kind, .timeout)
+    }
 }

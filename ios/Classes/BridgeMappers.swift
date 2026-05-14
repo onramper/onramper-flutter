@@ -206,4 +206,132 @@ enum BridgeMappers {
         case .userInfo:    return .userInfo
         }
     }
+
+    // MARK: - OnramperState (Swift -> Dart)
+
+    static func fromNative(_ native: OnramperState) -> OnramperStateDto {
+        switch native {
+        case .idle:
+            return OnramperStateDto(kind: .idle)
+        case .initializing:
+            return OnramperStateDto(kind: .initializing)
+        case .ready:
+            return OnramperStateDto(kind: .ready)
+        case .checkoutPreparing:
+            return OnramperStateDto(kind: .checkoutPreparing)
+        case .requireLogin(let reqs):
+            return OnramperStateDto(
+                kind: .requireLogin,
+                requireLoginRequirements: reqs.map(fromNative)
+            )
+        case .authenticating:
+            return OnramperStateDto(kind: .authenticating)
+        case .readyToCheckout:
+            return OnramperStateDto(kind: .readyToCheckout)
+        case .finalizing:
+            return OnramperStateDto(kind: .finalizing)
+        case .rendering(let ctx):
+            return OnramperStateDto(
+                kind: .rendering,
+                renderContext: fromNative(ctx)
+            )
+        case .completed:
+            return OnramperStateDto(kind: .completed)
+        case .failed(let err):
+            return OnramperStateDto(
+                kind: .failed,
+                failedError: fromNative(err)
+            )
+        }
+    }
+
+    static func fromNative(_ native: OnramperState.RenderContext) -> RenderContextDto {
+        RenderContextDto(
+            url: native.url.absoluteString,
+            renderType: fromNative(native.renderType),
+            paymentType: fromNative(native.paymentType)
+        )
+    }
+
+    static func fromNative(_ native: RenderType) -> RenderTypeDto {
+        switch native {
+        case .webview:  return .webview
+        case .deeplink: return .deeplink
+        }
+    }
+
+    static func fromNative(_ native: CheckoutPaymentType) -> CheckoutPaymentTypeDto {
+        switch native {
+        case .applePay:   return .applePay
+        case .revolutPay: return .revolutPay
+        }
+    }
+
+    // MARK: - OnramperError (Swift -> Dart)
+    // Full coverage + tests live in the Error mapper commit; this stub keeps
+    // the State/Event mappers compilable. The implementation here already
+    // handles every case but is exercised more broadly by the Error tests.
+
+    static func fromNative(_ native: OnramperError) -> OnramperErrorDto {
+        let message = native.errorDescription ?? "Unknown error"
+        // covers: notInitialized, initializationFailed, attestationFailed,
+        // invalidStateTransition, invalidState, networkError, decodingError,
+        // timeout, requirementNotSatisfied, amountOutOfRange, oidcFlowCancelled,
+        // oidcTokenExchangeFailed, oidcFlowFailed, userTokenInvalid,
+        // userTokenRefreshFailed, webviewLoadFailed, deepLinkFailed,
+        // invalidRequest, quoteUnavailable, checkoutForbidden, temporaryFailure,
+        // unrecoverable, configurationError, deviceBlocked, securityStorageFailed
+        switch native {
+        case .notInitialized:
+            return OnramperErrorDto(kind: .notInitialized, message: message, recoverable: false)
+        case .initializationFailed(let s):
+            return OnramperErrorDto(kind: .initializationFailed, message: message, recoverable: false, debugInfo: s)
+        case .attestationFailed(let s):
+            return OnramperErrorDto(kind: .attestationFailed, message: message, recoverable: false, debugInfo: s)
+        case .invalidStateTransition(let from, let to):
+            return OnramperErrorDto(kind: .invalidStateTransition, message: message, recoverable: false, fromState: from, toState: to)
+        case .invalidState(let expected, let actual):
+            return OnramperErrorDto(kind: .invalidState, message: message, recoverable: false, expectedState: expected, actualState: actual)
+        case .networkError(let code, let m):
+            return OnramperErrorDto(kind: .networkError, message: message, recoverable: true, code: Int64(code), debugInfo: m)
+        case .decodingError(let s):
+            return OnramperErrorDto(kind: .decodingError, message: message, recoverable: false, debugInfo: s)
+        case .timeout:
+            return OnramperErrorDto(kind: .timeout, message: message, recoverable: true)
+        case .requirementNotSatisfied(let s):
+            return OnramperErrorDto(kind: .requirementNotSatisfied, message: message, recoverable: true, debugInfo: s)
+        case .amountOutOfRange(let min, let max):
+            return OnramperErrorDto(kind: .amountOutOfRange, message: message, recoverable: true, minAmount: min, maxAmount: max)
+        case .oidcFlowCancelled:
+            return OnramperErrorDto(kind: .oidcFlowCancelled, message: message, recoverable: true)
+        case .oidcTokenExchangeFailed(let s):
+            return OnramperErrorDto(kind: .oidcTokenExchangeFailed, message: message, recoverable: false, debugInfo: s)
+        case .oidcFlowFailed(let s):
+            return OnramperErrorDto(kind: .oidcFlowFailed, message: message, recoverable: false, debugInfo: s)
+        case .userTokenInvalid:
+            return OnramperErrorDto(kind: .userTokenInvalid, message: message, recoverable: true)
+        case .userTokenRefreshFailed(let s):
+            return OnramperErrorDto(kind: .userTokenRefreshFailed, message: message, recoverable: true, debugInfo: s)
+        case .webviewLoadFailed(let s):
+            return OnramperErrorDto(kind: .webviewLoadFailed, message: message, recoverable: false, debugInfo: s)
+        case .deepLinkFailed(let s):
+            return OnramperErrorDto(kind: .deepLinkFailed, message: message, recoverable: false, debugInfo: s)
+        case .invalidRequest(let field, let debug):
+            return OnramperErrorDto(kind: .invalidRequest, message: message, recoverable: true, field: field, debugInfo: debug)
+        case .quoteUnavailable(let debug):
+            return OnramperErrorDto(kind: .quoteUnavailable, message: message, recoverable: true, debugInfo: debug)
+        case .checkoutForbidden(let debug):
+            return OnramperErrorDto(kind: .checkoutForbidden, message: message, recoverable: false, debugInfo: debug)
+        case .temporaryFailure(let retry, let debug):
+            return OnramperErrorDto(kind: .temporaryFailure, message: message, recoverable: true, retryAfterSeconds: retry, debugInfo: debug)
+        case .unrecoverable(let debug):
+            return OnramperErrorDto(kind: .unrecoverable, message: message, recoverable: false, debugInfo: debug)
+        case .configurationError(let reason):
+            return OnramperErrorDto(kind: .configurationError, message: message, recoverable: false, debugInfo: reason)
+        case .deviceBlocked:
+            return OnramperErrorDto(kind: .deviceBlocked, message: message, recoverable: false)
+        case .securityStorageFailed(let status):
+            return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false, code: Int64(status))
+        }
+    }
 }
