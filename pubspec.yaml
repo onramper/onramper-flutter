@@ -1,0 +1,27 @@
+name: onramper_sdk
+description: Flutter plugin wrapping the iOS OnramperSDK for crypto on-ramping.
+version: 0.1.0
+homepage: https://github.com/onramper/onramper-flutter
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  pigeon: ^22.0.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: OnramperSdkPlugin
+        dartPluginClass: OnramperClient
