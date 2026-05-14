@@ -108,4 +108,102 @@ enum BridgeMappers {
         case .sell: return .sell
         }
     }
+
+    // MARK: - Checkout Requirements (Swift -> Dart)
+
+    static func fromNative(_ native: CheckoutIntentResponse) -> CheckoutRequirementsResultDto {
+        CheckoutRequirementsResultDto(
+            headlessCheckoutId: native.headlessCheckoutId,
+            requirements: native.checkoutRequirements.map(fromNative),
+            quote: fromNative(native.quote)
+        )
+    }
+
+    static func fromNative(_ native: CheckoutRequirement) -> CheckoutRequirementDto {
+        switch native {
+        case .tos(let r):
+            return CheckoutRequirementDto(type: .tos, tos: fromNative(r), amountLimit: nil, userInfo: nil)
+        case .amountLimit(let r):
+            return CheckoutRequirementDto(type: .amountLimit, tos: nil, amountLimit: fromNative(r), userInfo: nil)
+        case .userInfo(let r):
+            return CheckoutRequirementDto(type: .userInfo, tos: nil, amountLimit: nil, userInfo: fromNative(r))
+        }
+    }
+
+    static func fromNative(_ native: ToSRequirement) -> TosRequirementDto {
+        TosRequirementDto(
+            providerId: native.providerId,
+            items: native.items.map(fromNative)
+        )
+    }
+
+    static func fromNative(_ native: ToSItem) -> TosItemDto {
+        TosItemDto(
+            type: fromNative(native.type),
+            required: native.required,
+            satisfied: native.satisfied,
+            url: native.url,
+            content: native.content
+        )
+    }
+
+    static func fromNative(_ native: ToSItemType) -> TosItemTypeDto {
+        switch native {
+        case .tos:           return .tos
+        case .privacyPolicy: return .privacyPolicy
+        case .userAgreement: return .userAgreement
+        }
+    }
+
+    static func fromNative(_ native: AmountLimitRequirement) -> AmountLimitRequirementDto {
+        AmountLimitRequirementDto(
+            providerId: native.providerId,
+            minAmountLimit: native.minAmountLimit,
+            maxAmountLimit: native.maxAmountLimit
+        )
+    }
+
+    static func fromNative(_ native: UserInfoRequirement) -> UserInfoRequirementDto {
+        UserInfoRequirementDto(
+            providerId: native.providerId,
+            fields: native.fields.map(fromNative)
+        )
+    }
+
+    static func fromNative(_ native: UserInfoField) -> UserInfoFieldDto {
+        UserInfoFieldDto(
+            type: fromNative(native.type),
+            required: native.required,
+            satisfied: native.satisfied
+        )
+    }
+
+    static func fromNative(_ native: UserInfoFieldType) -> UserInfoFieldTypeDto {
+        switch native {
+        case .firstName:         return .firstName
+        case .lastName:          return .lastName
+        case .email:             return .email
+        case .emailVerification: return .emailVerification
+        case .phoneNumber:       return .phoneNumber
+        case .phoneVerification: return .phoneVerification
+        case .ssnLastFour:       return .ssnLastFour
+        case .address:           return .address
+        }
+    }
+
+    static func fromNative(_ native: CheckoutRequirementType) -> CheckoutRequirementTypeDto {
+        switch native {
+        case .tos:         return .tos
+        case .amountLimit: return .amountLimit
+        case .userInfo:    return .userInfo
+        }
+    }
+
+    static func toNative(_ dto: CheckoutRequirementTypeDto) -> CheckoutRequirementType {
+        switch dto {
+        case .tos:         return .tos
+        case .amountLimit: return .amountLimit
+        case .userInfo:    return .userInfo
+        }
+    }
 }
