@@ -569,4 +569,230 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(dto.kind, .failed)
         XCTAssertEqual(dto.error?.kind, .deviceBlocked)
     }
+
+    // MARK: - OnramperError (Swift -> Dart)
+
+    func test_onramperError_notInitialized() {
+        let dto = BridgeMappers.fromNative(OnramperError.notInitialized)
+        XCTAssertEqual(dto.kind, .notInitialized)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertFalse(dto.message.isEmpty)
+    }
+
+    func test_onramperError_initializationFailed_carriesDebugInfo() {
+        let dto = BridgeMappers.fromNative(OnramperError.initializationFailed("boom"))
+        XCTAssertEqual(dto.kind, .initializationFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "boom")
+    }
+
+    func test_onramperError_attestationFailed_carriesDebugInfo() {
+        let dto = BridgeMappers.fromNative(OnramperError.attestationFailed("attest-bad"))
+        XCTAssertEqual(dto.kind, .attestationFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "attest-bad")
+    }
+
+    func test_onramperError_invalidStateTransition_carriesFromTo() {
+        let dto = BridgeMappers.fromNative(OnramperError.invalidStateTransition(from: "idle", to: "completed"))
+        XCTAssertEqual(dto.kind, .invalidStateTransition)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.fromState, "idle")
+        XCTAssertEqual(dto.toState, "completed")
+    }
+
+    func test_onramperError_invalidState_carriesExpectedActual() {
+        let dto = BridgeMappers.fromNative(OnramperError.invalidState(expected: "ready", actual: "idle"))
+        XCTAssertEqual(dto.kind, .invalidState)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.expectedState, "ready")
+        XCTAssertEqual(dto.actualState, "idle")
+    }
+
+    func test_onramperError_networkError_carriesCodeAndDebugInfo() {
+        let dto = BridgeMappers.fromNative(OnramperError.networkError(code: 502, message: "bad gateway"))
+        XCTAssertEqual(dto.kind, .networkError)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.code, 502)
+        XCTAssertEqual(dto.debugInfo, "bad gateway")
+    }
+
+    func test_onramperError_decodingError() {
+        let dto = BridgeMappers.fromNative(OnramperError.decodingError("missing key"))
+        XCTAssertEqual(dto.kind, .decodingError)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "missing key")
+    }
+
+    func test_onramperError_timeout() {
+        let dto = BridgeMappers.fromNative(OnramperError.timeout)
+        XCTAssertEqual(dto.kind, .timeout)
+        XCTAssertTrue(dto.recoverable)
+    }
+
+    func test_onramperError_requirementNotSatisfied() {
+        let dto = BridgeMappers.fromNative(OnramperError.requirementNotSatisfied("kyc"))
+        XCTAssertEqual(dto.kind, .requirementNotSatisfied)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "kyc")
+    }
+
+    func test_onramperError_amountOutOfRange_carriesMinMax() {
+        let dto = BridgeMappers.fromNative(OnramperError.amountOutOfRange(min: 20.0, max: 5000.0))
+        XCTAssertEqual(dto.kind, .amountOutOfRange)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.minAmount, 20.0)
+        XCTAssertEqual(dto.maxAmount, 5000.0)
+    }
+
+    func test_onramperError_oidcFlowCancelled() {
+        let dto = BridgeMappers.fromNative(OnramperError.oidcFlowCancelled)
+        XCTAssertEqual(dto.kind, .oidcFlowCancelled)
+        XCTAssertTrue(dto.recoverable)
+    }
+
+    func test_onramperError_oidcTokenExchangeFailed() {
+        let dto = BridgeMappers.fromNative(OnramperError.oidcTokenExchangeFailed("bad token"))
+        XCTAssertEqual(dto.kind, .oidcTokenExchangeFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "bad token")
+    }
+
+    func test_onramperError_oidcFlowFailed() {
+        let dto = BridgeMappers.fromNative(OnramperError.oidcFlowFailed("err"))
+        XCTAssertEqual(dto.kind, .oidcFlowFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "err")
+    }
+
+    func test_onramperError_userTokenInvalid() {
+        let dto = BridgeMappers.fromNative(OnramperError.userTokenInvalid)
+        XCTAssertEqual(dto.kind, .userTokenInvalid)
+        XCTAssertTrue(dto.recoverable)
+    }
+
+    func test_onramperError_userTokenRefreshFailed() {
+        let dto = BridgeMappers.fromNative(OnramperError.userTokenRefreshFailed("expired"))
+        XCTAssertEqual(dto.kind, .userTokenRefreshFailed)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "expired")
+    }
+
+    func test_onramperError_webviewLoadFailed() {
+        let dto = BridgeMappers.fromNative(OnramperError.webviewLoadFailed("404"))
+        XCTAssertEqual(dto.kind, .webviewLoadFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "404")
+    }
+
+    func test_onramperError_deepLinkFailed() {
+        let dto = BridgeMappers.fromNative(OnramperError.deepLinkFailed("no app"))
+        XCTAssertEqual(dto.kind, .deepLinkFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "no app")
+    }
+
+    func test_onramperError_invalidRequest_carriesFieldAndDebug() {
+        let dto = BridgeMappers.fromNative(OnramperError.invalidRequest(field: "amount", debugInfo: "negative"))
+        XCTAssertEqual(dto.kind, .invalidRequest)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.field, "amount")
+        XCTAssertEqual(dto.debugInfo, "negative")
+    }
+
+    func test_onramperError_invalidRequest_nilsAllowed() {
+        let dto = BridgeMappers.fromNative(OnramperError.invalidRequest(field: nil, debugInfo: nil))
+        XCTAssertEqual(dto.kind, .invalidRequest)
+        XCTAssertNil(dto.field)
+        XCTAssertNil(dto.debugInfo)
+    }
+
+    func test_onramperError_quoteUnavailable() {
+        let dto = BridgeMappers.fromNative(OnramperError.quoteUnavailable(debugInfo: "no liquidity"))
+        XCTAssertEqual(dto.kind, .quoteUnavailable)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "no liquidity")
+    }
+
+    func test_onramperError_checkoutForbidden() {
+        let dto = BridgeMappers.fromNative(OnramperError.checkoutForbidden(debugInfo: "region"))
+        XCTAssertEqual(dto.kind, .checkoutForbidden)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "region")
+    }
+
+    func test_onramperError_temporaryFailure_carriesRetryAndDebug() {
+        let dto = BridgeMappers.fromNative(OnramperError.temporaryFailure(retryAfter: 30.0, debugInfo: "rate limit"))
+        XCTAssertEqual(dto.kind, .temporaryFailure)
+        XCTAssertTrue(dto.recoverable)
+        XCTAssertEqual(dto.retryAfterSeconds, 30.0)
+        XCTAssertEqual(dto.debugInfo, "rate limit")
+    }
+
+    func test_onramperError_unrecoverable() {
+        let dto = BridgeMappers.fromNative(OnramperError.unrecoverable(debugInfo: "fatal"))
+        XCTAssertEqual(dto.kind, .unrecoverable)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "fatal")
+    }
+
+    func test_onramperError_configurationError() {
+        let dto = BridgeMappers.fromNative(OnramperError.configurationError(reason: "missing apiKey"))
+        XCTAssertEqual(dto.kind, .configurationError)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.debugInfo, "missing apiKey")
+    }
+
+    func test_onramperError_deviceBlocked() {
+        let dto = BridgeMappers.fromNative(OnramperError.deviceBlocked)
+        XCTAssertEqual(dto.kind, .deviceBlocked)
+        XCTAssertFalse(dto.recoverable)
+    }
+
+    func test_onramperError_securityStorageFailed_carriesCode() {
+        let dto = BridgeMappers.fromNative(OnramperError.securityStorageFailed(status: -25300))
+        XCTAssertEqual(dto.kind, .securityStorageFailed)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertEqual(dto.code, -25300)
+    }
+
+    /// Iterates every native case to confirm each produces a non-empty
+    /// `message` and a defined `kind`. If a new case is added to
+    /// `OnramperError` without updating the mapper, this fixture array
+    /// will not type-check and force the addition.
+    func test_onramperError_allCases_produceNonEmptyMessage() {
+        let fixtures: [OnramperError] = [
+            .notInitialized,
+            .initializationFailed("x"),
+            .attestationFailed("x"),
+            .invalidStateTransition(from: "a", to: "b"),
+            .invalidState(expected: "a", actual: "b"),
+            .networkError(code: 500, message: "x"),
+            .decodingError("x"),
+            .timeout,
+            .requirementNotSatisfied("x"),
+            .amountOutOfRange(min: 1, max: 2),
+            .oidcFlowCancelled,
+            .oidcTokenExchangeFailed("x"),
+            .oidcFlowFailed("x"),
+            .userTokenInvalid,
+            .userTokenRefreshFailed("x"),
+            .webviewLoadFailed("x"),
+            .deepLinkFailed("x"),
+            .invalidRequest(field: nil, debugInfo: nil),
+            .quoteUnavailable(debugInfo: nil),
+            .checkoutForbidden(debugInfo: nil),
+            .temporaryFailure(retryAfter: nil, debugInfo: nil),
+            .unrecoverable(debugInfo: nil),
+            .configurationError(reason: "x"),
+            .deviceBlocked,
+            .securityStorageFailed(status: -1),
+        ]
+
+        XCTAssertEqual(fixtures.count, 25)
+        for native in fixtures {
+            let dto = BridgeMappers.fromNative(native)
+            XCTAssertFalse(dto.message.isEmpty, "Empty message for native case: \(native)")
+        }
+    }
 }
