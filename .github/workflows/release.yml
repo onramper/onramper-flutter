@@ -1,0 +1,39 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Plugin version (e.g. 1.0.0 or 1.0.0+1)'
+        required: true
+
+jobs:
+  release:
+    runs-on: macos-14
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - run: git lfs pull
+      - name: Update pubspec version
+        run: |
+          sed -i '' "s/^version:.*/version: ${VERSION}/" pubspec.yaml
+      - name: Update podspec version
+        run: |
+          sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_sdk.podspec
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions'
+          git config user.email 'actions@github.com'
+      - name: Commit + tag
+        run: |
+          git commit -am "chore: release v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin master "v${VERSION}"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          generate_release_notes: true

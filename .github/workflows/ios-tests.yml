@@ -1,0 +1,21 @@
+name: ios-tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  pod-lib-lint:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - run: git lfs pull
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+      - run: flutter pub get
+      - run: pod lib lint ios/onramper_sdk.podspec --allow-warnings
