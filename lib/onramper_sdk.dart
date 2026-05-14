@@ -12,3 +12,5 @@ export 'src/models/quote.dart';
 export 'src/models/requirements.dart';
 export 'src/models/state.dart';
 export 'src/onramper_client.dart' show OnramperClient, SessionExpirationHandler;
+export 'src/widget/checkout_button.dart';
+export 'src/widget/checkout_button_style.dart';
