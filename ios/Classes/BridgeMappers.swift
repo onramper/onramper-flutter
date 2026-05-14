@@ -52,4 +52,24 @@ enum BridgeMappers {
         case .trace:   return .debug
         }
     }
+
+    // MARK: - Quote (Swift -> Dart)
+
+    static func fromNative(_ native: QuoteResponse) -> QuoteDto {
+        QuoteDto(
+            quoteId: native.quoteId,
+            ramp: native.ramp,
+            rate: native.rate,
+            networkFee: native.networkFee,
+            transactionFee: native.transactionFee,
+            payout: native.payout,
+            paymentMethod: native.paymentMethod,
+            recommendations: native.recommendations,
+            errors: native.errors?.map(fromNative)
+        )
+    }
+
+    static func fromNative(_ native: QuoteError) -> QuoteErrorDto {
+        QuoteErrorDto(type: native.type, message: native.message)
+    }
 }
