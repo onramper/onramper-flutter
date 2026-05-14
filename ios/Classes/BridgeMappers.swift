@@ -72,4 +72,40 @@ enum BridgeMappers {
     static func fromNative(_ native: QuoteError) -> QuoteErrorDto {
         QuoteErrorDto(type: native.type, message: native.message)
     }
+
+    // MARK: - CheckoutIntentRequest inputs (Dart -> Swift)
+
+    static func toNative(_ dto: CheckoutIntentRequestDto) -> CheckoutIntentRequest {
+        CheckoutIntentRequest(
+            onramperTransactionData: toNative(dto.transactionData),
+            onlyOnramps: dto.onlyOnramps
+        )
+    }
+
+    static func toNative(_ dto: OnramperTransactionDataDto) -> OnramperTransactionData {
+        // Pass values through unchanged; `OnramperTransactionData.init`
+        // lowercases source/destination/country/subdivision itself.
+        OnramperTransactionData(
+            onramp: dto.onramp,
+            source: dto.source,
+            destination: dto.destination,
+            amount: dto.amount,
+            type: toNative(dto.type),
+            country: dto.country,
+            subdivision: dto.subdivision,
+            paymentMethod: dto.paymentMethod,
+            wallet: toNative(dto.wallet)
+        )
+    }
+
+    static func toNative(_ dto: WalletInfoDto) -> WalletInfo {
+        WalletInfo(network: dto.network, address: dto.address, memo: dto.memo)
+    }
+
+    static func toNative(_ dto: TransactionTypeDto) -> TransactionType {
+        switch dto {
+        case .buy:  return .buy
+        case .sell: return .sell
+        }
+    }
 }

@@ -109,4 +109,120 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(dto.type, "x")
         XCTAssertEqual(dto.message, "y")
     }
+
+    // MARK: - CheckoutIntentRequest inputs (Dart -> Swift)
+
+    func test_transactionTypeDto_toNative_buy() {
+        XCTAssertEqual(BridgeMappers.toNative(TransactionTypeDto.buy), TransactionType.buy)
+    }
+
+    func test_transactionTypeDto_toNative_sell() {
+        XCTAssertEqual(BridgeMappers.toNative(TransactionTypeDto.sell), TransactionType.sell)
+    }
+
+    func test_walletInfoDto_toNative_allFields() {
+        let dto = WalletInfoDto(network: "ethereum", address: "0xabc", memo: "tag-1")
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertEqual(native.network, "ethereum")
+        XCTAssertEqual(native.address, "0xabc")
+        XCTAssertEqual(native.memo, "tag-1")
+    }
+
+    func test_walletInfoDto_toNative_nilMemo() {
+        let dto = WalletInfoDto(network: "bitcoin", address: "bc1q", memo: nil)
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertNil(native.memo)
+    }
+
+    func test_onramperTransactionDataDto_toNative_allFields() {
+        let dto = OnramperTransactionDataDto(
+            onramp: "moonpay",
+            source: "USD",
+            amount: 100.0,
+            type: .buy,
+            paymentMethod: "credit_card",
+            wallet: WalletInfoDto(network: "ethereum", address: "0xabc", memo: nil),
+            destination: "BTC",
+            country: "US",
+            subdivision: "US-CA"
+        )
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertEqual(native.onramp, "moonpay")
+        // Native init lowercases source/destination/country/subdivision; the
+        // mapper does not pre-lowercase.
+        XCTAssertEqual(native.source, "usd")
+        XCTAssertEqual(native.destination, "btc")
+        XCTAssertEqual(native.amount, 100.0)
+        XCTAssertEqual(native.type, .buy)
+        XCTAssertEqual(native.country, "us")
+        XCTAssertEqual(native.subdivision, "us-ca")
+        XCTAssertEqual(native.paymentMethod, "credit_card")
+        XCTAssertEqual(native.wallet.network, "ethereum")
+        XCTAssertEqual(native.wallet.address, "0xabc")
+    }
+
+    func test_onramperTransactionDataDto_toNative_optionalsNil() {
+        let dto = OnramperTransactionDataDto(
+            onramp: "x",
+            source: "usd",
+            amount: 1.0,
+            type: .sell,
+            paymentMethod: "pm",
+            wallet: WalletInfoDto(network: "n", address: "a", memo: nil),
+            destination: nil,
+            country: nil,
+            subdivision: nil
+        )
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertNil(native.destination)
+        XCTAssertNil(native.country)
+        XCTAssertNil(native.subdivision)
+        XCTAssertEqual(native.type, .sell)
+    }
+
+    func test_checkoutIntentRequestDto_toNative_passesThroughOnlyOnramps() {
+        let dto = CheckoutIntentRequestDto(
+            transactionData: OnramperTransactionDataDto(
+                onramp: "moonpay",
+                source: "usd",
+                amount: 50.0,
+                type: .buy,
+                paymentMethod: "pm",
+                wallet: WalletInfoDto(network: "ethereum", address: "0x", memo: nil)
+            ),
+            onlyOnramps: ["moonpay", "transak"]
+        )
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertEqual(native.onlyOnramps, ["moonpay", "transak"])
+        XCTAssertEqual(native.onramperTransactionData.onramp, "moonpay")
+        XCTAssertEqual(native.onramperTransactionData.amount, 50.0)
+    }
+
+    func test_checkoutIntentRequestDto_toNative_nilOnlyOnramps() {
+        let dto = CheckoutIntentRequestDto(
+            transactionData: OnramperTransactionDataDto(
+                onramp: "x",
+                source: "usd",
+                amount: 1.0,
+                type: .buy,
+                paymentMethod: "pm",
+                wallet: WalletInfoDto(network: "n", address: "a", memo: nil)
+            ),
+            onlyOnramps: nil
+        )
+
+        let native = BridgeMappers.toNative(dto)
+
+        XCTAssertNil(native.onlyOnramps)
+    }
 }
