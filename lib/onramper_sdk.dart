@@ -11,3 +11,4 @@ export 'src/models/events.dart';
 export 'src/models/quote.dart';
 export 'src/models/requirements.dart';
 export 'src/models/state.dart';
+export 'src/onramper_client.dart' show OnramperClient, SessionExpirationHandler;
