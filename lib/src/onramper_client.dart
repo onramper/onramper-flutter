@@ -61,6 +61,16 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
         sessionExpirationHandler: sessionExpirationHandler,
       );
 
+  /// Required by `dartPluginClass: OnramperClient` in `pubspec.yaml`.
+  ///
+  /// Flutter's generated `dart_plugin_registrant` calls this on app start.
+  /// The SDK uses Pigeon-generated channels that wire themselves up on first
+  /// use, so there's nothing to register here — this entry point exists
+  /// solely to satisfy the Flutter plugin contract.
+  static void registerWith() {
+    // No-op: Pigeon channels are configured per-client in `_OnramperClient._`.
+  }
+
   OnramperClient._({
     required OnramperConfiguration configuration,
     required OnramperHostApi hostApi,
