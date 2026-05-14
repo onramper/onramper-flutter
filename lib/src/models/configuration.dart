@@ -1,5 +1,20 @@
 import '../platform/pigeon.g.dart';
 
+/// Session credentials returned by the partner backend, used to bootstrap and
+/// later refresh an SDK session.
+///
+/// Returned by [SessionExpirationHandler] when the native SDK requests a fresh
+/// session, and passed to [OnramperClient.initialize] for the initial handshake.
+class SessionCredentials {
+  const SessionCredentials({
+    required this.sessionId,
+    required this.sessionToken,
+  });
+
+  final String sessionId;
+  final String sessionToken;
+}
+
 /// Runtime environment the SDK targets.
 enum OnramperEnvironment { development, production }
 
