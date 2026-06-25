@@ -1,4 +1,5 @@
 import Flutter
+import SwiftUI
 import UIKit
 import OnramperSDK
 
@@ -129,6 +130,12 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // Task is not deallocated. Cleared by the presenter's `onDismissed` hook
     // (terminal event) or by `dispose(...)`.
     var activeCheckoutPresenter: PluginCheckoutPresenter?
+
+    // Captures the native SwiftUI `OnramperCheckoutButton` returned by the most
+    // recent `getCheckoutRequirements` call so `presentCheckout` can host it
+    // directly. Its `init` is internal, but the SDK constructs it for us inside
+    // `getCheckoutRequirements`. Cleared on reset / dispose.
+    var capturedCheckoutButton: OnramperCheckoutButton?
 
     // `FlutterPlugin.register(with:)` is invoked on the main thread by
     // Flutter's plugin registry. It's declared `nonisolated` because the
@@ -284,11 +291,12 @@ extension OnramperSdkPlugin: OnramperHostApi {
             defer { self.inFlightRequirements = nil }
             do {
                 // `getCheckoutRequirements` is UIKit-gated and returns a
-                // SwiftUI button + quote. We use it (rather than
-                // `prepareCheckout`) because it surfaces the quote we need
-                // for the DTO. The button is discarded — Task 7 will present
-                // checkout via a different path.
+                // SwiftUI button + quote. We keep both: the button is the
+                // native, pre-wired UI that `presentCheckout` hosts (its
+                // internal init is unreachable from us, but the SDK
+                // constructs it on this call); the quote populates the DTO.
                 let result = try await client.getCheckoutRequirements(nativeRequest)
+                self.capturedCheckoutButton = result.button
 
                 guard let headlessId = collector.headlessCheckoutId else {
                     // No `didStartCheckout` delegate call observed during
@@ -326,12 +334,19 @@ extension OnramperSdkPlugin: OnramperHostApi {
             completion(.failure(PluginError.notConfigured.asPigeonError))
             return
         }
+        guard let button = capturedCheckoutButton else {
+            completion(.failure(
+                PluginError.missingResponse("call getCheckoutRequirements before presentCheckout")
+                    .asPigeonError
+            ))
+            return
+        }
         Task { @MainActor in
             guard let root = Self.findRootViewController() else {
                 completion(.failure(PluginError.noRootViewController.asPigeonError))
                 return
             }
-            let presenter = PluginCheckoutPresenter(client: client)
+            let presenter = PluginCheckoutPresenter(client: client, content: AnyView(button))
             // Drop the strong reference once the modal dismisses (terminal
             // event). Capture `self` weakly so an in-flight dismissal does
             // not extend plugin lifetime.
@@ -351,6 +366,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
         let client = self.client
         Task { @MainActor in
             await client?.reset()
+            self.capturedCheckoutButton = nil
             completion(.success(()))
         }
     }
@@ -363,6 +379,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
             self.client = nil
             self.inFlightRequirements = nil
             self.activeCheckoutPresenter = nil
+            self.capturedCheckoutButton = nil
             completion(.success(()))
         }
     }

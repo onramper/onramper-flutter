@@ -32,7 +32,7 @@ final class PluginCheckoutPresenterTests: XCTestCase {
             logLevel: .off
         ))
         let client = try XCTUnwrap(plugin.testClient(), "configure should create a client")
-        _ = PluginCheckoutPresenter(client: client)
+        _ = PluginCheckoutPresenter(client: client, content: AnyView(EmptyView()))
     }
 
     func test_present_attachesModalToParent() async throws {
@@ -55,7 +55,7 @@ final class PluginCheckoutPresenterTests: XCTestCase {
         // no-op because the window has no scene attachment.
         window.makeKeyAndVisible()
 
-        let presenter = PluginCheckoutPresenter(client: client)
+        let presenter = PluginCheckoutPresenter(client: client, content: AnyView(EmptyView()))
         presenter.present(from: parent)
 
         // `present(_:animated:)` schedules the transition on the next runloop
@@ -67,8 +67,8 @@ final class PluginCheckoutPresenterTests: XCTestCase {
         await fulfillment(of: [exp], timeout: 1.0)
 
         XCTAssertNotNil(parent.presentedViewController, "expected a modal to be presented over the parent")
-        XCTAssertTrue(parent.presentedViewController is UIHostingController<OnramperCheckoutView>,
-                      "expected a UIHostingController hosting OnramperCheckoutView")
+        XCTAssertTrue(parent.presentedViewController is UIHostingController<AnyView>,
+                      "expected a UIHostingController hosting the provided content")
     }
 }
 #endif

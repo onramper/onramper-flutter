@@ -92,6 +92,22 @@ enum CheckoutRequirementKind { tos, amountLimit, userInfo }
 /// Specific Terms of Service style document the user must accept.
 enum TosItemType { tos, privacyPolicy, userAgreement }
 
+/// Human-readable label for a [TosItemType]. Mirrors native
+/// `ToSPresentation.displayName` in OnramperSDK so Dart rendering matches the
+/// iOS SDK's wording 1:1.
+extension TosItemTypeDisplayName on TosItemType {
+  String get displayName {
+    switch (this) {
+      case TosItemType.tos:
+        return 'Terms of Service';
+      case TosItemType.privacyPolicy:
+        return 'Privacy Policy';
+      case TosItemType.userAgreement:
+        return 'User Agreement';
+    }
+  }
+}
+
 /// Identity / KYC fields that may be required before checkout.
 enum UserInfoFieldType {
   firstName,

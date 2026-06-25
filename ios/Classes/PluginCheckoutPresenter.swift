@@ -18,25 +18,26 @@ import OnramperSDK
 @MainActor
 final class PluginCheckoutPresenter {
     private let client: OnramperClient
+    private let content: AnyView
     private weak var presentedHost: UIViewController?
     private var dismissTask: Task<Void, Never>?
     /// Optional hook invoked after the modal has been dismissed in response to
     /// a terminal event. Used by the plugin to drop its strong reference.
     var onDismissed: (@MainActor () -> Void)?
 
-    init(client: OnramperClient) {
+    init(client: OnramperClient, content: AnyView) {
         self.client = client
+        self.content = content
     }
 
-    /// Presents the native checkout view modally over `parent` (typically the
-    /// Flutter app's root view controller). Subscribes to `client.events` and
-    /// auto-dismisses on `.completed` or `.failed`. There is no native
-    /// `closed` event, so user-initiated dismissal (swipe-down on a non-
-    /// fullScreen sheet) is not currently bridged — we present fullScreen to
-    /// keep the contract explicit: native owns the modal until terminal.
+    /// Presents `content` modally over `parent` (typically the Flutter app's
+    /// root view controller). Subscribes to `client.events` and auto-dismisses
+    /// on `.completed` or `.failed`. There is no native `closed` event, so
+    /// user-initiated dismissal (swipe-down on a non-fullScreen sheet) is not
+    /// currently bridged — we present fullScreen to keep the contract
+    /// explicit: native owns the modal until terminal.
     func present(from parent: UIViewController) {
-        let checkoutView = OnramperCheckoutView(sdk: client)
-        let host = UIHostingController(rootView: checkoutView)
+        let host = UIHostingController(rootView: content)
         host.modalPresentationStyle = .fullScreen
         parent.present(host, animated: true)
         presentedHost = host

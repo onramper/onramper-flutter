@@ -9,8 +9,7 @@ import 'package:onramper_sdk/onramper_sdk.dart';
 /// native iOS demo uses (see `oid-ios-demo/SessionTokenService.swift`). The
 /// bearer token is injected at build time via `--dart-define`, never hard-coded.
 class SessionTokenService {
-  static const _endpoint =
-      'https://demo-stg.onramper.dev/demo/create-session';
+  static const _endpoint = 'https://demo-stg.onramper.dev/demo/create-session';
 
   static Future<SessionCredentials> fetch({required String authToken}) async {
     if (authToken.isEmpty) {
@@ -32,7 +31,7 @@ class SessionTokenService {
       },
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode != 201) {
       throw HttpException(
         'create-session ${response.statusCode}: ${response.body}',
       );

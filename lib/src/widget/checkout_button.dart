@@ -92,14 +92,9 @@ class _OnramperCheckoutButtonState extends State<OnramperCheckoutButton> {
     );
   }
 
-  List<TosItem> get _tosItems {
-    return widget.requirements.tos
-        .expand((req) => req.items)
-        .where((item) =>
-            (item.content?.isNotEmpty ?? false) ||
-            (item.url?.isNotEmpty ?? false))
-        .toList(growable: false);
-  }
+  List<TosItem> get _tosItems => widget.requirements.tos
+      .expand((req) => req.items.where((i) => i.required && !i.satisfied))
+      .toList(growable: false);
 
   bool _isBusy(OnramperStateKind kind) => switch (kind) {
         OnramperStateKind.checkoutPreparing ||
@@ -120,7 +115,7 @@ class _TosLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = item.content ?? item.url ?? '';
+    final label = item.type.displayName;
     final url = item.url;
     final defaultStyle = style.tosStyle ?? const TextStyle(fontSize: 12);
     final linkStyle = style.tosLinkStyle ??
