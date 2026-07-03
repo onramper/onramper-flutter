@@ -110,14 +110,6 @@ enum BridgeMappers {
 
     // MARK: - Checkout Requirements (Swift -> Dart)
 
-    static func fromNative(_ native: CheckoutIntentResponse) -> CheckoutRequirementsResultDto {
-        CheckoutRequirementsResultDto(
-            headlessCheckoutId: native.headlessCheckoutId,
-            requirements: native.checkoutRequirements.map(fromNative),
-            quote: fromNative(native.quote)
-        )
-    }
-
     static func fromNative(_ native: CheckoutRequirement) -> CheckoutRequirementDto {
         switch native {
         case .tos(let r):
