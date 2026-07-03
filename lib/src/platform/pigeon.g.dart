@@ -1100,6 +1100,30 @@ class OnramperHostApi {
     }
   }
 
+  /// Programmatically starts checkout — equivalent to tapping the Buy button.
+  /// Only valid in readyToCheckout state.
+  Future<void> autoCheckout() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.autoCheckout$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
   Future<void> reset() async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(

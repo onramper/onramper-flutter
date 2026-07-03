@@ -1,7 +1,4 @@
-import 'package:flutter/widgets.dart';
-
 import '../platform/pigeon.g.dart';
-import '../widget/native_checkout_button.dart';
 import 'quote.dart';
 
 // ---------------------------------------------------------------------------
@@ -290,11 +287,6 @@ class CheckoutRequirementsResult {
 
   /// Opaque handle for the native checkout button stored in the platform registry.
   final String buttonHandle;
-
-  /// The native `OnramperCheckoutButton` embedded directly in the Flutter widget
-  /// tree via a platform view. Drop this into your layout — no `presentCheckout()`
-  /// call needed. The button handles the full flow: OIDC login, finalize, payment.
-  Widget get button => OnramperNativeCheckoutButton(buttonHandle: buttonHandle);
 
   /// Convenience: only the ToS requirements (if any).
   List<TosRequirement> get tos => requirements

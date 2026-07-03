@@ -61,6 +61,7 @@ void main() {
           headlessCheckoutId: 'co_123',
           requirements: const [],
           quote: QuoteDto(rate: 0.000017, payout: 0.000017),
+          buttonHandle: 'btn-handle-1',
         );
       final client = OnramperClient.forTesting(
         configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
@@ -68,7 +69,7 @@ void main() {
       );
       final result = await client.getCheckoutRequirements(const CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          onramp: 'transak', source: 'usd', amount: 100, type: TransactionType.buy,
+          source: 'usd', amount: 100, type: TransactionType.buy,
           paymentMethod: 'credit_debit_card',
           wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
         ),
@@ -198,11 +199,12 @@ class FakeOnramperHostApi implements OnramperHostApi {
           headlessCheckoutId: 'stub',
           requirements: const [],
           quote: QuoteDto(),
+          buttonHandle: 'stub-handle',
         );
   }
 
   @override
-  Future<void> presentCheckout() async {}
+  Future<void> autoCheckout() async {}
 
   @override
   Future<void> reset() async {}

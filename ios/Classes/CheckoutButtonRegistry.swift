@@ -17,7 +17,8 @@ actor CheckoutButtonRegistry {
     }
 
     func consume(_ handle: String) -> AnyView? {
-        entries[handle]
+        // Remove on consume so the view is not retained after the platform view claims it.
+        return entries.removeValue(forKey: handle)
     }
 
     func drop(_ handle: String) {

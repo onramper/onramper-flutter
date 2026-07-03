@@ -23,7 +23,6 @@ void main() {
   group('OnramperTransactionData.toDto', () {
     test('round-trips all fields and maps TransactionType', () {
       const data = OnramperTransactionData(
-        onramp: 'moonpay',
         source: 'USD',
         amount: 100.0,
         type: TransactionType.buy,
@@ -35,7 +34,6 @@ void main() {
       );
 
       final dto = data.toDto();
-      expect(dto.onramp, 'moonpay');
       expect(dto.source, 'USD');
       expect(dto.amount, 100.0);
       expect(dto.type, TransactionTypeDto.buy);
@@ -48,7 +46,6 @@ void main() {
 
     test('sell type maps to TransactionTypeDto.sell', () {
       const data = OnramperTransactionData(
-        onramp: 'm',
         source: 's',
         amount: 1.0,
         type: TransactionType.sell,
@@ -63,7 +60,6 @@ void main() {
     test('passes through transactionData and onlyOnramps', () {
       const req = CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          onramp: 'mp',
           source: 'USD',
           amount: 50,
           type: TransactionType.buy,
@@ -74,14 +70,12 @@ void main() {
       );
 
       final dto = req.toDto();
-      expect(dto.transactionData.onramp, 'mp');
       expect(dto.onlyOnramps, <String>['moonpay', 'transak']);
     });
 
     test('onlyOnramps null is preserved', () {
       const req = CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          onramp: 'mp',
           source: 'USD',
           amount: 50,
           type: TransactionType.buy,
@@ -285,6 +279,7 @@ void main() {
           ),
         ],
         quote: QuoteDto(quoteId: 'q'),
+        buttonHandle: 'handle-1',
       );
 
       final r = CheckoutRequirementsResult.fromDto(dto);
@@ -293,6 +288,7 @@ void main() {
       expect(r.requirements, hasLength(2));
       expect(r.quote, isA<QuoteResponse>());
       expect(r.quote.quoteId, 'q');
+      expect(r.buttonHandle, 'handle-1');
     });
 
     test('tos convenience getter filters non-tos and missing payloads', () {
@@ -313,6 +309,7 @@ void main() {
           ),
         ],
         quote: QuoteDto(),
+        buttonHandle: 'handle-2',
       );
 
       final r = CheckoutRequirementsResult.fromDto(dto);

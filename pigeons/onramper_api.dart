@@ -347,6 +347,10 @@ abstract class OnramperHostApi {
   void initialize(SessionCredentialsDto credentials);
   @async
   CheckoutRequirementsResultDto getCheckoutRequirements(CheckoutIntentRequestDto request);
+  /// Programmatically starts checkout — equivalent to tapping the Buy button.
+  /// Only valid in readyToCheckout state.
+  @async
+  void autoCheckout();
   @async
   void reset();
   @async

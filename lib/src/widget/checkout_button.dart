@@ -112,3 +112,20 @@ class _TosLine extends StatelessWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
+
+/// Convenience extension that gives [CheckoutRequirementsResult] a `button`
+/// getter in widget-aware code without coupling the models layer to Flutter UI.
+///
+/// Usage:
+/// ```dart
+/// import 'package:onramper_sdk/src/widget/checkout_button.dart';
+/// // ...
+/// final widget = result.button; // returns OnramperNativeCheckoutButton
+/// ```
+extension CheckoutRequirementsResultWidget on CheckoutRequirementsResult {
+  /// The native `OnramperCheckoutButton` embedded directly in the Flutter
+  /// widget tree via a platform view. Drop this into your layout — no
+  /// `presentCheckout()` call needed. The button handles the full checkout
+  /// flow: OIDC login, finalize, payment.
+  Widget get button => OnramperNativeCheckoutButton(buttonHandle: buttonHandle);
+}

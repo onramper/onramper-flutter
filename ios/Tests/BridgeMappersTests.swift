@@ -477,9 +477,13 @@ final class BridgeMappersTests: XCTestCase {
     }
 
     // MARK: - CheckoutEvent (Swift -> Dart)
+    //
+    // fromNative returns CheckoutEventDto? — nil for provider lifecycle events
+    // that have no Pigeon DTO representation. All tests below force-unwrap
+    // because the tested cases must produce a non-nil result.
 
     func test_checkoutEvent_fromNative_stateChanged() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.stateChanged(.ready))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.stateChanged(.ready))!
 
         XCTAssertEqual(dto.kind, .stateChanged)
         XCTAssertEqual(dto.state?.kind, .ready)
@@ -491,7 +495,7 @@ final class BridgeMappersTests: XCTestCase {
     }
 
     func test_checkoutEvent_fromNative_checkoutStarted() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutStarted("co_abc"))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutStarted("co_abc"))!
 
         XCTAssertEqual(dto.kind, .checkoutStarted)
         XCTAssertEqual(dto.checkoutId, "co_abc")
@@ -501,7 +505,7 @@ final class BridgeMappersTests: XCTestCase {
     func test_checkoutEvent_fromNative_loginRequired() {
         let reqs: [CheckoutRequirement] = [.userInfo(UserInfoRequirement(providerId: "p", fields: []))]
 
-        let dto = BridgeMappers.fromNative(CheckoutEvent.loginRequired(reqs))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.loginRequired(reqs))!
 
         XCTAssertEqual(dto.kind, .loginRequired)
         XCTAssertEqual(dto.loginRequirements?.count, 1)
@@ -509,7 +513,7 @@ final class BridgeMappersTests: XCTestCase {
     }
 
     func test_checkoutEvent_fromNative_readyToCheckout() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.readyToCheckout)
+        let dto = BridgeMappers.fromNative(CheckoutEvent.readyToCheckout)!
 
         XCTAssertEqual(dto.kind, .readyToCheckout)
         XCTAssertNil(dto.state)
@@ -517,7 +521,7 @@ final class BridgeMappersTests: XCTestCase {
     }
 
     func test_checkoutEvent_fromNative_requirementSatisfied() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.requirementSatisfied(.amountLimit))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.requirementSatisfied(.amountLimit))!
 
         XCTAssertEqual(dto.kind, .requirementSatisfied)
         XCTAssertEqual(dto.requirementType, .amountLimit)
@@ -533,7 +537,7 @@ final class BridgeMappersTests: XCTestCase {
             )
         )
 
-        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutFinalized(response))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.checkoutFinalized(response))!
 
         XCTAssertEqual(dto.kind, .checkoutFinalized)
         XCTAssertEqual(dto.checkoutId, "co_xyz")
@@ -548,7 +552,7 @@ final class BridgeMappersTests: XCTestCase {
                 url: URL(string: "https://render.example.com")!,
                 renderType: .webview
             )
-        )
+        )!
 
         XCTAssertEqual(dto.kind, .renderingStarted)
         XCTAssertEqual(dto.renderContext?.url, "https://render.example.com")
@@ -557,17 +561,28 @@ final class BridgeMappersTests: XCTestCase {
     }
 
     func test_checkoutEvent_fromNative_completed() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.completed(checkoutId: "co_done"))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.completed(checkoutId: "co_done"))!
 
         XCTAssertEqual(dto.kind, .completed)
         XCTAssertEqual(dto.checkoutId, "co_done")
     }
 
     func test_checkoutEvent_fromNative_failed() {
-        let dto = BridgeMappers.fromNative(CheckoutEvent.failed(.deviceBlocked))
+        let dto = BridgeMappers.fromNative(CheckoutEvent.failed(.deviceBlocked))!
 
         XCTAssertEqual(dto.kind, .failed)
         XCTAssertEqual(dto.error?.kind, .deviceBlocked)
+    }
+
+    func test_checkoutEvent_fromNative_providerLifecycleEvents_returnNil() {
+        // Provider lifecycle events have no Pigeon DTO yet and must return nil
+        // so the call site in OnramperSdkPlugin can skip forwarding them to Dart.
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.checkoutCancelled))
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.providerReady))
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.paymentAuthorized))
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.paymentProcessing))
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.paymentCancelled))
+        XCTAssertNil(BridgeMappers.fromNative(CheckoutEvent.providerError))
     }
 
     // MARK: - OnramperError (Swift -> Dart)
@@ -756,6 +771,14 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(dto.code, -25300)
     }
 
+    func test_onramperError_securityTrustFailed_mapsToUnrecoverableWithHost() {
+        let dto = BridgeMappers.fromNative(OnramperError.securityTrustFailed(host: "api.example.com"))
+        XCTAssertEqual(dto.kind, .unrecoverable)
+        XCTAssertFalse(dto.recoverable)
+        XCTAssertTrue(dto.debugInfo?.contains("api.example.com") ?? false,
+                      "debugInfo should include the host; got: \(dto.debugInfo ?? "nil")")
+    }
+
     /// Iterates every native case to confirm each produces a non-empty
     /// `message` and a defined `kind`. If a new case is added to
     /// `OnramperError` without updating the mapper, this fixture array
@@ -787,9 +810,10 @@ final class BridgeMappersTests: XCTestCase {
             .configurationError(reason: "x"),
             .deviceBlocked,
             .securityStorageFailed(status: -1),
+            .securityTrustFailed(host: "example.com"),
         ]
 
-        XCTAssertEqual(fixtures.count, 25)
+        XCTAssertEqual(fixtures.count, 26)
         for native in fixtures {
             let dto = BridgeMappers.fromNative(native)
             XCTAssertFalse(dto.message.isEmpty, "Empty message for native case: \(native)")

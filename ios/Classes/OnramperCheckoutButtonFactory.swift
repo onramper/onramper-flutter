@@ -83,6 +83,15 @@ private final class CheckoutButtonContainerView: UIView {
             hc.view.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         hostingController = hc
+        // Race guard: if the view entered a window before mountButton() completed,
+        // willMove(toWindow:) fired without a hostingController and couldn't attach.
+        // Attach now if we are already in a window.
+        if let currentWindow = window,
+           let parent = currentWindow.rootViewController?.topMostPresentedViewController(),
+           hc.parent == nil {
+            parent.addChild(hc)
+            hc.didMove(toParent: parent)
+        }
     }
 
     override func willMove(toWindow newWindow: UIWindow?) {
@@ -90,7 +99,9 @@ private final class CheckoutButtonContainerView: UIView {
         guard let hc = hostingController else { return }
         if newWindow != nil {
             // Attach to nearest VC so sheets can present over the app.
-            if let parent = newWindow?.rootViewController?.topMostPresentedViewController() {
+            // Guard against double-attachment in case mountButton() already attached.
+            if hc.parent == nil,
+               let parent = newWindow?.rootViewController?.topMostPresentedViewController() {
                 parent.addChild(hc)
                 hc.didMove(toParent: parent)
             }

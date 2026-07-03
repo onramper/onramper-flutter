@@ -15,8 +15,6 @@ enum PluginError: Error {
     /// The native SDK produced no usable response (e.g. swallowed a
     /// `CheckoutIntentResponse` we needed to assemble a DTO).
     case missingResponse(String)
-    /// `presentCheckout()` could not locate a host `UIViewController` to
-    /// present the native modal from (no key window / no root).
     /// Maps to PigeonError so Dart receives a stable code/message pair
     /// instead of `String(describing:)` of the enum case.
     var asPigeonError: PigeonError {
@@ -190,8 +188,11 @@ extension OnramperSdkPlugin: OnramperHostApi {
         let api = self.flutterApi
         eventForwardingTask = Task { @MainActor [weak self] in
             for await event in newClient.events {
-                let dto = BridgeMappers.fromNative(event)
-                api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
+                // fromNative returns nil for provider lifecycle events that
+                // have no Pigeon DTO yet — skip forwarding those to Dart.
+                if let dto = BridgeMappers.fromNative(event) {
+                    api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
+                }
                 self?.observeEventForRequirementsCollector(event)
             }
         }
@@ -268,7 +269,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // Store the button in the registry and hand the handle to Dart so
                 // OnramperNativeCheckoutButton can look it up via the platform view.
                 if let prev = self.lastButtonHandle {
-                    Task { await CheckoutButtonRegistry.shared.drop(prev) }
+                    await CheckoutButtonRegistry.shared.drop(prev)
                 }
                 let handle = await CheckoutButtonRegistry.shared.store(result.button)
                 self.lastButtonHandle = handle
@@ -289,6 +290,25 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     buttonHandle: handle
                 )
                 completion(.success(dto))
+            } catch let onramperError as OnramperError {
+                let errDto = BridgeMappers.fromNative(onramperError)
+                self.flutterApi?.onError(error: errDto) { _ in }
+                completion(.failure(PigeonError(code: "onramper_error", message: errDto.message, details: nil)))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func autoCheckout(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let client else {
+            completion(.failure(PluginError.notConfigured.asPigeonError))
+            return
+        }
+        Task { @MainActor in
+            do {
+                _ = try await client.finalizeAndRender()
+                completion(.success(()))
             } catch let onramperError as OnramperError {
                 let errDto = BridgeMappers.fromNative(onramperError)
                 self.flutterApi?.onError(error: errDto) { _ in }

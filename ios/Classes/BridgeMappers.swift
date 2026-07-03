@@ -260,7 +260,13 @@ enum BridgeMappers {
 
     // MARK: - CheckoutEvent (Swift -> Dart)
 
-    static func fromNative(_ native: CheckoutEvent) -> CheckoutEventDto {
+    /// Maps a native `CheckoutEvent` to its Pigeon DTO.
+    ///
+    /// Returns `nil` for provider lifecycle events (`checkoutCancelled`,
+    /// `providerReady`, `paymentAuthorized`, `paymentProcessing`,
+    /// `paymentCancelled`, `providerError`) that have no Pigeon DTO
+    /// representation yet. Call sites must skip `nil` results.
+    static func fromNative(_ native: CheckoutEvent) -> CheckoutEventDto? {
         switch native {
         case .stateChanged(let state):
             return CheckoutEventDto(kind: .stateChanged, state: fromNative(state))
@@ -300,10 +306,11 @@ enum BridgeMappers {
             return CheckoutEventDto(kind: .completed, checkoutId: checkoutId)
         case .failed(let err):
             return CheckoutEventDto(kind: .failed, error: fromNative(err))
-        // Provider lifecycle events not yet in the Pigeon DTO — drop silently.
+        // Provider lifecycle events have no Pigeon DTO representation yet.
+        // Return nil so the call site can skip forwarding them to Dart.
         case .checkoutCancelled, .providerReady, .paymentAuthorized,
              .paymentProcessing, .paymentCancelled, .providerError:
-            return CheckoutEventDto(kind: .completed)
+            return nil
         }
     }
 
@@ -372,8 +379,8 @@ enum BridgeMappers {
             return OnramperErrorDto(kind: .deviceBlocked, message: message, recoverable: false)
         case .securityStorageFailed(let status):
             return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false, code: Int64(status))
-        case .securityTrustFailed:
-            return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false)
+        case .securityTrustFailed(let host):
+            return OnramperErrorDto(kind: .unrecoverable, message: message, recoverable: false, debugInfo: "securityTrustFailed: \(host)")
         }
     }
 }

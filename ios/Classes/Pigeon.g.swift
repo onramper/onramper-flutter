@@ -1029,6 +1029,9 @@ protocol OnramperHostApi {
   func configure(config: ConfigurationDto) throws
   func initialize(credentials: SessionCredentialsDto, completion: @escaping (Result<Void, Error>) -> Void)
   func getCheckoutRequirements(request: CheckoutIntentRequestDto, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
+  /// Programmatically starts checkout — equivalent to tapping the Buy button.
+  /// Only valid in readyToCheckout state.
+  func autoCheckout(completion: @escaping (Result<Void, Error>) -> Void)
   func reset(completion: @escaping (Result<Void, Error>) -> Void)
   func dispose(completion: @escaping (Result<Void, Error>) -> Void)
   func provideRefreshedSession(credentials: SessionCredentialsDto) throws
@@ -1089,6 +1092,23 @@ class OnramperHostApiSetup {
       }
     } else {
       getCheckoutRequirementsChannel.setMessageHandler(nil)
+    }
+    /// Programmatically starts checkout — equivalent to tapping the Buy button.
+    /// Only valid in readyToCheckout state.
+    let autoCheckoutChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.autoCheckout\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      autoCheckoutChannel.setMessageHandler { _, reply in
+        api.autoCheckout { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      autoCheckoutChannel.setMessageHandler(nil)
     }
     let resetChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
