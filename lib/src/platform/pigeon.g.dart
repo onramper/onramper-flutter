@@ -237,7 +237,6 @@ class WalletInfoDto {
 
 class OnramperTransactionDataDto {
   OnramperTransactionDataDto({
-    required this.onramp,
     required this.source,
     required this.amount,
     required this.type,
@@ -247,8 +246,6 @@ class OnramperTransactionDataDto {
     this.country,
     this.subdivision,
   });
-
-  String onramp;
 
   String source;
 
@@ -268,7 +265,6 @@ class OnramperTransactionDataDto {
 
   Object encode() {
     return <Object?>[
-      onramp,
       source,
       amount,
       type,
@@ -283,15 +279,14 @@ class OnramperTransactionDataDto {
   static OnramperTransactionDataDto decode(Object result) {
     result as List<Object?>;
     return OnramperTransactionDataDto(
-      onramp: result[0]! as String,
-      source: result[1]! as String,
-      amount: result[2]! as double,
-      type: result[3]! as TransactionTypeDto,
-      paymentMethod: result[4]! as String,
-      wallet: result[5]! as WalletInfoDto,
-      destination: result[6] as String?,
-      country: result[7] as String?,
-      subdivision: result[8] as String?,
+      source: result[0]! as String,
+      amount: result[1]! as double,
+      type: result[2]! as TransactionTypeDto,
+      paymentMethod: result[3]! as String,
+      wallet: result[4]! as WalletInfoDto,
+      destination: result[5] as String?,
+      country: result[6] as String?,
+      subdivision: result[7] as String?,
     );
   }
 }
@@ -605,6 +600,7 @@ class CheckoutRequirementsResultDto {
     required this.headlessCheckoutId,
     required this.requirements,
     required this.quote,
+    required this.buttonHandle,
   });
 
   String headlessCheckoutId;
@@ -613,11 +609,16 @@ class CheckoutRequirementsResultDto {
 
   QuoteDto quote;
 
+  /// Opaque handle used to look up the native OnramperCheckoutButton in the
+  /// platform-view registry. Pass to OnramperNativeCheckoutButton.
+  String buttonHandle;
+
   Object encode() {
     return <Object?>[
       headlessCheckoutId,
       requirements,
       quote,
+      buttonHandle,
     ];
   }
 
@@ -627,6 +628,7 @@ class CheckoutRequirementsResultDto {
       headlessCheckoutId: result[0]! as String,
       requirements: (result[1] as List<Object?>?)!.cast<CheckoutRequirementDto>(),
       quote: result[2]! as QuoteDto,
+      buttonHandle: result[3]! as String,
     );
   }
 }
@@ -1095,28 +1097,6 @@ class OnramperHostApi {
       );
     } else {
       return (pigeonVar_replyList[0] as CheckoutRequirementsResultDto?)!;
-    }
-  }
-
-  Future<void> presentCheckout() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.presentCheckout$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_channel.send(null) as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else {
-      return;
     }
   }
 

@@ -17,8 +17,6 @@ enum PluginError: Error {
     case missingResponse(String)
     /// `presentCheckout()` could not locate a host `UIViewController` to
     /// present the native modal from (no key window / no root).
-    case noRootViewController
-
     /// Maps to PigeonError so Dart receives a stable code/message pair
     /// instead of `String(describing:)` of the enum case.
     var asPigeonError: PigeonError {
@@ -31,8 +29,6 @@ enum PluginError: Error {
             return PigeonError(code: "not_implemented", message: "Method not yet implemented in this plugin version", details: nil)
         case .missingResponse(let detail):
             return PigeonError(code: "missing_response", message: "Native SDK produced no usable response", details: detail)
-        case .noRootViewController:
-            return PigeonError(code: "no_root_view_controller", message: "Cannot find a host view controller to present checkout from", details: nil)
         }
     }
 }
@@ -126,16 +122,9 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // on dispose / reconfigure.
     private var eventForwardingTask: Task<Void, Never>?
 
-    // Retains the currently-presented checkout modal so its event-observation
-    // Task is not deallocated. Cleared by the presenter's `onDismissed` hook
-    // (terminal event) or by `dispose(...)`.
-    var activeCheckoutPresenter: PluginCheckoutPresenter?
-
-    // Captures the native SwiftUI `OnramperCheckoutButton` returned by the most
-    // recent `getCheckoutRequirements` call so `presentCheckout` can host it
-    // directly. Its `init` is internal, but the SDK constructs it for us inside
-    // `getCheckoutRequirements`. Cleared on reset / dispose.
-    var capturedCheckoutButton: OnramperCheckoutButton?
+    // Handle of the most recent button stored in CheckoutButtonRegistry.
+    // Cleared on reset / dispose so stale handles don't linger.
+    private var lastButtonHandle: String?
 
     // `FlutterPlugin.register(with:)` is invoked on the main thread by
     // Flutter's plugin registry. It's declared `nonisolated` because the
@@ -147,7 +136,7 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
             let plugin = OnramperSdkPlugin()
             OnramperHostApiSetup.setUp(binaryMessenger: messenger, api: plugin)
             plugin.flutterApi = OnramperFlutterApi(binaryMessenger: messenger)
-            // Keep a strong reference so the plugin outlives `register(with:)`.
+            registerOnramperCheckoutButtonFactory(registrar: registrar)
             registrar.publish(plugin)
         }
     }
@@ -169,27 +158,6 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
         eventForwardingTask?.cancel(); eventForwardingTask = nil
     }
 
-    /// Locates the topmost presented view controller on the key window. Used
-    /// as the host for the native checkout modal. Returns `nil` in headless
-    /// contexts (unit tests without a UIWindow, app launch before scene
-    /// attachment, etc.) — callers must surface `noRootViewController` in
-    /// that case.
-    static func findRootViewController() -> UIViewController? {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first(where: { $0.isKeyWindow })?
-            .rootViewController?
-            .topMostPresentedViewController()
-    }
-}
-
-private extension UIViewController {
-    func topMostPresentedViewController() -> UIViewController {
-        var top: UIViewController = self
-        while let presented = top.presentedViewController { top = presented }
-        return top
-    }
 }
 
 // MARK: - OnramperHostApi conformance
@@ -296,12 +264,16 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // internal init is unreachable from us, but the SDK
                 // constructs it on this call); the quote populates the DTO.
                 let result = try await client.getCheckoutRequirements(nativeRequest)
-                self.capturedCheckoutButton = result.button
+
+                // Store the button in the registry and hand the handle to Dart so
+                // OnramperNativeCheckoutButton can look it up via the platform view.
+                if let prev = self.lastButtonHandle {
+                    Task { await CheckoutButtonRegistry.shared.drop(prev) }
+                }
+                let handle = await CheckoutButtonRegistry.shared.store(result.button)
+                self.lastButtonHandle = handle
 
                 guard let headlessId = collector.headlessCheckoutId else {
-                    // No `didStartCheckout` delegate call observed during
-                    // the run — the native SDK never reached that
-                    // checkpoint, so we have no checkout ID to surface.
                     completion(.failure(
                         PluginError.missingResponse("delegate.didStartCheckout was not invoked")
                             .asPigeonError
@@ -309,14 +281,12 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     return
                 }
 
-                // Convert the captured requirements (or an empty list when
-                // all reqs were locally satisfied and the SDK landed in
-                // `.readyToCheckout`).
                 let nativeReqs = collector.requireLoginRequirements ?? []
                 let dto = CheckoutRequirementsResultDto(
                     headlessCheckoutId: headlessId,
                     requirements: nativeReqs.map(BridgeMappers.fromNative),
-                    quote: BridgeMappers.fromNative(result.quote)
+                    quote: BridgeMappers.fromNative(result.quote),
+                    buttonHandle: handle
                 )
                 completion(.success(dto))
             } catch let onramperError as OnramperError {
@@ -329,44 +299,13 @@ extension OnramperSdkPlugin: OnramperHostApi {
         }
     }
 
-    func presentCheckout(completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let client else {
-            completion(.failure(PluginError.notConfigured.asPigeonError))
-            return
-        }
-        guard let button = capturedCheckoutButton else {
-            completion(.failure(
-                PluginError.missingResponse("call getCheckoutRequirements before presentCheckout")
-                    .asPigeonError
-            ))
-            return
-        }
-        Task { @MainActor in
-            guard let root = Self.findRootViewController() else {
-                completion(.failure(PluginError.noRootViewController.asPigeonError))
-                return
-            }
-            let presenter = PluginCheckoutPresenter(client: client, content: AnyView(button))
-            // Drop the strong reference once the modal dismisses (terminal
-            // event). Capture `self` weakly so an in-flight dismissal does
-            // not extend plugin lifetime.
-            presenter.onDismissed = { [weak self] in
-                guard let self else { return }
-                if self.activeCheckoutPresenter === presenter {
-                    self.activeCheckoutPresenter = nil
-                }
-            }
-            self.activeCheckoutPresenter = presenter
-            presenter.present(from: root)
-            completion(.success(()))
-        }
-    }
-
     func reset(completion: @escaping (Result<Void, Error>) -> Void) {
         let client = self.client
+        let handle = self.lastButtonHandle
         Task { @MainActor in
             await client?.reset()
-            self.capturedCheckoutButton = nil
+            if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
+            self.lastButtonHandle = nil
             completion(.success(()))
         }
     }
@@ -376,10 +315,10 @@ extension OnramperSdkPlugin: OnramperHostApi {
         Task { @MainActor in
             await client?.reset()
             self.tearDownObservers()
+            await CheckoutButtonRegistry.shared.dropAll()
             self.client = nil
             self.inFlightRequirements = nil
-            self.activeCheckoutPresenter = nil
-            self.capturedCheckoutButton = nil
+            self.lastButtonHandle = nil
             completion(.success(()))
         }
     }

@@ -86,7 +86,6 @@ enum BridgeMappers {
         // Pass values through unchanged; `OnramperTransactionData.init`
         // lowercases source/destination/country/subdivision itself.
         OnramperTransactionData(
-            onramp: dto.onramp,
             source: dto.source,
             destination: dto.destination,
             amount: dto.amount,
@@ -309,6 +308,10 @@ enum BridgeMappers {
             return CheckoutEventDto(kind: .completed, checkoutId: checkoutId)
         case .failed(let err):
             return CheckoutEventDto(kind: .failed, error: fromNative(err))
+        // Provider lifecycle events not yet in the Pigeon DTO — drop silently.
+        case .checkoutCancelled, .providerReady, .paymentAuthorized,
+             .paymentProcessing, .paymentCancelled, .providerError:
+            return CheckoutEventDto(kind: .completed)
         }
     }
 
@@ -377,6 +380,8 @@ enum BridgeMappers {
             return OnramperErrorDto(kind: .deviceBlocked, message: message, recoverable: false)
         case .securityStorageFailed(let status):
             return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false, code: Int64(status))
+        case .securityTrustFailed:
+            return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false)
         }
     }
 }

@@ -107,7 +107,6 @@ class _ExampleHomeState extends State<ExampleHome> {
       final requirements = await _client.getCheckoutRequirements(
         const CheckoutIntentRequest(
           transactionData: OnramperTransactionData(
-            onramp: '',
             source: 'usd',
             destination: 'sol',
             amount: 100,

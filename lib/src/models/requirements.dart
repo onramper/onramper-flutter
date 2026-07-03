@@ -1,4 +1,7 @@
+import 'package:flutter/widgets.dart';
+
 import '../platform/pigeon.g.dart';
+import '../widget/native_checkout_button.dart';
 import 'quote.dart';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +30,6 @@ class WalletInfo {
 /// Transaction parameters for a single checkout intent.
 class OnramperTransactionData {
   const OnramperTransactionData({
-    required this.onramp,
     required this.source,
     required this.amount,
     required this.type,
@@ -38,7 +40,6 @@ class OnramperTransactionData {
     this.subdivision,
   });
 
-  final String onramp;
   final String source;
   final double amount;
   final TransactionType type;
@@ -49,7 +50,6 @@ class OnramperTransactionData {
   final String? subdivision;
 
   OnramperTransactionDataDto toDto() => OnramperTransactionDataDto(
-        onramp: onramp,
         source: source,
         amount: amount,
         type: switch (type) {
@@ -263,12 +263,13 @@ class CheckoutRequirement {
   final UserInfoRequirement? userInfo;
 }
 
-/// Aggregated response: a checkout id, requirements to satisfy, and the quote.
+/// Aggregated response: a checkout id, requirements, quote, and the native button.
 class CheckoutRequirementsResult {
-  const CheckoutRequirementsResult({
+  CheckoutRequirementsResult({
     required this.headlessCheckoutId,
     required this.requirements,
     required this.quote,
+    required this.buttonHandle,
   });
 
   factory CheckoutRequirementsResult.fromDto(
@@ -280,11 +281,20 @@ class CheckoutRequirementsResult {
           dto.requirements.map(CheckoutRequirement.fromDto),
         ),
         quote: QuoteResponse.fromDto(dto.quote),
+        buttonHandle: dto.buttonHandle,
       );
 
   final String headlessCheckoutId;
   final List<CheckoutRequirement> requirements;
   final QuoteResponse quote;
+
+  /// Opaque handle for the native checkout button stored in the platform registry.
+  final String buttonHandle;
+
+  /// The native `OnramperCheckoutButton` embedded directly in the Flutter widget
+  /// tree via a platform view. Drop this into your layout — no `presentCheckout()`
+  /// call needed. The button handles the full flow: OIDC login, finalize, payment.
+  Widget get button => OnramperNativeCheckoutButton(buttonHandle: buttonHandle);
 
   /// Convenience: only the ToS requirements (if any).
   List<TosRequirement> get tos => requirements

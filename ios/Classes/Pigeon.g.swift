@@ -270,7 +270,6 @@ struct WalletInfoDto {
 
 /// Generated class from Pigeon that represents data sent in messages.
 struct OnramperTransactionDataDto {
-  var onramp: String
   var source: String
   var amount: Double
   var type: TransactionTypeDto
@@ -283,18 +282,16 @@ struct OnramperTransactionDataDto {
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> OnramperTransactionDataDto? {
-    let onramp = pigeonVar_list[0] as! String
-    let source = pigeonVar_list[1] as! String
-    let amount = pigeonVar_list[2] as! Double
-    let type = pigeonVar_list[3] as! TransactionTypeDto
-    let paymentMethod = pigeonVar_list[4] as! String
-    let wallet = pigeonVar_list[5] as! WalletInfoDto
-    let destination: String? = nilOrValue(pigeonVar_list[6])
-    let country: String? = nilOrValue(pigeonVar_list[7])
-    let subdivision: String? = nilOrValue(pigeonVar_list[8])
+    let source = pigeonVar_list[0] as! String
+    let amount = pigeonVar_list[1] as! Double
+    let type = pigeonVar_list[2] as! TransactionTypeDto
+    let paymentMethod = pigeonVar_list[3] as! String
+    let wallet = pigeonVar_list[4] as! WalletInfoDto
+    let destination: String? = nilOrValue(pigeonVar_list[5])
+    let country: String? = nilOrValue(pigeonVar_list[6])
+    let subdivision: String? = nilOrValue(pigeonVar_list[7])
 
     return OnramperTransactionDataDto(
-      onramp: onramp,
       source: source,
       amount: amount,
       type: type,
@@ -307,7 +304,6 @@ struct OnramperTransactionDataDto {
   }
   func toList() -> [Any?] {
     return [
-      onramp,
       source,
       amount,
       type,
@@ -597,6 +593,9 @@ struct CheckoutRequirementsResultDto {
   var headlessCheckoutId: String
   var requirements: [CheckoutRequirementDto]
   var quote: QuoteDto
+  /// Opaque handle used to look up the native OnramperCheckoutButton in the
+  /// platform-view registry. Pass to OnramperNativeCheckoutButton.
+  var buttonHandle: String
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -604,11 +603,13 @@ struct CheckoutRequirementsResultDto {
     let headlessCheckoutId = pigeonVar_list[0] as! String
     let requirements = pigeonVar_list[1] as! [CheckoutRequirementDto]
     let quote = pigeonVar_list[2] as! QuoteDto
+    let buttonHandle = pigeonVar_list[3] as! String
 
     return CheckoutRequirementsResultDto(
       headlessCheckoutId: headlessCheckoutId,
       requirements: requirements,
-      quote: quote
+      quote: quote,
+      buttonHandle: buttonHandle
     )
   }
   func toList() -> [Any?] {
@@ -616,6 +617,7 @@ struct CheckoutRequirementsResultDto {
       headlessCheckoutId,
       requirements,
       quote,
+      buttonHandle,
     ]
   }
 }
@@ -1027,7 +1029,6 @@ protocol OnramperHostApi {
   func configure(config: ConfigurationDto) throws
   func initialize(credentials: SessionCredentialsDto, completion: @escaping (Result<Void, Error>) -> Void)
   func getCheckoutRequirements(request: CheckoutIntentRequestDto, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
-  func presentCheckout(completion: @escaping (Result<Void, Error>) -> Void)
   func reset(completion: @escaping (Result<Void, Error>) -> Void)
   func dispose(completion: @escaping (Result<Void, Error>) -> Void)
   func provideRefreshedSession(credentials: SessionCredentialsDto) throws
@@ -1088,21 +1089,6 @@ class OnramperHostApiSetup {
       }
     } else {
       getCheckoutRequirementsChannel.setMessageHandler(nil)
-    }
-    let presentCheckoutChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.presentCheckout\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      presentCheckoutChannel.setMessageHandler { _, reply in
-        api.presentCheckout { result in
-          switch result {
-          case .success:
-            reply(wrapResult(nil))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      presentCheckoutChannel.setMessageHandler(nil)
     }
     let resetChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

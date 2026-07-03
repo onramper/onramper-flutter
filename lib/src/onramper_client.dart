@@ -150,10 +150,6 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     return result;
   }
 
-  /// Asks the native side to render the checkout webview on top of the
-  /// Flutter view hierarchy.
-  Future<void> presentCheckout() => _host.presentCheckout();
-
   /// Resets the native SDK and clears cached requirements / errors.
   Future<void> reset() async {
     _tosRequirements = null;

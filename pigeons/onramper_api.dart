@@ -50,7 +50,6 @@ class WalletInfoDto {
 
 class OnramperTransactionDataDto {
   OnramperTransactionDataDto({
-    required this.onramp,
     required this.source,
     required this.amount,
     required this.type,
@@ -60,7 +59,6 @@ class OnramperTransactionDataDto {
     this.country,
     this.subdivision,
   });
-  final String onramp;
   final String source;
   final double amount;
   final TransactionTypeDto type;
@@ -188,10 +186,14 @@ class CheckoutRequirementsResultDto {
     required this.headlessCheckoutId,
     required this.requirements,
     required this.quote,
+    required this.buttonHandle,
   });
   final String headlessCheckoutId;
   final List<CheckoutRequirementDto> requirements;
   final QuoteDto quote;
+  /// Opaque handle used to look up the native OnramperCheckoutButton in the
+  /// platform-view registry. Pass to OnramperNativeCheckoutButton.
+  final String buttonHandle;
 }
 
 // ---- Render context ----
@@ -345,8 +347,6 @@ abstract class OnramperHostApi {
   void initialize(SessionCredentialsDto credentials);
   @async
   CheckoutRequirementsResultDto getCheckoutRequirements(CheckoutIntentRequestDto request);
-  @async
-  void presentCheckout();
   @async
   void reset();
   @async
