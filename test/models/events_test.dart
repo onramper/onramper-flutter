@@ -14,8 +14,8 @@ void main() {
     });
 
     test('all CheckoutEventKind counts match dto', () {
-      expect(CheckoutEventKind.values.length,
-          CheckoutEventKindDto.values.length);
+      expect(
+          CheckoutEventKind.values.length, CheckoutEventKindDto.values.length);
     });
 
     test('stateChanged carries state', () {

@@ -20,7 +20,8 @@ void main() {
         buttonHandle: buttonHandle,
       );
 
-  testWidgets('renders OnramperNativeCheckoutButton with no ToS when none provided',
+  testWidgets(
+      'renders OnramperNativeCheckoutButton with no ToS when none provided',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(

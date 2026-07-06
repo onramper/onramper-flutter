@@ -39,7 +39,8 @@ void main() {
         final s = OnramperState.fromDto(OnramperStateDto(kind: k));
         expect(s.kind, isA<OnramperStateKind>());
       }
-      expect(OnramperStateKind.values.length, OnramperStateKindDto.values.length);
+      expect(
+          OnramperStateKind.values.length, OnramperStateKindDto.values.length);
     });
 
     test('rendering state carries non-null renderContext', () {

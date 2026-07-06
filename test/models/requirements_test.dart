@@ -173,7 +173,8 @@ void main() {
     });
 
     test('all counts match', () {
-      expect(UserInfoFieldType.values.length, UserInfoFieldTypeDto.values.length);
+      expect(
+          UserInfoFieldType.values.length, UserInfoFieldTypeDto.values.length);
     });
   });
 
@@ -221,7 +222,8 @@ void main() {
     test('amountLimit variant', () {
       final dto = CheckoutRequirementDto(
         type: CheckoutRequirementTypeDto.amountLimit,
-        amountLimit: AmountLimitRequirementDto(providerId: 'mp', minAmountLimit: 1),
+        amountLimit:
+            AmountLimitRequirementDto(providerId: 'mp', minAmountLimit: 1),
       );
       final r = CheckoutRequirement.fromDto(dto);
       expect(r.kind, CheckoutRequirementKind.amountLimit);

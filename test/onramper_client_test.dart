@@ -10,7 +10,8 @@ void main() {
     test('configure() forwards via HostApi', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
       // configure is fire-and-forget in the constructor; wait for the microtask.
@@ -20,10 +21,12 @@ void main() {
       await client.dispose();
     });
 
-    test('onStateChanged updates state, stateStream, notifyListeners', () async {
+    test('onStateChanged updates state, stateStream, notifyListeners',
+        () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
 
@@ -32,7 +35,8 @@ void main() {
       final received = <OnramperState>[];
       final sub = client.stateStream.listen(received.add);
 
-      client.debugDispatchStateChanged(OnramperStateDto(kind: OnramperStateKindDto.ready));
+      client.debugDispatchStateChanged(
+          OnramperStateDto(kind: OnramperStateKindDto.ready));
       await Future<void>.delayed(Duration.zero);
 
       expect(client.state.kind, OnramperStateKind.ready);
@@ -46,7 +50,8 @@ void main() {
     test('initialize forwards credentials to HostApi', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
       await client.initialize(sessionId: 'sess', sessionToken: 'tok');
@@ -64,12 +69,16 @@ void main() {
           buttonHandle: 'btn-handle-1',
         );
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
-      final result = await client.getCheckoutRequirements(const CheckoutIntentRequest(
+      final result =
+          await client.getCheckoutRequirements(const CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          source: 'usd', amount: 100, type: TransactionType.buy,
+          source: 'usd',
+          amount: 100,
+          type: TransactionType.buy,
           paymentMethod: 'credit_debit_card',
           wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
         ),
@@ -82,7 +91,8 @@ void main() {
     test('onEvent fans out to events stream', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
       final received = <CheckoutEvent>[];
@@ -104,7 +114,8 @@ void main() {
     test('onError updates lastError and notifies listeners', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
       var notified = 0;
@@ -126,11 +137,13 @@ void main() {
       var handlerCalls = 0;
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
         sessionExpirationHandler: () async {
           handlerCalls++;
-          return const SessionCredentials(sessionId: 'new', sessionToken: 'newTok');
+          return const SessionCredentials(
+              sessionId: 'new', sessionToken: 'newTok');
         },
       );
 
@@ -140,10 +153,12 @@ void main() {
       await client.dispose();
     });
 
-    test('onSessionExpired without handler calls failRefreshedSession', () async {
+    test('onSessionExpired without handler calls failRefreshedSession',
+        () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
 
@@ -155,7 +170,8 @@ void main() {
     test('dispose closes streams', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
-        configuration: const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
         hostApi: fakeHost,
       );
       await client.dispose();
@@ -193,7 +209,8 @@ class FakeOnramperHostApi implements OnramperHostApi {
   }
 
   @override
-  Future<CheckoutRequirementsResultDto> getCheckoutRequirements(CheckoutIntentRequestDto request) async {
+  Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
+      CheckoutIntentRequestDto request) async {
     return nextRequirementsResult ??
         CheckoutRequirementsResultDto(
           headlessCheckoutId: 'stub',
@@ -215,7 +232,8 @@ class FakeOnramperHostApi implements OnramperHostApi {
   }
 
   @override
-  Future<void> provideRefreshedSession(SessionCredentialsDto credentials) async {
+  Future<void> provideRefreshedSession(
+      SessionCredentialsDto credentials) async {
     lastProvidedCredentials = credentials;
   }
 

@@ -249,8 +249,9 @@ class CheckoutRequirement {
       amountLimit: dto.amountLimit == null
           ? null
           : AmountLimitRequirement.fromDto(dto.amountLimit!),
-      userInfo:
-          dto.userInfo == null ? null : UserInfoRequirement.fromDto(dto.userInfo!),
+      userInfo: dto.userInfo == null
+          ? null
+          : UserInfoRequirement.fromDto(dto.userInfo!),
     );
   }
 

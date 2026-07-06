@@ -156,7 +156,8 @@ enum UserInfoFieldTypeDto {
 }
 
 class UserInfoFieldDto {
-  UserInfoFieldDto({required this.type, required this.required, required this.satisfied});
+  UserInfoFieldDto(
+      {required this.type, required this.required, required this.satisfied});
   final UserInfoFieldTypeDto type;
   final bool required;
   final bool satisfied;
@@ -191,6 +192,7 @@ class CheckoutRequirementsResultDto {
   final String headlessCheckoutId;
   final List<CheckoutRequirementDto> requirements;
   final QuoteDto quote;
+
   /// Opaque handle used to look up the native OnramperCheckoutButton in the
   /// platform-view registry. Pass to OnramperNativeCheckoutButton.
   final String buttonHandle;
@@ -326,16 +328,17 @@ class OnramperErrorDto {
   final String message;
   final bool recoverable;
   // Variant payloads (nullable; only populated for the relevant kind):
-  final int? code;                 // networkError.code, securityStorageFailed.status
-  final double? minAmount;         // amountOutOfRange.min
-  final double? maxAmount;         // amountOutOfRange.max
+  final int? code; // networkError.code, securityStorageFailed.status
+  final double? minAmount; // amountOutOfRange.min
+  final double? maxAmount; // amountOutOfRange.max
   final double? retryAfterSeconds; // temporaryFailure.retryAfter
-  final String? field;             // invalidRequest.field
-  final String? debugInfo;         // invalidRequest / quoteUnavailable / checkoutForbidden / temporaryFailure / unrecoverable
-  final String? fromState;         // invalidStateTransition.from
-  final String? toState;           // invalidStateTransition.to
-  final String? expectedState;     // invalidState.expected
-  final String? actualState;       // invalidState.actual
+  final String? field; // invalidRequest.field
+  final String?
+      debugInfo; // invalidRequest / quoteUnavailable / checkoutForbidden / temporaryFailure / unrecoverable
+  final String? fromState; // invalidStateTransition.from
+  final String? toState; // invalidStateTransition.to
+  final String? expectedState; // invalidState.expected
+  final String? actualState; // invalidState.actual
 }
 
 // ---- APIs ----
@@ -346,7 +349,9 @@ abstract class OnramperHostApi {
   @async
   void initialize(SessionCredentialsDto credentials);
   @async
-  CheckoutRequirementsResultDto getCheckoutRequirements(CheckoutIntentRequestDto request);
+  CheckoutRequirementsResultDto getCheckoutRequirements(
+      CheckoutIntentRequestDto request);
+
   /// Programmatically starts checkout — equivalent to tapping the Buy button.
   /// Only valid in readyToCheckout state.
   @async

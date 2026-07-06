@@ -15,7 +15,8 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse(
+    {Object? result, PlatformException? error, bool empty = false}) {
   if (empty) {
     return <Object?>[];
   }
@@ -626,7 +627,8 @@ class CheckoutRequirementsResultDto {
     result as List<Object?>;
     return CheckoutRequirementsResultDto(
       headlessCheckoutId: result[0]! as String,
-      requirements: (result[1] as List<Object?>?)!.cast<CheckoutRequirementDto>(),
+      requirements:
+          (result[1] as List<Object?>?)!.cast<CheckoutRequirementDto>(),
       quote: result[2]! as QuoteDto,
       buttonHandle: result[3]! as String,
     );
@@ -693,7 +695,8 @@ class OnramperStateDto {
     result as List<Object?>;
     return OnramperStateDto(
       kind: result[0]! as OnramperStateKindDto,
-      requireLoginRequirements: (result[1] as List<Object?>?)?.cast<CheckoutRequirementDto>(),
+      requireLoginRequirements:
+          (result[1] as List<Object?>?)?.cast<CheckoutRequirementDto>(),
       renderContext: result[2] as RenderContextDto?,
       failedError: result[3] as OnramperErrorDto?,
     );
@@ -743,7 +746,8 @@ class CheckoutEventDto {
       kind: result[0]! as CheckoutEventKindDto,
       state: result[1] as OnramperStateDto?,
       checkoutId: result[2] as String?,
-      loginRequirements: (result[3] as List<Object?>?)?.cast<CheckoutRequirementDto>(),
+      loginRequirements:
+          (result[3] as List<Object?>?)?.cast<CheckoutRequirementDto>(),
       requirementType: result[4] as CheckoutRequirementTypeDto?,
       renderContext: result[5] as RenderContextDto?,
       error: result[6] as OnramperErrorDto?,
@@ -832,7 +836,6 @@ class OnramperErrorDto {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -840,94 +843,94 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is EnvironmentDto) {
+    } else if (value is EnvironmentDto) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is ThemeDto) {
+    } else if (value is ThemeDto) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    }    else if (value is LogLevelDto) {
+    } else if (value is LogLevelDto) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    }    else if (value is TransactionTypeDto) {
+    } else if (value is TransactionTypeDto) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    }    else if (value is CheckoutRequirementTypeDto) {
+    } else if (value is CheckoutRequirementTypeDto) {
       buffer.putUint8(133);
       writeValue(buffer, value.index);
-    }    else if (value is TosItemTypeDto) {
+    } else if (value is TosItemTypeDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    }    else if (value is UserInfoFieldTypeDto) {
+    } else if (value is UserInfoFieldTypeDto) {
       buffer.putUint8(135);
       writeValue(buffer, value.index);
-    }    else if (value is RenderTypeDto) {
+    } else if (value is RenderTypeDto) {
       buffer.putUint8(136);
       writeValue(buffer, value.index);
-    }    else if (value is CheckoutPaymentTypeDto) {
+    } else if (value is CheckoutPaymentTypeDto) {
       buffer.putUint8(137);
       writeValue(buffer, value.index);
-    }    else if (value is OnramperStateKindDto) {
+    } else if (value is OnramperStateKindDto) {
       buffer.putUint8(138);
       writeValue(buffer, value.index);
-    }    else if (value is CheckoutEventKindDto) {
+    } else if (value is CheckoutEventKindDto) {
       buffer.putUint8(139);
       writeValue(buffer, value.index);
-    }    else if (value is OnramperErrorKindDto) {
+    } else if (value is OnramperErrorKindDto) {
       buffer.putUint8(140);
       writeValue(buffer, value.index);
-    }    else if (value is ConfigurationDto) {
+    } else if (value is ConfigurationDto) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    }    else if (value is SessionCredentialsDto) {
+    } else if (value is SessionCredentialsDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    }    else if (value is WalletInfoDto) {
+    } else if (value is WalletInfoDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    }    else if (value is OnramperTransactionDataDto) {
+    } else if (value is OnramperTransactionDataDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    }    else if (value is CheckoutIntentRequestDto) {
+    } else if (value is CheckoutIntentRequestDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    }    else if (value is QuoteErrorDto) {
+    } else if (value is QuoteErrorDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    }    else if (value is QuoteDto) {
+    } else if (value is QuoteDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    }    else if (value is TosItemDto) {
+    } else if (value is TosItemDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    }    else if (value is TosRequirementDto) {
+    } else if (value is TosRequirementDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    }    else if (value is AmountLimitRequirementDto) {
+    } else if (value is AmountLimitRequirementDto) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    }    else if (value is UserInfoFieldDto) {
+    } else if (value is UserInfoFieldDto) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    }    else if (value is UserInfoRequirementDto) {
+    } else if (value is UserInfoRequirementDto) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    }    else if (value is CheckoutRequirementDto) {
+    } else if (value is CheckoutRequirementDto) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    }    else if (value is CheckoutRequirementsResultDto) {
+    } else if (value is CheckoutRequirementsResultDto) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    }    else if (value is RenderContextDto) {
+    } else if (value is RenderContextDto) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    }    else if (value is OnramperStateDto) {
+    } else if (value is OnramperStateDto) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    }    else if (value is CheckoutEventDto) {
+    } else if (value is CheckoutEventDto) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    }    else if (value is OnramperErrorDto) {
+    } else if (value is OnramperErrorDto) {
       buffer.putUint8(158);
       writeValue(buffer, value.encode());
     } else {
@@ -938,77 +941,77 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129: 
+      case 129:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : EnvironmentDto.values[value];
-      case 130: 
+      case 130:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : ThemeDto.values[value];
-      case 131: 
+      case 131:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : LogLevelDto.values[value];
-      case 132: 
+      case 132:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : TransactionTypeDto.values[value];
-      case 133: 
+      case 133:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : CheckoutRequirementTypeDto.values[value];
-      case 134: 
+      case 134:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : TosItemTypeDto.values[value];
-      case 135: 
+      case 135:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : UserInfoFieldTypeDto.values[value];
-      case 136: 
+      case 136:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : RenderTypeDto.values[value];
-      case 137: 
+      case 137:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : CheckoutPaymentTypeDto.values[value];
-      case 138: 
+      case 138:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : OnramperStateKindDto.values[value];
-      case 139: 
+      case 139:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : CheckoutEventKindDto.values[value];
-      case 140: 
+      case 140:
         final int? value = readValue(buffer) as int?;
         return value == null ? null : OnramperErrorKindDto.values[value];
-      case 141: 
+      case 141:
         return ConfigurationDto.decode(readValue(buffer)!);
-      case 142: 
+      case 142:
         return SessionCredentialsDto.decode(readValue(buffer)!);
-      case 143: 
+      case 143:
         return WalletInfoDto.decode(readValue(buffer)!);
-      case 144: 
+      case 144:
         return OnramperTransactionDataDto.decode(readValue(buffer)!);
-      case 145: 
+      case 145:
         return CheckoutIntentRequestDto.decode(readValue(buffer)!);
-      case 146: 
+      case 146:
         return QuoteErrorDto.decode(readValue(buffer)!);
-      case 147: 
+      case 147:
         return QuoteDto.decode(readValue(buffer)!);
-      case 148: 
+      case 148:
         return TosItemDto.decode(readValue(buffer)!);
-      case 149: 
+      case 149:
         return TosRequirementDto.decode(readValue(buffer)!);
-      case 150: 
+      case 150:
         return AmountLimitRequirementDto.decode(readValue(buffer)!);
-      case 151: 
+      case 151:
         return UserInfoFieldDto.decode(readValue(buffer)!);
-      case 152: 
+      case 152:
         return UserInfoRequirementDto.decode(readValue(buffer)!);
-      case 153: 
+      case 153:
         return CheckoutRequirementDto.decode(readValue(buffer)!);
-      case 154: 
+      case 154:
         return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
-      case 155: 
+      case 155:
         return RenderContextDto.decode(readValue(buffer)!);
-      case 156: 
+      case 156:
         return OnramperStateDto.decode(readValue(buffer)!);
-      case 157: 
+      case 157:
         return CheckoutEventDto.decode(readValue(buffer)!);
-      case 158: 
+      case 158:
         return OnramperErrorDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1020,9 +1023,11 @@ class OnramperHostApi {
   /// Constructor for [OnramperHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  OnramperHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+  OnramperHostApi(
+      {BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
       : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+        pigeonVar_messageChannelSuffix =
+            messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -1030,8 +1035,10 @@ class OnramperHostApi {
   final String pigeonVar_messageChannelSuffix;
 
   Future<void> configure(ConfigurationDto config) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.configure$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.configure$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1052,8 +1059,10 @@ class OnramperHostApi {
   }
 
   Future<void> initialize(SessionCredentialsDto credentials) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.initialize$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.initialize$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1073,9 +1082,12 @@ class OnramperHostApi {
     }
   }
 
-  Future<CheckoutRequirementsResultDto> getCheckoutRequirements(CheckoutIntentRequestDto request) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+  Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
+      CheckoutIntentRequestDto request) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1103,8 +1115,10 @@ class OnramperHostApi {
   /// Programmatically starts checkout — equivalent to tapping the Buy button.
   /// Only valid in readyToCheckout state.
   Future<void> autoCheckout() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.autoCheckout$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.autoCheckout$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1125,8 +1139,10 @@ class OnramperHostApi {
   }
 
   Future<void> reset() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1147,8 +1163,10 @@ class OnramperHostApi {
   }
 
   Future<void> dispose() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.dispose$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.dispose$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1168,9 +1186,12 @@ class OnramperHostApi {
     }
   }
 
-  Future<void> provideRefreshedSession(SessionCredentialsDto credentials) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.provideRefreshedSession$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+  Future<void> provideRefreshedSession(
+      SessionCredentialsDto credentials) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.provideRefreshedSession$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1191,8 +1212,10 @@ class OnramperHostApi {
   }
 
   Future<void> failRefreshedSession(String reason) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.failRefreshedSession$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.failRefreshedSession$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -1224,18 +1247,26 @@ abstract class OnramperFlutterApi {
 
   void onSessionExpired();
 
-  static void setUp(OnramperFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(
+    OnramperFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged was null.');
+              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final OnramperStateDto? arg_state = (args[0] as OnramperStateDto?);
           assert(arg_state != null,
@@ -1245,22 +1276,26 @@ abstract class OnramperFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent was null.');
+              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final CheckoutEventDto? arg_event = (args[0] as CheckoutEventDto?);
           assert(arg_event != null,
@@ -1270,22 +1305,26 @@ abstract class OnramperFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError was null.');
+              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final OnramperErrorDto? arg_error = (args[0] as OnramperErrorDto?);
           assert(arg_error != null,
@@ -1295,15 +1334,19 @@ abstract class OnramperFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onSessionExpired$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onSessionExpired$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
@@ -1314,8 +1357,9 @@ abstract class OnramperFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }

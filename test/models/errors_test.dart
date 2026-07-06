@@ -72,7 +72,8 @@ void main() {
     });
 
     test('all kinds have complete mappings (counts match)', () {
-      expect(OnramperErrorKind.values.length, OnramperErrorKindDto.values.length);
+      expect(
+          OnramperErrorKind.values.length, OnramperErrorKindDto.values.length);
     });
 
     test('is an Exception', () {
