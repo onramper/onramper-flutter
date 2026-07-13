@@ -10,12 +10,17 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - run: git lfs pull
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
           channel: stable
       - run: flutter pub get
-      - run: pod lib lint ios/onramper_sdk.podspec --allow-warnings
+      - name: pod lib lint
+        env:
+          # Fine-grained PAT with Contents: Read-only on onramper/onramper-ios,
+          # shared org-wide as RELEASE_REPO_TOKEN (same secret onramper-react-
+          # native uses). Needed so the podspec's prepare_command can fetch
+          # OnramperSDK.xcframework at pod install time. Remove once
+          # onramper-ios is public.
+          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: pod lib lint ios/onramper_sdk.podspec --allow-warnings

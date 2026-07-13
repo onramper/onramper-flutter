@@ -221,9 +221,6 @@ class FakeOnramperHostApi implements OnramperHostApi {
   }
 
   @override
-  Future<void> autoCheckout() async {}
-
-  @override
   Future<void> reset() async {}
 
   @override

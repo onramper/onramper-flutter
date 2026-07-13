@@ -300,25 +300,6 @@ extension OnramperSdkPlugin: OnramperHostApi {
         }
     }
 
-    func autoCheckout(completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let client else {
-            completion(.failure(PluginError.notConfigured.asPigeonError))
-            return
-        }
-        Task { @MainActor in
-            do {
-                _ = try await client.finalizeAndRender()
-                completion(.success(()))
-            } catch let onramperError as OnramperError {
-                let errDto = BridgeMappers.fromNative(onramperError)
-                self.flutterApi?.onError(error: errDto) { _ in }
-                completion(.failure(PigeonError(code: "onramper_error", message: errDto.message, details: nil)))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-    }
-
     func reset(completion: @escaping (Result<Void, Error>) -> Void) {
         let client = self.client
         let handle = self.lastButtonHandle

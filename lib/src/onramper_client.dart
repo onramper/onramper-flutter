@@ -150,10 +150,6 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     return result;
   }
 
-  /// Programmatically starts checkout — equivalent to the user tapping the Buy button.
-  /// Only valid when the SDK is in [OnramperStateKind.readyToCheckout].
-  Future<void> autoCheckout() => _host.autoCheckout();
-
   /// Resets the native SDK and clears cached requirements / errors.
   Future<void> reset() async {
     _tosRequirements = null;

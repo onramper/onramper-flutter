@@ -31,3 +31,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 /build/
 /coverage/
+
+# OnramperSDK.xcframework is fetched by ios/onramper_sdk.podspec prepare_command
+# at `pod install` time, so we don't check it in.
+/ios/Frameworks/

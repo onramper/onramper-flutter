@@ -11,9 +11,9 @@ class ExampleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'Onramper SDK example',
-      home: const ExampleHome(),
+      home: ExampleHome(),
     );
   }
 }
@@ -159,7 +159,6 @@ class _ExampleHomeState extends State<ExampleHome> {
                 )
               else
                 OnramperCheckoutButton(
-                  client: _client,
                   requirements: _requirements!,
                 ),
               const SizedBox(height: 24),
