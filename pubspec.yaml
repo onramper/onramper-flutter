@@ -19,8 +19,9 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   # Pinned rather than caret-versioned because pigeon writes its own version
   # into the generated file header, so any bump causes the CI drift check to
-  # fail.
-  pigeon: 22.7.4
+  # fail. 22.7.2 is the last release compatible with the Dart 3.4.0 that
+  # ships with Flutter 3.22.0 (used by CI).
+  pigeon: 22.7.2
 
 flutter:
   plugin:
