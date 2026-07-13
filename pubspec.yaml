@@ -17,7 +17,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  pigeon: ^22.0.0
+  # Pinned rather than caret-versioned because pigeon writes its own version
+  # into the generated file header, so any bump causes the CI drift check to
+  # fail.
+  pigeon: 22.7.4
 
 flutter:
   plugin:
