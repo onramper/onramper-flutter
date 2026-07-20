@@ -7,7 +7,8 @@ on:
 
 jobs:
   pod-lib-lint:
-    runs-on: macos-15
+    # macos-26 for Xcode 26 / Swift 6.2, which the v1.1.0 xcframework needs.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
