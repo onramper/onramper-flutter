@@ -30,9 +30,9 @@ Pod::Spec.new do |s|
   # the `sha256:` prefix).
   s.prepare_command = <<~CMD
     set -euo pipefail
-    ONRAMPER_SDK_VERSION="v1.1.0"
-    ONRAMPER_SDK_ASSET_ID="461197092"
-    ONRAMPER_SDK_SHA256="ff638a874587498611915af37ca05a26ebddd4a3be6c44af50edb40a348fc2b8"
+    ONRAMPER_SDK_VERSION="v1.0.1"
+    ONRAMPER_SDK_ASSET_ID="444768050"
+    ONRAMPER_SDK_SHA256="3b0ef3356d46bdda6f3dc29043e3f00a9386bfa3411ce3115f2d479044458740"
     FRAMEWORKS_DIR="Frameworks"
     XCFRAMEWORK_DIR="$FRAMEWORKS_DIR/OnramperSDK.xcframework"
     VERSION_STAMP="$FRAMEWORKS_DIR/.version"
