@@ -1,17 +1,22 @@
 name: release
 
+# Manual-dispatch release cutter. Bumps versions in pubspec.yaml and the
+# podspec, verifies pub.dev would accept the package, then commits, tags,
+# and pushes. Automated pub.dev publication is left to a separate workflow
+# — see `publish.yml`.
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Plugin version (e.g. 1.1.0 or 1.1.0+1)'
+        description: 'Plugin version (e.g. 1.1.0). Must match onramper-ios SDK version.'
         required: true
 
 jobs:
   release:
     runs-on: macos-15
     permissions:
-      # Push the release commit + tag, and create the GitHub release.
+      # Push the release commit + tag, create the GitHub release.
       contents: write
     env:
       VERSION: ${{ inputs.version }}
@@ -36,10 +41,11 @@ jobs:
       - name: flutter pub get
         run: flutter pub get
 
-      # Dry-run publish gates the tag creation on pub.dev acceptance —
-      # catches metadata / analysis / dependency issues before we push a
-      # permanent tag. The real `dart pub publish` step below is gated on
-      # dry-run passing.
+      # Dry-run publish gates tag creation on pub.dev acceptance. If pub.dev
+      # would reject the package (bad metadata, dependency issues, format
+      # violations), this step fails and the tag is never pushed. Cheap
+      # safety net — running it here means we find out before creating a
+      # permanent tag rather than after.
       - name: dart pub publish --dry-run
         run: dart pub publish --dry-run
 
@@ -53,22 +59,6 @@ jobs:
           git commit -am "chore: release v${VERSION}"
           git tag "v${VERSION}"
           git push origin master "v${VERSION}"
-
-      # `dart pub publish` requires pub.dev credentials. In CI this normally
-      # comes from `PUB_CREDENTIALS_JSON` (a repo/org secret set to the JSON
-      # contents of `~/.config/dart/pub-credentials.json` obtained on a
-      # maintainer machine via `dart pub token add https://pub.dev`). If the
-      # secret is absent this step is skipped and the release is tag-only —
-      # a maintainer can then publish manually with `dart pub publish` from
-      # their own machine.
-      - name: dart pub publish
-        if: ${{ env.PUB_CREDENTIALS_JSON != '' }}
-        env:
-          PUB_CREDENTIALS_JSON: ${{ secrets.PUB_CREDENTIALS_JSON }}
-        run: |
-          mkdir -p "$HOME/.config/dart"
-          printf '%s' "$PUB_CREDENTIALS_JSON" > "$HOME/.config/dart/pub-credentials.json"
-          dart pub publish --force
 
       - uses: softprops/action-gh-release@v2
         with:
