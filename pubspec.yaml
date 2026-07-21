@@ -1,8 +1,10 @@
 name: onramper_sdk
-description: Flutter plugin wrapping the iOS OnramperSDK for crypto on-ramping.
-version: 1.0.0
+description: Official Flutter plugin for the Onramper crypto on-ramp. Configures, initializes, and embeds a native SwiftUI checkout button. iOS-only, requires iOS 16+ and App Attest.
+version: 1.1.0
 homepage: https://github.com/onramper/onramper-flutter
-publish_to: 'none'
+repository: https://github.com/onramper/onramper-flutter
+issue_tracker: https://github.com/onramper/onramper-flutter/issues
+documentation: https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

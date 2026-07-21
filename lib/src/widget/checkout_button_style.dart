@@ -10,16 +10,13 @@ import '../platform/pigeon.g.dart';
 /// [OnramperClient.getCheckoutRequirements]). The `tosStyle` and
 /// `tosLinkStyle` fields style the Dart-side ToS text.
 ///
-/// `labelStyle` is accepted for forward compatibility with a future
-/// button-label-text customization API but is not currently forwarded to
-/// native — the native SDK does not expose per-instance label text/font
-/// overrides.
+/// The native button's label text ("Buy") is fixed by the SDK and not
+/// currently overridable from Dart.
 class CheckoutButtonStyle {
   const CheckoutButtonStyle({
     this.backgroundColor,
     this.foregroundColor,
     this.borderRadius = 12,
-    this.labelStyle,
     this.tosStyle,
     this.tosLinkStyle,
   });
@@ -33,9 +30,6 @@ class CheckoutButtonStyle {
 
   /// Corner radius in logical points. Applied to the native button.
   final double borderRadius;
-
-  /// Reserved for a future SDK label-text override. Not currently used.
-  final TextStyle? labelStyle;
 
   /// Style for the ToS lines rendered above the native button.
   final TextStyle? tosStyle;
