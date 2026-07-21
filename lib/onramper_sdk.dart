@@ -1,8 +1,8 @@
 /// Public Dart API for the OnramperSDK Flutter plugin.
 ///
 /// Exports the idiomatic Dart wrappers around the Pigeon-generated DTOs
-/// (`lib/src/platform/pigeon.g.dart`). The high-level facade class
-/// (`OnramperClient`) is added in a follow-up task.
+/// (`lib/src/platform/pigeon.g.dart`) plus the top-level [OnramperClient]
+/// facade and the checkout button widget.
 library onramper_sdk;
 
 export 'src/models/configuration.dart';

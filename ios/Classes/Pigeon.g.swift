@@ -97,6 +97,12 @@ enum CheckoutRequirementTypeDto: Int {
   case tos = 0
   case amountLimit = 1
   case userInfo = 2
+  case reverification = 3
+}
+
+enum ReverificationFieldDto: Int {
+  case email = 0
+  case phone = 1
 }
 
 enum TosItemTypeDto: Int {
@@ -150,6 +156,12 @@ enum CheckoutEventKindDto: Int {
   case renderingStarted = 6
   case completed = 7
   case failed = 8
+  case checkoutCancelled = 9
+  case providerReady = 10
+  case paymentAuthorized = 11
+  case paymentProcessing = 12
+  case paymentCancelled = 13
+  case providerError = 14
 }
 
 enum OnramperErrorKindDto: Int {
@@ -178,6 +190,7 @@ enum OnramperErrorKindDto: Int {
   case configurationError = 22
   case deviceBlocked = 23
   case securityStorageFailed = 24
+  case securityTrustFailed = 25
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
@@ -271,11 +284,11 @@ struct WalletInfoDto {
 /// Generated class from Pigeon that represents data sent in messages.
 struct OnramperTransactionDataDto {
   var source: String
+  var destination: String
   var amount: Double
   var type: TransactionTypeDto
   var paymentMethod: String
   var wallet: WalletInfoDto
-  var destination: String? = nil
   var country: String? = nil
   var subdivision: String? = nil
 
@@ -283,21 +296,21 @@ struct OnramperTransactionDataDto {
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> OnramperTransactionDataDto? {
     let source = pigeonVar_list[0] as! String
-    let amount = pigeonVar_list[1] as! Double
-    let type = pigeonVar_list[2] as! TransactionTypeDto
-    let paymentMethod = pigeonVar_list[3] as! String
-    let wallet = pigeonVar_list[4] as! WalletInfoDto
-    let destination: String? = nilOrValue(pigeonVar_list[5])
+    let destination = pigeonVar_list[1] as! String
+    let amount = pigeonVar_list[2] as! Double
+    let type = pigeonVar_list[3] as! TransactionTypeDto
+    let paymentMethod = pigeonVar_list[4] as! String
+    let wallet = pigeonVar_list[5] as! WalletInfoDto
     let country: String? = nilOrValue(pigeonVar_list[6])
     let subdivision: String? = nilOrValue(pigeonVar_list[7])
 
     return OnramperTransactionDataDto(
       source: source,
+      destination: destination,
       amount: amount,
       type: type,
       paymentMethod: paymentMethod,
       wallet: wallet,
-      destination: destination,
       country: country,
       subdivision: subdivision
     )
@@ -305,11 +318,11 @@ struct OnramperTransactionDataDto {
   func toList() -> [Any?] {
     return [
       source,
+      destination,
       amount,
       type,
       paymentMethod,
       wallet,
-      destination,
       country,
       subdivision,
     ]
@@ -341,53 +354,27 @@ struct CheckoutIntentRequestDto {
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
-struct QuoteErrorDto {
-  var type: String? = nil
-  var message: String? = nil
-
-
-  // swift-format-ignore: AlwaysUseLowerCamelCase
-  static func fromList(_ pigeonVar_list: [Any?]) -> QuoteErrorDto? {
-    let type: String? = nilOrValue(pigeonVar_list[0])
-    let message: String? = nilOrValue(pigeonVar_list[1])
-
-    return QuoteErrorDto(
-      type: type,
-      message: message
-    )
-  }
-  func toList() -> [Any?] {
-    return [
-      type,
-      message,
-    ]
-  }
-}
-
-/// Generated class from Pigeon that represents data sent in messages.
 struct QuoteDto {
-  var quoteId: String? = nil
-  var ramp: String? = nil
-  var rate: Double? = nil
-  var networkFee: Double? = nil
-  var transactionFee: Double? = nil
-  var payout: Double? = nil
-  var paymentMethod: String? = nil
+  var quoteId: String
+  var ramp: String
+  var rate: Double
+  var networkFee: Double
+  var transactionFee: Double
+  var payout: Double
+  var paymentMethod: String
   var recommendations: [String]? = nil
-  var errors: [QuoteErrorDto]? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> QuoteDto? {
-    let quoteId: String? = nilOrValue(pigeonVar_list[0])
-    let ramp: String? = nilOrValue(pigeonVar_list[1])
-    let rate: Double? = nilOrValue(pigeonVar_list[2])
-    let networkFee: Double? = nilOrValue(pigeonVar_list[3])
-    let transactionFee: Double? = nilOrValue(pigeonVar_list[4])
-    let payout: Double? = nilOrValue(pigeonVar_list[5])
-    let paymentMethod: String? = nilOrValue(pigeonVar_list[6])
+    let quoteId = pigeonVar_list[0] as! String
+    let ramp = pigeonVar_list[1] as! String
+    let rate = pigeonVar_list[2] as! Double
+    let networkFee = pigeonVar_list[3] as! Double
+    let transactionFee = pigeonVar_list[4] as! Double
+    let payout = pigeonVar_list[5] as! Double
+    let paymentMethod = pigeonVar_list[6] as! String
     let recommendations: [String]? = nilOrValue(pigeonVar_list[7])
-    let errors: [QuoteErrorDto]? = nilOrValue(pigeonVar_list[8])
 
     return QuoteDto(
       quoteId: quoteId,
@@ -397,8 +384,7 @@ struct QuoteDto {
       transactionFee: transactionFee,
       payout: payout,
       paymentMethod: paymentMethod,
-      recommendations: recommendations,
-      errors: errors
+      recommendations: recommendations
     )
   }
   func toList() -> [Any?] {
@@ -411,7 +397,6 @@ struct QuoteDto {
       payout,
       paymentMethod,
       recommendations,
-      errors,
     ]
   }
 }
@@ -479,6 +464,9 @@ struct TosRequirementDto {
 /// Generated class from Pigeon that represents data sent in messages.
 struct AmountLimitRequirementDto {
   var providerId: String
+  /// True when the requested amount is already within the provider's min/max
+  /// bounds. Consumers can treat this as a "no action needed" signal.
+  var amountLimitSatisfied: Bool
   var minAmountLimit: Double? = nil
   var maxAmountLimit: Double? = nil
 
@@ -486,11 +474,13 @@ struct AmountLimitRequirementDto {
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> AmountLimitRequirementDto? {
     let providerId = pigeonVar_list[0] as! String
-    let minAmountLimit: Double? = nilOrValue(pigeonVar_list[1])
-    let maxAmountLimit: Double? = nilOrValue(pigeonVar_list[2])
+    let amountLimitSatisfied = pigeonVar_list[1] as! Bool
+    let minAmountLimit: Double? = nilOrValue(pigeonVar_list[2])
+    let maxAmountLimit: Double? = nilOrValue(pigeonVar_list[3])
 
     return AmountLimitRequirementDto(
       providerId: providerId,
+      amountLimitSatisfied: amountLimitSatisfied,
       minAmountLimit: minAmountLimit,
       maxAmountLimit: maxAmountLimit
     )
@@ -498,6 +488,7 @@ struct AmountLimitRequirementDto {
   func toList() -> [Any?] {
     return [
       providerId,
+      amountLimitSatisfied,
       minAmountLimit,
       maxAmountLimit,
     ]
@@ -557,11 +548,46 @@ struct UserInfoRequirementDto {
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
+struct ReverificationRequirementDto {
+  var providerId: String
+  var field: ReverificationFieldDto
+  var requiredRecencyDays: Int64
+  /// ISO-8601 timestamp of the last successful verification for [field], or
+  /// null if never verified.
+  var lastVerifiedAt: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> ReverificationRequirementDto? {
+    let providerId = pigeonVar_list[0] as! String
+    let field = pigeonVar_list[1] as! ReverificationFieldDto
+    let requiredRecencyDays = pigeonVar_list[2] as! Int64
+    let lastVerifiedAt: String? = nilOrValue(pigeonVar_list[3])
+
+    return ReverificationRequirementDto(
+      providerId: providerId,
+      field: field,
+      requiredRecencyDays: requiredRecencyDays,
+      lastVerifiedAt: lastVerifiedAt
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      providerId,
+      field,
+      requiredRecencyDays,
+      lastVerifiedAt,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
 struct CheckoutRequirementDto {
   var type: CheckoutRequirementTypeDto
   var tos: TosRequirementDto? = nil
   var amountLimit: AmountLimitRequirementDto? = nil
   var userInfo: UserInfoRequirementDto? = nil
+  var reverification: ReverificationRequirementDto? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -570,12 +596,14 @@ struct CheckoutRequirementDto {
     let tos: TosRequirementDto? = nilOrValue(pigeonVar_list[1])
     let amountLimit: AmountLimitRequirementDto? = nilOrValue(pigeonVar_list[2])
     let userInfo: UserInfoRequirementDto? = nilOrValue(pigeonVar_list[3])
+    let reverification: ReverificationRequirementDto? = nilOrValue(pigeonVar_list[4])
 
     return CheckoutRequirementDto(
       type: type,
       tos: tos,
       amountLimit: amountLimit,
-      userInfo: userInfo
+      userInfo: userInfo,
+      reverification: reverification
     )
   }
   func toList() -> [Any?] {
@@ -584,6 +612,7 @@ struct CheckoutRequirementDto {
       tos,
       amountLimit,
       userInfo,
+      reverification,
     ]
   }
 }
@@ -626,14 +655,18 @@ struct CheckoutRequirementsResultDto {
 struct RenderContextDto {
   var url: String
   var renderType: RenderTypeDto
-  var paymentType: CheckoutPaymentTypeDto
+  /// Payment type for this render context. Present when the context comes from
+  /// a finalized checkout (state.rendering, checkoutFinalized event) but null
+  /// on the intermediate renderingStarted event, which the native SDK emits
+  /// without payment-type info.
+  var paymentType: CheckoutPaymentTypeDto? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> RenderContextDto? {
     let url = pigeonVar_list[0] as! String
     let renderType = pigeonVar_list[1] as! RenderTypeDto
-    let paymentType = pigeonVar_list[2] as! CheckoutPaymentTypeDto
+    let paymentType: CheckoutPaymentTypeDto? = nilOrValue(pigeonVar_list[2])
 
     return RenderContextDto(
       url: url,
@@ -646,6 +679,58 @@ struct RenderContextDto {
       url,
       renderType,
       paymentType,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct HeadlessCheckoutDataDto {
+  var url: String
+  var renderType: RenderTypeDto
+  var checkoutPaymentType: CheckoutPaymentTypeDto
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> HeadlessCheckoutDataDto? {
+    let url = pigeonVar_list[0] as! String
+    let renderType = pigeonVar_list[1] as! RenderTypeDto
+    let checkoutPaymentType = pigeonVar_list[2] as! CheckoutPaymentTypeDto
+
+    return HeadlessCheckoutDataDto(
+      url: url,
+      renderType: renderType,
+      checkoutPaymentType: checkoutPaymentType
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      url,
+      renderType,
+      checkoutPaymentType,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct CheckoutFinalizeResponseDto {
+  var headlessCheckoutId: String
+  var headlessCheckoutData: HeadlessCheckoutDataDto
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> CheckoutFinalizeResponseDto? {
+    let headlessCheckoutId = pigeonVar_list[0] as! String
+    let headlessCheckoutData = pigeonVar_list[1] as! HeadlessCheckoutDataDto
+
+    return CheckoutFinalizeResponseDto(
+      headlessCheckoutId: headlessCheckoutId,
+      headlessCheckoutData: headlessCheckoutData
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      headlessCheckoutId,
+      headlessCheckoutData,
     ]
   }
 }
@@ -690,6 +775,12 @@ struct CheckoutEventDto {
   var loginRequirements: [CheckoutRequirementDto]? = nil
   var requirementType: CheckoutRequirementTypeDto? = nil
   var renderContext: RenderContextDto? = nil
+  /// Populated on `checkoutFinalized`. Carries the full finalize payload so
+  /// consumers can inspect provider-side metadata.
+  var finalizeResponse: CheckoutFinalizeResponseDto? = nil
+  /// Populated on `providerError` — a short human-readable string from the
+  /// underlying provider explaining the failure.
+  var providerReason: String? = nil
   var error: OnramperErrorDto? = nil
 
 
@@ -701,7 +792,9 @@ struct CheckoutEventDto {
     let loginRequirements: [CheckoutRequirementDto]? = nilOrValue(pigeonVar_list[3])
     let requirementType: CheckoutRequirementTypeDto? = nilOrValue(pigeonVar_list[4])
     let renderContext: RenderContextDto? = nilOrValue(pigeonVar_list[5])
-    let error: OnramperErrorDto? = nilOrValue(pigeonVar_list[6])
+    let finalizeResponse: CheckoutFinalizeResponseDto? = nilOrValue(pigeonVar_list[6])
+    let providerReason: String? = nilOrValue(pigeonVar_list[7])
+    let error: OnramperErrorDto? = nilOrValue(pigeonVar_list[8])
 
     return CheckoutEventDto(
       kind: kind,
@@ -710,6 +803,8 @@ struct CheckoutEventDto {
       loginRequirements: loginRequirements,
       requirementType: requirementType,
       renderContext: renderContext,
+      finalizeResponse: finalizeResponse,
+      providerReason: providerReason,
       error: error
     )
   }
@@ -721,6 +816,8 @@ struct CheckoutEventDto {
       loginRequirements,
       requirementType,
       renderContext,
+      finalizeResponse,
+      providerReason,
       error,
     ]
   }
@@ -741,6 +838,7 @@ struct OnramperErrorDto {
   var toState: String? = nil
   var expectedState: String? = nil
   var actualState: String? = nil
+  var host: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -758,6 +856,7 @@ struct OnramperErrorDto {
     let toState: String? = nilOrValue(pigeonVar_list[10])
     let expectedState: String? = nilOrValue(pigeonVar_list[11])
     let actualState: String? = nilOrValue(pigeonVar_list[12])
+    let host: String? = nilOrValue(pigeonVar_list[13])
 
     return OnramperErrorDto(
       kind: kind,
@@ -772,7 +871,8 @@ struct OnramperErrorDto {
       fromState: fromState,
       toState: toState,
       expectedState: expectedState,
-      actualState: actualState
+      actualState: actualState,
+      host: host
     )
   }
   func toList() -> [Any?] {
@@ -790,6 +890,38 @@ struct OnramperErrorDto {
       toState,
       expectedState,
       actualState,
+      host,
+    ]
+  }
+}
+
+/// Colors are hex strings (`#RRGGBB` or `#RRGGBBAA`) matching the format the
+/// React Native SDK uses. `borderRadius` is in points.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct CheckoutButtonStyleDto {
+  var backgroundColor: String? = nil
+  var foregroundColor: String? = nil
+  var borderRadius: Double? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> CheckoutButtonStyleDto? {
+    let backgroundColor: String? = nilOrValue(pigeonVar_list[0])
+    let foregroundColor: String? = nilOrValue(pigeonVar_list[1])
+    let borderRadius: Double? = nilOrValue(pigeonVar_list[2])
+
+    return CheckoutButtonStyleDto(
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      borderRadius: borderRadius
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      backgroundColor,
+      foregroundColor,
+      borderRadius,
     ]
   }
 }
@@ -830,57 +962,61 @@ private class PigeonPigeonCodecReader: FlutterStandardReader {
     case 134:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return TosItemTypeDto(rawValue: enumResultAsInt)
+        return ReverificationFieldDto(rawValue: enumResultAsInt)
       }
       return nil
     case 135:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return UserInfoFieldTypeDto(rawValue: enumResultAsInt)
+        return TosItemTypeDto(rawValue: enumResultAsInt)
       }
       return nil
     case 136:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return RenderTypeDto(rawValue: enumResultAsInt)
+        return UserInfoFieldTypeDto(rawValue: enumResultAsInt)
       }
       return nil
     case 137:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return CheckoutPaymentTypeDto(rawValue: enumResultAsInt)
+        return RenderTypeDto(rawValue: enumResultAsInt)
       }
       return nil
     case 138:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return OnramperStateKindDto(rawValue: enumResultAsInt)
+        return CheckoutPaymentTypeDto(rawValue: enumResultAsInt)
       }
       return nil
     case 139:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return CheckoutEventKindDto(rawValue: enumResultAsInt)
+        return OnramperStateKindDto(rawValue: enumResultAsInt)
       }
       return nil
     case 140:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return OnramperErrorKindDto(rawValue: enumResultAsInt)
+        return CheckoutEventKindDto(rawValue: enumResultAsInt)
       }
       return nil
     case 141:
-      return ConfigurationDto.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return OnramperErrorKindDto(rawValue: enumResultAsInt)
+      }
+      return nil
     case 142:
-      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
+      return ConfigurationDto.fromList(self.readValue() as! [Any?])
     case 143:
-      return WalletInfoDto.fromList(self.readValue() as! [Any?])
+      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
     case 144:
-      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
+      return WalletInfoDto.fromList(self.readValue() as! [Any?])
     case 145:
-      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
+      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
     case 146:
-      return QuoteErrorDto.fromList(self.readValue() as! [Any?])
+      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
     case 147:
       return QuoteDto.fromList(self.readValue() as! [Any?])
     case 148:
@@ -894,17 +1030,25 @@ private class PigeonPigeonCodecReader: FlutterStandardReader {
     case 152:
       return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
     case 153:
-      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
+      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
     case 154:
-      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
     case 155:
-      return RenderContextDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
     case 156:
-      return OnramperStateDto.fromList(self.readValue() as! [Any?])
+      return RenderContextDto.fromList(self.readValue() as! [Any?])
     case 157:
-      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
     case 158:
+      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
+    case 159:
+      return OnramperStateDto.fromList(self.readValue() as! [Any?])
+    case 160:
+      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+    case 161:
       return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+    case 162:
+      return CheckoutButtonStyleDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -928,43 +1072,43 @@ private class PigeonPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? CheckoutRequirementTypeDto {
       super.writeByte(133)
       super.writeValue(value.rawValue)
-    } else if let value = value as? TosItemTypeDto {
+    } else if let value = value as? ReverificationFieldDto {
       super.writeByte(134)
       super.writeValue(value.rawValue)
-    } else if let value = value as? UserInfoFieldTypeDto {
+    } else if let value = value as? TosItemTypeDto {
       super.writeByte(135)
       super.writeValue(value.rawValue)
-    } else if let value = value as? RenderTypeDto {
+    } else if let value = value as? UserInfoFieldTypeDto {
       super.writeByte(136)
       super.writeValue(value.rawValue)
-    } else if let value = value as? CheckoutPaymentTypeDto {
+    } else if let value = value as? RenderTypeDto {
       super.writeByte(137)
       super.writeValue(value.rawValue)
-    } else if let value = value as? OnramperStateKindDto {
+    } else if let value = value as? CheckoutPaymentTypeDto {
       super.writeByte(138)
       super.writeValue(value.rawValue)
-    } else if let value = value as? CheckoutEventKindDto {
+    } else if let value = value as? OnramperStateKindDto {
       super.writeByte(139)
       super.writeValue(value.rawValue)
-    } else if let value = value as? OnramperErrorKindDto {
+    } else if let value = value as? CheckoutEventKindDto {
       super.writeByte(140)
       super.writeValue(value.rawValue)
-    } else if let value = value as? ConfigurationDto {
+    } else if let value = value as? OnramperErrorKindDto {
       super.writeByte(141)
-      super.writeValue(value.toList())
-    } else if let value = value as? SessionCredentialsDto {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? ConfigurationDto {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? WalletInfoDto {
+    } else if let value = value as? SessionCredentialsDto {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperTransactionDataDto {
+    } else if let value = value as? WalletInfoDto {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutIntentRequestDto {
+    } else if let value = value as? OnramperTransactionDataDto {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? QuoteErrorDto {
+    } else if let value = value as? CheckoutIntentRequestDto {
       super.writeByte(146)
       super.writeValue(value.toList())
     } else if let value = value as? QuoteDto {
@@ -985,23 +1129,35 @@ private class PigeonPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? UserInfoRequirementDto {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementDto {
+    } else if let value = value as? ReverificationRequirementDto {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementsResultDto {
+    } else if let value = value as? CheckoutRequirementDto {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? RenderContextDto {
+    } else if let value = value as? CheckoutRequirementsResultDto {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperStateDto {
+    } else if let value = value as? RenderContextDto {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutEventDto {
+    } else if let value = value as? HeadlessCheckoutDataDto {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperErrorDto {
+    } else if let value = value as? CheckoutFinalizeResponseDto {
       super.writeByte(158)
+      super.writeValue(value.toList())
+    } else if let value = value as? OnramperStateDto {
+      super.writeByte(159)
+      super.writeValue(value.toList())
+    } else if let value = value as? CheckoutEventDto {
+      super.writeByte(160)
+      super.writeValue(value.toList())
+    } else if let value = value as? OnramperErrorDto {
+      super.writeByte(161)
+      super.writeValue(value.toList())
+    } else if let value = value as? CheckoutButtonStyleDto {
+      super.writeByte(162)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1028,8 +1184,16 @@ class PigeonPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 protocol OnramperHostApi {
   func configure(config: ConfigurationDto) throws
   func initialize(credentials: SessionCredentialsDto, completion: @escaping (Result<Void, Error>) -> Void)
-  func getCheckoutRequirements(request: CheckoutIntentRequestDto, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
+  func getCheckoutRequirements(request: CheckoutIntentRequestDto, buttonStyle: CheckoutButtonStyleDto?, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
   func reset(completion: @escaping (Result<Void, Error>) -> Void)
+  /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
+  /// session (DPoP key + session token) is preserved, but the next checkout
+  /// will re-prompt for OnramperID login.
+  func signOut(completion: @escaping (Result<Void, Error>) -> Void)
+  /// Drops a stored native checkout button by handle without tearing down the
+  /// whole SDK client. Useful when the consumer's UI navigates away from a
+  /// prepared intent without dismissing it.
+  func cancelPreparedIntent(buttonHandle: String) throws
   func dispose(completion: @escaping (Result<Void, Error>) -> Void)
   func provideRefreshedSession(credentials: SessionCredentialsDto) throws
   func failRefreshedSession(reason: String) throws
@@ -1078,7 +1242,8 @@ class OnramperHostApiSetup {
       getCheckoutRequirementsChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let requestArg = args[0] as! CheckoutIntentRequestDto
-        api.getCheckoutRequirements(request: requestArg) { result in
+        let buttonStyleArg: CheckoutButtonStyleDto? = nilOrValue(args[1])
+        api.getCheckoutRequirements(request: requestArg, buttonStyle: buttonStyleArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -1104,6 +1269,42 @@ class OnramperHostApiSetup {
       }
     } else {
       resetChannel.setMessageHandler(nil)
+    }
+    /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
+    /// session (DPoP key + session token) is preserved, but the next checkout
+    /// will re-prompt for OnramperID login.
+    let signOutChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.signOut\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      signOutChannel.setMessageHandler { _, reply in
+        api.signOut { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      signOutChannel.setMessageHandler(nil)
+    }
+    /// Drops a stored native checkout button by handle without tearing down the
+    /// whole SDK client. Useful when the consumer's UI navigates away from a
+    /// prepared intent without dismissing it.
+    let cancelPreparedIntentChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.cancelPreparedIntent\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      cancelPreparedIntentChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let buttonHandleArg = args[0] as! String
+        do {
+          try api.cancelPreparedIntent(buttonHandle: buttonHandleArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      cancelPreparedIntentChannel.setMessageHandler(nil)
     }
     let disposeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.dispose\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

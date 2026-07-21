@@ -55,6 +55,12 @@ enum CheckoutRequirementTypeDto {
   tos,
   amountLimit,
   userInfo,
+  reverification,
+}
+
+enum ReverificationFieldDto {
+  email,
+  phone,
 }
 
 enum TosItemTypeDto {
@@ -108,6 +114,12 @@ enum CheckoutEventKindDto {
   renderingStarted,
   completed,
   failed,
+  checkoutCancelled,
+  providerReady,
+  paymentAuthorized,
+  paymentProcessing,
+  paymentCancelled,
+  providerError,
 }
 
 enum OnramperErrorKindDto {
@@ -136,6 +148,7 @@ enum OnramperErrorKindDto {
   configurationError,
   deviceBlocked,
   securityStorageFailed,
+  securityTrustFailed,
 }
 
 class ConfigurationDto {
@@ -239,16 +252,18 @@ class WalletInfoDto {
 class OnramperTransactionDataDto {
   OnramperTransactionDataDto({
     required this.source,
+    required this.destination,
     required this.amount,
     required this.type,
     required this.paymentMethod,
     required this.wallet,
-    this.destination,
     this.country,
     this.subdivision,
   });
 
   String source;
+
+  String destination;
 
   double amount;
 
@@ -258,8 +273,6 @@ class OnramperTransactionDataDto {
 
   WalletInfoDto wallet;
 
-  String? destination;
-
   String? country;
 
   String? subdivision;
@@ -267,11 +280,11 @@ class OnramperTransactionDataDto {
   Object encode() {
     return <Object?>[
       source,
+      destination,
       amount,
       type,
       paymentMethod,
       wallet,
-      destination,
       country,
       subdivision,
     ];
@@ -281,11 +294,11 @@ class OnramperTransactionDataDto {
     result as List<Object?>;
     return OnramperTransactionDataDto(
       source: result[0]! as String,
-      amount: result[1]! as double,
-      type: result[2]! as TransactionTypeDto,
-      paymentMethod: result[3]! as String,
-      wallet: result[4]! as WalletInfoDto,
-      destination: result[5] as String?,
+      destination: result[1]! as String,
+      amount: result[2]! as double,
+      type: result[3]! as TransactionTypeDto,
+      paymentMethod: result[4]! as String,
+      wallet: result[5]! as WalletInfoDto,
       country: result[6] as String?,
       subdivision: result[7] as String?,
     );
@@ -318,62 +331,33 @@ class CheckoutIntentRequestDto {
   }
 }
 
-class QuoteErrorDto {
-  QuoteErrorDto({
-    this.type,
-    this.message,
-  });
-
-  String? type;
-
-  String? message;
-
-  Object encode() {
-    return <Object?>[
-      type,
-      message,
-    ];
-  }
-
-  static QuoteErrorDto decode(Object result) {
-    result as List<Object?>;
-    return QuoteErrorDto(
-      type: result[0] as String?,
-      message: result[1] as String?,
-    );
-  }
-}
-
 class QuoteDto {
   QuoteDto({
-    this.quoteId,
-    this.ramp,
-    this.rate,
-    this.networkFee,
-    this.transactionFee,
-    this.payout,
-    this.paymentMethod,
+    required this.quoteId,
+    required this.ramp,
+    required this.rate,
+    required this.networkFee,
+    required this.transactionFee,
+    required this.payout,
+    required this.paymentMethod,
     this.recommendations,
-    this.errors,
   });
 
-  String? quoteId;
+  String quoteId;
 
-  String? ramp;
+  String ramp;
 
-  double? rate;
+  double rate;
 
-  double? networkFee;
+  double networkFee;
 
-  double? transactionFee;
+  double transactionFee;
 
-  double? payout;
+  double payout;
 
-  String? paymentMethod;
+  String paymentMethod;
 
   List<String>? recommendations;
-
-  List<QuoteErrorDto>? errors;
 
   Object encode() {
     return <Object?>[
@@ -385,22 +369,20 @@ class QuoteDto {
       payout,
       paymentMethod,
       recommendations,
-      errors,
     ];
   }
 
   static QuoteDto decode(Object result) {
     result as List<Object?>;
     return QuoteDto(
-      quoteId: result[0] as String?,
-      ramp: result[1] as String?,
-      rate: result[2] as double?,
-      networkFee: result[3] as double?,
-      transactionFee: result[4] as double?,
-      payout: result[5] as double?,
-      paymentMethod: result[6] as String?,
+      quoteId: result[0]! as String,
+      ramp: result[1]! as String,
+      rate: result[2]! as double,
+      networkFee: result[3]! as double,
+      transactionFee: result[4]! as double,
+      payout: result[5]! as double,
+      paymentMethod: result[6]! as String,
       recommendations: (result[7] as List<Object?>?)?.cast<String>(),
-      errors: (result[8] as List<Object?>?)?.cast<QuoteErrorDto>(),
     );
   }
 }
@@ -475,11 +457,16 @@ class TosRequirementDto {
 class AmountLimitRequirementDto {
   AmountLimitRequirementDto({
     required this.providerId,
+    required this.amountLimitSatisfied,
     this.minAmountLimit,
     this.maxAmountLimit,
   });
 
   String providerId;
+
+  /// True when the requested amount is already within the provider's min/max
+  /// bounds. Consumers can treat this as a "no action needed" signal.
+  bool amountLimitSatisfied;
 
   double? minAmountLimit;
 
@@ -488,6 +475,7 @@ class AmountLimitRequirementDto {
   Object encode() {
     return <Object?>[
       providerId,
+      amountLimitSatisfied,
       minAmountLimit,
       maxAmountLimit,
     ];
@@ -497,8 +485,9 @@ class AmountLimitRequirementDto {
     result as List<Object?>;
     return AmountLimitRequirementDto(
       providerId: result[0]! as String,
-      minAmountLimit: result[1] as double?,
-      maxAmountLimit: result[2] as double?,
+      amountLimitSatisfied: result[1]! as bool,
+      minAmountLimit: result[2] as double?,
+      maxAmountLimit: result[3] as double?,
     );
   }
 }
@@ -560,12 +549,51 @@ class UserInfoRequirementDto {
   }
 }
 
+class ReverificationRequirementDto {
+  ReverificationRequirementDto({
+    required this.providerId,
+    required this.field,
+    required this.requiredRecencyDays,
+    this.lastVerifiedAt,
+  });
+
+  String providerId;
+
+  ReverificationFieldDto field;
+
+  int requiredRecencyDays;
+
+  /// ISO-8601 timestamp of the last successful verification for [field], or
+  /// null if never verified.
+  String? lastVerifiedAt;
+
+  Object encode() {
+    return <Object?>[
+      providerId,
+      field,
+      requiredRecencyDays,
+      lastVerifiedAt,
+    ];
+  }
+
+  static ReverificationRequirementDto decode(Object result) {
+    result as List<Object?>;
+    return ReverificationRequirementDto(
+      providerId: result[0]! as String,
+      field: result[1]! as ReverificationFieldDto,
+      requiredRecencyDays: result[2]! as int,
+      lastVerifiedAt: result[3] as String?,
+    );
+  }
+}
+
 class CheckoutRequirementDto {
   CheckoutRequirementDto({
     required this.type,
     this.tos,
     this.amountLimit,
     this.userInfo,
+    this.reverification,
   });
 
   CheckoutRequirementTypeDto type;
@@ -576,12 +604,15 @@ class CheckoutRequirementDto {
 
   UserInfoRequirementDto? userInfo;
 
+  ReverificationRequirementDto? reverification;
+
   Object encode() {
     return <Object?>[
       type,
       tos,
       amountLimit,
       userInfo,
+      reverification,
     ];
   }
 
@@ -592,6 +623,7 @@ class CheckoutRequirementDto {
       tos: result[1] as TosRequirementDto?,
       amountLimit: result[2] as AmountLimitRequirementDto?,
       userInfo: result[3] as UserInfoRequirementDto?,
+      reverification: result[4] as ReverificationRequirementDto?,
     );
   }
 }
@@ -639,14 +671,18 @@ class RenderContextDto {
   RenderContextDto({
     required this.url,
     required this.renderType,
-    required this.paymentType,
+    this.paymentType,
   });
 
   String url;
 
   RenderTypeDto renderType;
 
-  CheckoutPaymentTypeDto paymentType;
+  /// Payment type for this render context. Present when the context comes from
+  /// a finalized checkout (state.rendering, checkoutFinalized event) but null
+  /// on the intermediate renderingStarted event, which the native SDK emits
+  /// without payment-type info.
+  CheckoutPaymentTypeDto? paymentType;
 
   Object encode() {
     return <Object?>[
@@ -661,7 +697,64 @@ class RenderContextDto {
     return RenderContextDto(
       url: result[0]! as String,
       renderType: result[1]! as RenderTypeDto,
-      paymentType: result[2]! as CheckoutPaymentTypeDto,
+      paymentType: result[2] as CheckoutPaymentTypeDto?,
+    );
+  }
+}
+
+class HeadlessCheckoutDataDto {
+  HeadlessCheckoutDataDto({
+    required this.url,
+    required this.renderType,
+    required this.checkoutPaymentType,
+  });
+
+  String url;
+
+  RenderTypeDto renderType;
+
+  CheckoutPaymentTypeDto checkoutPaymentType;
+
+  Object encode() {
+    return <Object?>[
+      url,
+      renderType,
+      checkoutPaymentType,
+    ];
+  }
+
+  static HeadlessCheckoutDataDto decode(Object result) {
+    result as List<Object?>;
+    return HeadlessCheckoutDataDto(
+      url: result[0]! as String,
+      renderType: result[1]! as RenderTypeDto,
+      checkoutPaymentType: result[2]! as CheckoutPaymentTypeDto,
+    );
+  }
+}
+
+class CheckoutFinalizeResponseDto {
+  CheckoutFinalizeResponseDto({
+    required this.headlessCheckoutId,
+    required this.headlessCheckoutData,
+  });
+
+  String headlessCheckoutId;
+
+  HeadlessCheckoutDataDto headlessCheckoutData;
+
+  Object encode() {
+    return <Object?>[
+      headlessCheckoutId,
+      headlessCheckoutData,
+    ];
+  }
+
+  static CheckoutFinalizeResponseDto decode(Object result) {
+    result as List<Object?>;
+    return CheckoutFinalizeResponseDto(
+      headlessCheckoutId: result[0]! as String,
+      headlessCheckoutData: result[1]! as HeadlessCheckoutDataDto,
     );
   }
 }
@@ -711,6 +804,8 @@ class CheckoutEventDto {
     this.loginRequirements,
     this.requirementType,
     this.renderContext,
+    this.finalizeResponse,
+    this.providerReason,
     this.error,
   });
 
@@ -726,6 +821,14 @@ class CheckoutEventDto {
 
   RenderContextDto? renderContext;
 
+  /// Populated on `checkoutFinalized`. Carries the full finalize payload so
+  /// consumers can inspect provider-side metadata.
+  CheckoutFinalizeResponseDto? finalizeResponse;
+
+  /// Populated on `providerError` — a short human-readable string from the
+  /// underlying provider explaining the failure.
+  String? providerReason;
+
   OnramperErrorDto? error;
 
   Object encode() {
@@ -736,6 +839,8 @@ class CheckoutEventDto {
       loginRequirements,
       requirementType,
       renderContext,
+      finalizeResponse,
+      providerReason,
       error,
     ];
   }
@@ -750,7 +855,9 @@ class CheckoutEventDto {
           (result[3] as List<Object?>?)?.cast<CheckoutRequirementDto>(),
       requirementType: result[4] as CheckoutRequirementTypeDto?,
       renderContext: result[5] as RenderContextDto?,
-      error: result[6] as OnramperErrorDto?,
+      finalizeResponse: result[6] as CheckoutFinalizeResponseDto?,
+      providerReason: result[7] as String?,
+      error: result[8] as OnramperErrorDto?,
     );
   }
 }
@@ -770,6 +877,7 @@ class OnramperErrorDto {
     this.toState,
     this.expectedState,
     this.actualState,
+    this.host,
   });
 
   OnramperErrorKindDto kind;
@@ -798,6 +906,8 @@ class OnramperErrorDto {
 
   String? actualState;
 
+  String? host;
+
   Object encode() {
     return <Object?>[
       kind,
@@ -813,6 +923,7 @@ class OnramperErrorDto {
       toState,
       expectedState,
       actualState,
+      host,
     ];
   }
 
@@ -832,6 +943,40 @@ class OnramperErrorDto {
       toState: result[10] as String?,
       expectedState: result[11] as String?,
       actualState: result[12] as String?,
+      host: result[13] as String?,
+    );
+  }
+}
+
+/// Colors are hex strings (`#RRGGBB` or `#RRGGBBAA`) matching the format the
+/// React Native SDK uses. `borderRadius` is in points.
+class CheckoutButtonStyleDto {
+  CheckoutButtonStyleDto({
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderRadius,
+  });
+
+  String? backgroundColor;
+
+  String? foregroundColor;
+
+  double? borderRadius;
+
+  Object encode() {
+    return <Object?>[
+      backgroundColor,
+      foregroundColor,
+      borderRadius,
+    ];
+  }
+
+  static CheckoutButtonStyleDto decode(Object result) {
+    result as List<Object?>;
+    return CheckoutButtonStyleDto(
+      backgroundColor: result[0] as String?,
+      foregroundColor: result[1] as String?,
+      borderRadius: result[2] as double?,
     );
   }
 }
@@ -858,43 +1003,43 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is CheckoutRequirementTypeDto) {
       buffer.putUint8(133);
       writeValue(buffer, value.index);
-    } else if (value is TosItemTypeDto) {
+    } else if (value is ReverificationFieldDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    } else if (value is UserInfoFieldTypeDto) {
+    } else if (value is TosItemTypeDto) {
       buffer.putUint8(135);
       writeValue(buffer, value.index);
-    } else if (value is RenderTypeDto) {
+    } else if (value is UserInfoFieldTypeDto) {
       buffer.putUint8(136);
       writeValue(buffer, value.index);
-    } else if (value is CheckoutPaymentTypeDto) {
+    } else if (value is RenderTypeDto) {
       buffer.putUint8(137);
       writeValue(buffer, value.index);
-    } else if (value is OnramperStateKindDto) {
+    } else if (value is CheckoutPaymentTypeDto) {
       buffer.putUint8(138);
       writeValue(buffer, value.index);
-    } else if (value is CheckoutEventKindDto) {
+    } else if (value is OnramperStateKindDto) {
       buffer.putUint8(139);
       writeValue(buffer, value.index);
-    } else if (value is OnramperErrorKindDto) {
+    } else if (value is CheckoutEventKindDto) {
       buffer.putUint8(140);
       writeValue(buffer, value.index);
-    } else if (value is ConfigurationDto) {
+    } else if (value is OnramperErrorKindDto) {
       buffer.putUint8(141);
-      writeValue(buffer, value.encode());
-    } else if (value is SessionCredentialsDto) {
+      writeValue(buffer, value.index);
+    } else if (value is ConfigurationDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is WalletInfoDto) {
+    } else if (value is SessionCredentialsDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperTransactionDataDto) {
+    } else if (value is WalletInfoDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutIntentRequestDto) {
+    } else if (value is OnramperTransactionDataDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is QuoteErrorDto) {
+    } else if (value is CheckoutIntentRequestDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
     } else if (value is QuoteDto) {
@@ -915,23 +1060,35 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is UserInfoRequirementDto) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementDto) {
+    } else if (value is ReverificationRequirementDto) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementsResultDto) {
+    } else if (value is CheckoutRequirementDto) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    } else if (value is RenderContextDto) {
+    } else if (value is CheckoutRequirementsResultDto) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperStateDto) {
+    } else if (value is RenderContextDto) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutEventDto) {
+    } else if (value is HeadlessCheckoutDataDto) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperErrorDto) {
+    } else if (value is CheckoutFinalizeResponseDto) {
       buffer.putUint8(158);
+      writeValue(buffer, value.encode());
+    } else if (value is OnramperStateDto) {
+      buffer.putUint8(159);
+      writeValue(buffer, value.encode());
+    } else if (value is CheckoutEventDto) {
+      buffer.putUint8(160);
+      writeValue(buffer, value.encode());
+    } else if (value is OnramperErrorDto) {
+      buffer.putUint8(161);
+      writeValue(buffer, value.encode());
+    } else if (value is CheckoutButtonStyleDto) {
+      buffer.putUint8(162);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -958,37 +1115,38 @@ class _PigeonCodec extends StandardMessageCodec {
         return value == null ? null : CheckoutRequirementTypeDto.values[value];
       case 134:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : TosItemTypeDto.values[value];
+        return value == null ? null : ReverificationFieldDto.values[value];
       case 135:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : UserInfoFieldTypeDto.values[value];
+        return value == null ? null : TosItemTypeDto.values[value];
       case 136:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : RenderTypeDto.values[value];
+        return value == null ? null : UserInfoFieldTypeDto.values[value];
       case 137:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : CheckoutPaymentTypeDto.values[value];
+        return value == null ? null : RenderTypeDto.values[value];
       case 138:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : OnramperStateKindDto.values[value];
+        return value == null ? null : CheckoutPaymentTypeDto.values[value];
       case 139:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : CheckoutEventKindDto.values[value];
+        return value == null ? null : OnramperStateKindDto.values[value];
       case 140:
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : OnramperErrorKindDto.values[value];
+        return value == null ? null : CheckoutEventKindDto.values[value];
       case 141:
-        return ConfigurationDto.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : OnramperErrorKindDto.values[value];
       case 142:
-        return SessionCredentialsDto.decode(readValue(buffer)!);
+        return ConfigurationDto.decode(readValue(buffer)!);
       case 143:
-        return WalletInfoDto.decode(readValue(buffer)!);
+        return SessionCredentialsDto.decode(readValue(buffer)!);
       case 144:
-        return OnramperTransactionDataDto.decode(readValue(buffer)!);
+        return WalletInfoDto.decode(readValue(buffer)!);
       case 145:
-        return CheckoutIntentRequestDto.decode(readValue(buffer)!);
+        return OnramperTransactionDataDto.decode(readValue(buffer)!);
       case 146:
-        return QuoteErrorDto.decode(readValue(buffer)!);
+        return CheckoutIntentRequestDto.decode(readValue(buffer)!);
       case 147:
         return QuoteDto.decode(readValue(buffer)!);
       case 148:
@@ -1002,17 +1160,25 @@ class _PigeonCodec extends StandardMessageCodec {
       case 152:
         return UserInfoRequirementDto.decode(readValue(buffer)!);
       case 153:
-        return CheckoutRequirementDto.decode(readValue(buffer)!);
+        return ReverificationRequirementDto.decode(readValue(buffer)!);
       case 154:
-        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
+        return CheckoutRequirementDto.decode(readValue(buffer)!);
       case 155:
-        return RenderContextDto.decode(readValue(buffer)!);
+        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
       case 156:
-        return OnramperStateDto.decode(readValue(buffer)!);
+        return RenderContextDto.decode(readValue(buffer)!);
       case 157:
-        return CheckoutEventDto.decode(readValue(buffer)!);
+        return HeadlessCheckoutDataDto.decode(readValue(buffer)!);
       case 158:
+        return CheckoutFinalizeResponseDto.decode(readValue(buffer)!);
+      case 159:
+        return OnramperStateDto.decode(readValue(buffer)!);
+      case 160:
+        return CheckoutEventDto.decode(readValue(buffer)!);
+      case 161:
         return OnramperErrorDto.decode(readValue(buffer)!);
+      case 162:
+        return CheckoutButtonStyleDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -1083,7 +1249,8 @@ class OnramperHostApi {
   }
 
   Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
-      CheckoutIntentRequestDto request) async {
+      CheckoutIntentRequestDto request,
+      CheckoutButtonStyleDto? buttonStyle) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
@@ -1092,8 +1259,8 @@ class OnramperHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_channel.send(<Object?>[request]) as List<Object?>?;
+    final List<Object?>? pigeonVar_replyList = await pigeonVar_channel
+        .send(<Object?>[request, buttonStyle]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
@@ -1123,6 +1290,60 @@ class OnramperHostApi {
     );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
+  /// session (DPoP key + session token) is preserved, but the next checkout
+  /// will re-prompt for OnramperID login.
+  Future<void> signOut() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.signOut$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Drops a stored native checkout button by handle without tearing down the
+  /// whole SDK client. Useful when the consumer's UI navigates away from a
+  /// prepared intent without dismissing it.
+  Future<void> cancelPreparedIntent(String buttonHandle) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.cancelPreparedIntent$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[buttonHandle]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {

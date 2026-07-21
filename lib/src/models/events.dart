@@ -4,6 +4,11 @@ import 'requirements.dart';
 import 'state.dart';
 
 /// Discriminator for events streamed to consumers of [OnramperClient.events].
+///
+/// The first 9 kinds are the "canonical" SDK events. The last 6
+/// (`checkoutCancelled` … `providerError`) are provider-lifecycle events
+/// forwarded from the third-party checkout webview — not every provider emits
+/// every kind.
 enum CheckoutEventKind {
   stateChanged,
   checkoutStarted,
@@ -14,7 +19,64 @@ enum CheckoutEventKind {
   renderingStarted,
   completed,
   failed,
+  checkoutCancelled,
+  providerReady,
+  paymentAuthorized,
+  paymentProcessing,
+  paymentCancelled,
+  providerError,
 }
+
+/// Full finalize response emitted with a [CheckoutEventKind.checkoutFinalized]
+/// event. Consumers usually only need [renderContext] on the same event — this
+/// carries the full payload for cases where partner-side metadata matters.
+class CheckoutFinalizeResponse {
+  const CheckoutFinalizeResponse({
+    required this.headlessCheckoutId,
+    required this.headlessCheckoutData,
+  });
+
+  factory CheckoutFinalizeResponse.fromDto(CheckoutFinalizeResponseDto dto) =>
+      CheckoutFinalizeResponse(
+        headlessCheckoutId: dto.headlessCheckoutId,
+        headlessCheckoutData:
+            HeadlessCheckoutData.fromDto(dto.headlessCheckoutData),
+      );
+
+  final String headlessCheckoutId;
+  final HeadlessCheckoutData headlessCheckoutData;
+}
+
+/// Payment-render information carried inside [CheckoutFinalizeResponse].
+class HeadlessCheckoutData {
+  const HeadlessCheckoutData({
+    required this.url,
+    required this.renderType,
+    required this.checkoutPaymentType,
+  });
+
+  factory HeadlessCheckoutData.fromDto(HeadlessCheckoutDataDto dto) =>
+      HeadlessCheckoutData(
+        url: dto.url,
+        renderType: _renderTypeFromDto(dto.renderType),
+        checkoutPaymentType: _paymentTypeFromDto(dto.checkoutPaymentType),
+      );
+
+  final String url;
+  final RenderType renderType;
+  final CheckoutPaymentType checkoutPaymentType;
+}
+
+RenderType _renderTypeFromDto(RenderTypeDto dto) => switch (dto) {
+      RenderTypeDto.webview => RenderType.webview,
+      RenderTypeDto.deeplink => RenderType.deeplink,
+    };
+
+CheckoutPaymentType _paymentTypeFromDto(CheckoutPaymentTypeDto dto) =>
+    switch (dto) {
+      CheckoutPaymentTypeDto.applePay => CheckoutPaymentType.applePay,
+      CheckoutPaymentTypeDto.revolutPay => CheckoutPaymentType.revolutPay,
+    };
 
 /// Domain event observed from the native SDK.
 ///
@@ -28,6 +90,8 @@ class CheckoutEvent {
     this.loginRequirements,
     this.requirementType,
     this.renderContext,
+    this.finalizeResponse,
+    this.providerReason,
     this.error,
   });
 
@@ -46,6 +110,10 @@ class CheckoutEvent {
         renderContext: dto.renderContext == null
             ? null
             : RenderContext.fromDto(dto.renderContext!),
+        finalizeResponse: dto.finalizeResponse == null
+            ? null
+            : CheckoutFinalizeResponse.fromDto(dto.finalizeResponse!),
+        providerReason: dto.providerReason,
         error: dto.error == null ? null : OnramperError.fromDto(dto.error!),
       );
 
@@ -55,6 +123,14 @@ class CheckoutEvent {
   final List<CheckoutRequirement>? loginRequirements;
   final CheckoutRequirementKind? requirementType;
   final RenderContext? renderContext;
+
+  /// Populated on [CheckoutEventKind.checkoutFinalized]. Full finalize
+  /// response including provider-side metadata.
+  final CheckoutFinalizeResponse? finalizeResponse;
+
+  /// Populated on [CheckoutEventKind.providerError]. Short human-readable
+  /// reason string forwarded from the underlying provider.
+  final String? providerReason;
   final OnramperError? error;
 
   static CheckoutEventKind _kindFromDto(CheckoutEventKindDto dto) =>
@@ -73,6 +149,16 @@ class CheckoutEvent {
           CheckoutEventKind.renderingStarted,
         CheckoutEventKindDto.completed => CheckoutEventKind.completed,
         CheckoutEventKindDto.failed => CheckoutEventKind.failed,
+        CheckoutEventKindDto.checkoutCancelled =>
+          CheckoutEventKind.checkoutCancelled,
+        CheckoutEventKindDto.providerReady => CheckoutEventKind.providerReady,
+        CheckoutEventKindDto.paymentAuthorized =>
+          CheckoutEventKind.paymentAuthorized,
+        CheckoutEventKindDto.paymentProcessing =>
+          CheckoutEventKind.paymentProcessing,
+        CheckoutEventKindDto.paymentCancelled =>
+          CheckoutEventKind.paymentCancelled,
+        CheckoutEventKindDto.providerError => CheckoutEventKind.providerError,
       };
 
   static CheckoutRequirementKind _reqTypeFromDto(
@@ -83,5 +169,7 @@ class CheckoutEvent {
         CheckoutRequirementTypeDto.amountLimit =>
           CheckoutRequirementKind.amountLimit,
         CheckoutRequirementTypeDto.userInfo => CheckoutRequirementKind.userInfo,
+        CheckoutRequirementTypeDto.reverification =>
+          CheckoutRequirementKind.reverification,
       };
 }

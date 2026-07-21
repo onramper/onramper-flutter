@@ -24,7 +24,4 @@ jobs:
           # OnramperSDK.xcframework at pod install time. Remove once
           # onramper-ios is public.
           ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
-        # --skip-tests: the Tests/ spec is stale relative to BridgeMappers and
-        # has been broken on every CI run in this repo's history; fixing it is
-        # a follow-up task, not part of the release-binary migration.
-        run: pod lib lint ios/onramper_sdk.podspec --allow-warnings --skip-tests
+        run: pod lib lint ios/onramper_sdk.podspec --allow-warnings

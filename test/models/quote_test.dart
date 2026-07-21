@@ -14,9 +14,6 @@ void main() {
         payout: 100.0,
         paymentMethod: 'credit_card',
         recommendations: <String>['fastest', 'cheapest'],
-        errors: <QuoteErrorDto>[
-          QuoteErrorDto(type: 'min', message: 'amount too low'),
-        ],
       );
 
       final q = QuoteResponse.fromDto(dto);
@@ -29,56 +26,39 @@ void main() {
       expect(q.payout, 100.0);
       expect(q.paymentMethod, 'credit_card');
       expect(q.recommendations, <String>['fastest', 'cheapest']);
-      expect(q.errors, hasLength(1));
-      expect(q.errors!.first.type, 'min');
-      expect(q.errors!.first.message, 'amount too low');
     });
 
-    test('round-trips an all-nil quote', () {
-      final dto = QuoteDto();
-      final q = QuoteResponse.fromDto(dto);
-
-      expect(q.quoteId, isNull);
-      expect(q.ramp, isNull);
-      expect(q.rate, isNull);
-      expect(q.networkFee, isNull);
-      expect(q.transactionFee, isNull);
-      expect(q.payout, isNull);
-      expect(q.paymentMethod, isNull);
-      expect(q.recommendations, isNull);
-      expect(q.errors, isNull);
-    });
-
-    test('round-trips a quote with multiple errors and no recommendations', () {
+    test('omitted recommendations map to null', () {
       final dto = QuoteDto(
-        errors: <QuoteErrorDto>[
-          QuoteErrorDto(type: 'a', message: 'A'),
-          QuoteErrorDto(type: 'b', message: 'B'),
-          QuoteErrorDto(),
-        ],
+        quoteId: 'q',
+        ramp: 'r',
+        rate: 1,
+        networkFee: 0,
+        transactionFee: 0,
+        payout: 1,
+        paymentMethod: 'pm',
       );
 
       final q = QuoteResponse.fromDto(dto);
 
       expect(q.recommendations, isNull);
-      expect(q.errors, hasLength(3));
-      expect(q.errors![2].type, isNull);
-      expect(q.errors![2].message, isNull);
-    });
-  });
-
-  group('QuoteError.fromDto', () {
-    test('preserves both fields', () {
-      final dto = QuoteErrorDto(type: 't', message: 'm');
-      final err = QuoteError.fromDto(dto);
-      expect(err.type, 't');
-      expect(err.message, 'm');
     });
 
-    test('preserves null fields', () {
-      final err = QuoteError.fromDto(QuoteErrorDto());
-      expect(err.type, isNull);
-      expect(err.message, isNull);
+    test('recommendations list is unmodifiable', () {
+      final dto = QuoteDto(
+        quoteId: 'q',
+        ramp: 'r',
+        rate: 1,
+        networkFee: 0,
+        transactionFee: 0,
+        payout: 1,
+        paymentMethod: 'pm',
+        recommendations: <String>['a'],
+      );
+
+      final q = QuoteResponse.fromDto(dto);
+
+      expect(() => q.recommendations!.add('b'), throwsUnsupportedError);
     });
   });
 }

@@ -16,7 +16,15 @@ void main() {
       CheckoutRequirementsResult(
         headlessCheckoutId: 'co_1',
         requirements: requirements ?? const [],
-        quote: const QuoteResponse(rate: 0.000017),
+        quote: const QuoteResponse(
+          quoteId: 'q',
+          ramp: 'moonpay',
+          rate: 0.000017,
+          networkFee: 0,
+          transactionFee: 0,
+          payout: 0.000017,
+          paymentMethod: 'credit_debit_card',
+        ),
         buttonHandle: buttonHandle,
       );
 

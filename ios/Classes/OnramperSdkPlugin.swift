@@ -10,8 +10,6 @@ enum PluginError: Error {
     case notConfigured
     /// The native SDK has not been `initialize(...)`-d yet.
     case notInitialized
-    /// Reserved for HostApi methods that Task 7+ will implement.
-    case notImplemented
     /// The native SDK produced no usable response (e.g. swallowed a
     /// `CheckoutIntentResponse` we needed to assemble a DTO).
     case missingResponse(String)
@@ -23,8 +21,6 @@ enum PluginError: Error {
             return PigeonError(code: "not_configured", message: "OnramperHostApi.configure has not been called", details: nil)
         case .notInitialized:
             return PigeonError(code: "not_initialized", message: "OnramperHostApi.initialize has not been called", details: nil)
-        case .notImplemented:
-            return PigeonError(code: "not_implemented", message: "Method not yet implemented in this plugin version", details: nil)
         case .missingResponse(let detail):
             return PigeonError(code: "missing_response", message: "Native SDK produced no usable response", details: detail)
         }
@@ -163,7 +159,12 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 // `OnramperHostApi` is generated `internal`, so conforming methods stay
 // `internal` too (no `public` keyword). They are still discoverable from
 // Pigeon-generated code because that code lives in the same module.
-
+//
+// The extension is `@MainActor` because the class is @MainActor and Swift 6
+// requires the isolation to be spelled out on the extension too when
+// conforming to a non-isolated protocol like `OnramperHostApi` (pigeon
+// generates that protocol without any actor annotation).
+@MainActor
 extension OnramperSdkPlugin: OnramperHostApi {
 
     func configure(config: ConfigurationDto) throws {
@@ -188,11 +189,8 @@ extension OnramperSdkPlugin: OnramperHostApi {
         let api = self.flutterApi
         eventForwardingTask = Task { @MainActor [weak self] in
             for await event in newClient.events {
-                // fromNative returns nil for provider lifecycle events that
-                // have no Pigeon DTO yet — skip forwarding those to Dart.
-                if let dto = BridgeMappers.fromNative(event) {
-                    api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
-                }
+                let dto = BridgeMappers.fromNative(event)
+                api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
                 self?.observeEventForRequirementsCollector(event)
             }
         }
@@ -246,6 +244,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
 
     func getCheckoutRequirements(
         request: CheckoutIntentRequestDto,
+        buttonStyle: CheckoutButtonStyleDto?,
         completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void
     ) {
         guard let client else {
@@ -253,6 +252,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
             return
         }
         let nativeRequest = BridgeMappers.toNative(request)
+        let nativeStyle = BridgeMappers.toNative(buttonStyle)
         let collector = CheckoutRequirementsCollector()
         self.inFlightRequirements = collector
 
@@ -260,11 +260,13 @@ extension OnramperSdkPlugin: OnramperHostApi {
             defer { self.inFlightRequirements = nil }
             do {
                 // `getCheckoutRequirements` is UIKit-gated and returns a
-                // SwiftUI button + quote. We keep both: the button is the
-                // native, pre-wired UI that `presentCheckout` hosts (its
-                // internal init is unreachable from us, but the SDK
-                // constructs it on this call); the quote populates the DTO.
-                let result = try await client.getCheckoutRequirements(nativeRequest)
+                // SwiftUI button + quote. The button's appearance comes from
+                // `nativeStyle`, defaulting to the SDK's system-blue if the
+                // consumer didn't override.
+                let result = try await client.getCheckoutRequirements(
+                    nativeRequest,
+                    buttonStyle: nativeStyle
+                )
 
                 // Store the button in the registry and hand the handle to Dart so
                 // OnramperNativeCheckoutButton can look it up via the platform view.
@@ -311,6 +313,27 @@ extension OnramperSdkPlugin: OnramperHostApi {
         }
     }
 
+    func signOut(completion: @escaping (Result<Void, Error>) -> Void) {
+        let client = self.client
+        let handle = self.lastButtonHandle
+        Task { @MainActor in
+            await client?.signOut()
+            // Drop the current button too — the intent it addressed was tied
+            // to the now-cleared OIDC identity.
+            if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
+            self.lastButtonHandle = nil
+            completion(.success(()))
+        }
+    }
+
+    func cancelPreparedIntent(buttonHandle: String) throws {
+        // Fire-and-forget — the registry actor serialises access. If the
+        // handle refers to the currently-tracked button, also clear our
+        // reference so a subsequent reset() doesn't try to drop a stale id.
+        Task { await CheckoutButtonRegistry.shared.drop(buttonHandle) }
+        if lastButtonHandle == buttonHandle { lastButtonHandle = nil }
+    }
+
     func dispose(completion: @escaping (Result<Void, Error>) -> Void) {
         let client = self.client
         Task { @MainActor in
@@ -345,7 +368,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
 // All callbacks run on the main actor (per the SDK protocol). We forward
 // state changes to Dart via `onStateChanged` and feed the in-flight
 // requirements collector when a `getCheckoutRequirements` call is mid-flight.
-
+@MainActor
 extension OnramperSdkPlugin: OnramperDelegate {
 
     public func onramperClient(_ client: OnramperClient, didChangeState state: OnramperState) {

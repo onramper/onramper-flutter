@@ -51,20 +51,20 @@ class WalletInfoDto {
 class OnramperTransactionDataDto {
   OnramperTransactionDataDto({
     required this.source,
+    required this.destination,
     required this.amount,
     required this.type,
     required this.paymentMethod,
     required this.wallet,
-    this.destination,
     this.country,
     this.subdivision,
   });
   final String source;
+  final String destination;
   final double amount;
   final TransactionTypeDto type;
   final String paymentMethod;
   final WalletInfoDto wallet;
-  final String? destination;
   final String? country;
   final String? subdivision;
 }
@@ -77,38 +77,32 @@ class CheckoutIntentRequestDto {
 
 // ---- Quote ----
 
-class QuoteErrorDto {
-  QuoteErrorDto({this.type, this.message});
-  final String? type;
-  final String? message;
-}
-
 class QuoteDto {
   QuoteDto({
-    this.quoteId,
-    this.ramp,
-    this.rate,
-    this.networkFee,
-    this.transactionFee,
-    this.payout,
-    this.paymentMethod,
+    required this.quoteId,
+    required this.ramp,
+    required this.rate,
+    required this.networkFee,
+    required this.transactionFee,
+    required this.payout,
+    required this.paymentMethod,
     this.recommendations,
-    this.errors,
   });
-  final String? quoteId;
-  final String? ramp;
-  final double? rate;
-  final double? networkFee;
-  final double? transactionFee;
-  final double? payout;
-  final String? paymentMethod;
+  final String quoteId;
+  final String ramp;
+  final double rate;
+  final double networkFee;
+  final double transactionFee;
+  final double payout;
+  final String paymentMethod;
   final List<String>? recommendations;
-  final List<QuoteErrorDto>? errors;
 }
 
 // ---- Checkout requirements ----
 
-enum CheckoutRequirementTypeDto { tos, amountLimit, userInfo }
+enum CheckoutRequirementTypeDto { tos, amountLimit, userInfo, reverification }
+
+enum ReverificationFieldDto { email, phone }
 
 enum TosItemTypeDto { tos, privacyPolicy, userAgreement }
 
@@ -136,10 +130,15 @@ class TosRequirementDto {
 class AmountLimitRequirementDto {
   AmountLimitRequirementDto({
     required this.providerId,
+    required this.amountLimitSatisfied,
     this.minAmountLimit,
     this.maxAmountLimit,
   });
   final String providerId;
+
+  /// True when the requested amount is already within the provider's min/max
+  /// bounds. Consumers can treat this as a "no action needed" signal.
+  final bool amountLimitSatisfied;
   final double? minAmountLimit;
   final double? maxAmountLimit;
 }
@@ -169,17 +168,35 @@ class UserInfoRequirementDto {
   final List<UserInfoFieldDto> fields;
 }
 
+class ReverificationRequirementDto {
+  ReverificationRequirementDto({
+    required this.providerId,
+    required this.field,
+    required this.requiredRecencyDays,
+    this.lastVerifiedAt,
+  });
+  final String providerId;
+  final ReverificationFieldDto field;
+  final int requiredRecencyDays;
+
+  /// ISO-8601 timestamp of the last successful verification for [field], or
+  /// null if never verified.
+  final String? lastVerifiedAt;
+}
+
 class CheckoutRequirementDto {
   CheckoutRequirementDto({
     required this.type,
     this.tos,
     this.amountLimit,
     this.userInfo,
+    this.reverification,
   });
   final CheckoutRequirementTypeDto type;
   final TosRequirementDto? tos;
   final AmountLimitRequirementDto? amountLimit;
   final UserInfoRequirementDto? userInfo;
+  final ReverificationRequirementDto? reverification;
 }
 
 class CheckoutRequirementsResultDto {
@@ -208,11 +225,38 @@ class RenderContextDto {
   RenderContextDto({
     required this.url,
     required this.renderType,
-    required this.paymentType,
+    this.paymentType,
   });
   final String url;
   final RenderTypeDto renderType;
-  final CheckoutPaymentTypeDto paymentType;
+
+  /// Payment type for this render context. Present when the context comes from
+  /// a finalized checkout (state.rendering, checkoutFinalized event) but null
+  /// on the intermediate renderingStarted event, which the native SDK emits
+  /// without payment-type info.
+  final CheckoutPaymentTypeDto? paymentType;
+}
+
+// ---- Checkout finalize response ----
+
+class HeadlessCheckoutDataDto {
+  HeadlessCheckoutDataDto({
+    required this.url,
+    required this.renderType,
+    required this.checkoutPaymentType,
+  });
+  final String url;
+  final RenderTypeDto renderType;
+  final CheckoutPaymentTypeDto checkoutPaymentType;
+}
+
+class CheckoutFinalizeResponseDto {
+  CheckoutFinalizeResponseDto({
+    required this.headlessCheckoutId,
+    required this.headlessCheckoutData,
+  });
+  final String headlessCheckoutId;
+  final HeadlessCheckoutDataDto headlessCheckoutData;
 }
 
 // ---- State ----
@@ -256,6 +300,14 @@ enum CheckoutEventKindDto {
   renderingStarted,
   completed,
   failed,
+  // Provider-lifecycle events emitted from the third-party checkout webview.
+  // Not every provider emits every event.
+  checkoutCancelled,
+  providerReady,
+  paymentAuthorized,
+  paymentProcessing,
+  paymentCancelled,
+  providerError,
 }
 
 class CheckoutEventDto {
@@ -266,6 +318,8 @@ class CheckoutEventDto {
     this.loginRequirements,
     this.requirementType,
     this.renderContext,
+    this.finalizeResponse,
+    this.providerReason,
     this.error,
   });
   final CheckoutEventKindDto kind;
@@ -274,6 +328,14 @@ class CheckoutEventDto {
   final List<CheckoutRequirementDto>? loginRequirements;
   final CheckoutRequirementTypeDto? requirementType;
   final RenderContextDto? renderContext;
+
+  /// Populated on `checkoutFinalized`. Carries the full finalize payload so
+  /// consumers can inspect provider-side metadata.
+  final CheckoutFinalizeResponseDto? finalizeResponse;
+
+  /// Populated on `providerError` — a short human-readable string from the
+  /// underlying provider explaining the failure.
+  final String? providerReason;
   final OnramperErrorDto? error;
 }
 
@@ -306,6 +368,7 @@ enum OnramperErrorKindDto {
   configurationError,
   deviceBlocked,
   securityStorageFailed,
+  securityTrustFailed,
 }
 
 class OnramperErrorDto {
@@ -323,6 +386,7 @@ class OnramperErrorDto {
     this.toState,
     this.expectedState,
     this.actualState,
+    this.host,
   });
   final OnramperErrorKindDto kind;
   final String message;
@@ -339,6 +403,22 @@ class OnramperErrorDto {
   final String? toState; // invalidStateTransition.to
   final String? expectedState; // invalidState.expected
   final String? actualState; // invalidState.actual
+  final String? host; // securityTrustFailed.host
+}
+
+// ---- Button style ----
+
+/// Colors are hex strings (`#RRGGBB` or `#RRGGBBAA`) matching the format the
+/// React Native SDK uses. `borderRadius` is in points.
+class CheckoutButtonStyleDto {
+  CheckoutButtonStyleDto({
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderRadius,
+  });
+  final String? backgroundColor;
+  final String? foregroundColor;
+  final double? borderRadius;
 }
 
 // ---- APIs ----
@@ -350,9 +430,22 @@ abstract class OnramperHostApi {
   void initialize(SessionCredentialsDto credentials);
   @async
   CheckoutRequirementsResultDto getCheckoutRequirements(
-      CheckoutIntentRequestDto request);
+    CheckoutIntentRequestDto request,
+    CheckoutButtonStyleDto? buttonStyle,
+  );
   @async
   void reset();
+
+  /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
+  /// session (DPoP key + session token) is preserved, but the next checkout
+  /// will re-prompt for OnramperID login.
+  @async
+  void signOut();
+
+  /// Drops a stored native checkout button by handle without tearing down the
+  /// whole SDK client. Useful when the consumer's UI navigates away from a
+  /// prepared intent without dismissing it.
+  void cancelPreparedIntent(String buttonHandle);
   @async
   void dispose();
   // Resolves a pending sessionExpired callback; Dart calls this after sourcing

@@ -29,6 +29,7 @@ enum OnramperErrorKind {
   configurationError,
   deviceBlocked,
   securityStorageFailed,
+  securityTrustFailed,
 }
 
 /// Public, throwable error type exposed by the SDK.
@@ -51,6 +52,7 @@ class OnramperError implements Exception {
     this.toState,
     this.expectedState,
     this.actualState,
+    this.host,
   });
 
   factory OnramperError.fromDto(OnramperErrorDto dto) => OnramperError(
@@ -67,6 +69,7 @@ class OnramperError implements Exception {
         toState: dto.toState,
         expectedState: dto.expectedState,
         actualState: dto.actualState,
+        host: dto.host,
       );
 
   final OnramperErrorKind kind;
@@ -82,6 +85,10 @@ class OnramperError implements Exception {
   final String? toState;
   final String? expectedState;
   final String? actualState;
+
+  /// Populated for [OnramperErrorKind.securityTrustFailed]. The host whose
+  /// certificate pinning check failed.
+  final String? host;
 
   @override
   String toString() => 'OnramperError(${kind.name}): $message';
@@ -128,6 +135,8 @@ class OnramperError implements Exception {
       OnramperErrorKindDto.deviceBlocked => OnramperErrorKind.deviceBlocked,
       OnramperErrorKindDto.securityStorageFailed =>
         OnramperErrorKind.securityStorageFailed,
+      OnramperErrorKindDto.securityTrustFailed =>
+        OnramperErrorKind.securityTrustFailed,
     };
   }
 }
