@@ -4,7 +4,7 @@ A short, practical walkthrough for partners adding the Onramper Flutter plugin t
 
 ## Overview
 
-`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release) and requires Apple's **App Attest** capability. The bundled iOS SDK is downloaded from the [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release binaries at `pod install` time (sha256-pinned to a specific SDK version) — while that repository is internal you'll need a GitHub PAT with `Contents: Read-only` access to it (see `README.md` for the exact env-var name).
+`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release) and requires Apple's **App Attest** capability. The bundled iOS SDK is downloaded from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release binaries at `pod install` time (sha256-pinned to a specific SDK version) — no authentication required.
 
 ## 1. iOS app prerequisites
 
@@ -27,7 +27,6 @@ Before writing any Dart code, the iOS Runner target must be configured for App A
 - **Set iOS deployment target to 16.0 or higher** in both `ios/Podfile` (`platform :ios, '16.0'`) and the Runner Xcode project (Build Settings → iOS Deployment Target).
 - **Register your Flutter app's bundle identifier with Onramper** so the attestation service accepts it. Bundle IDs are validated server-side; an unregistered bundle ID is rejected with `OnramperErrorKind.attestationFailed`.
 - **Run on a real device.** App Attest is unavailable on the iOS Simulator. Attempting to attest on a simulator surfaces as `OnramperError(kind: attestationUnavailable)` (mapped to `attestationFailed`); test on a physical device throughout integration.
-- **Export a GitHub PAT for `pod install`** while `onramper/onramper-ios` is internal. Set `ONRAMPER_IOS_READ_TOKEN` (or `GITHUB_TOKEN`) in your shell, or authenticate `gh auth login` — the podspec's `prepare_command` reads any of the three at install time. Once `onramper-ios` becomes public, this requirement goes away.
 
 ## 2. Install
 
@@ -52,11 +51,10 @@ Then fetch packages and pods:
 
 ```bash
 flutter pub get
-export ONRAMPER_IOS_READ_TOKEN=ghp_...   # PAT with read access to onramper/onramper-ios
 cd ios && pod install
 ```
 
-The `pod install` step downloads the pinned OnramperSDK.xcframework from the [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release into `ios/Frameworks/` and links it into the Runner project. The download is sha256-verified against the checksum baked into the podspec, so a corrupted or unexpected binary fails install.
+The `pod install` step downloads the pinned OnramperSDK.xcframework from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release into `ios/Frameworks/` and links it into the Runner project. The download is sha256-verified against the checksum baked into the podspec, so a corrupted or unexpected binary fails install. No GitHub authentication is required for the anonymous download; if you hit rate limits (60/hour anonymous), export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` to bump the ceiling to 5000/hour.
 
 ## 3. Configure the client
 
@@ -351,8 +349,8 @@ See `example/lib/main.dart` for a full working example that wires `initialize`, 
 |---|---|---|
 | `OnramperError(kind: attestationFailed)` on first call | Running on iOS Simulator, or bundle ID not registered with Onramper | Run on a real device; confirm bundle ID is registered. |
 | `pod install` fails with deployment target error | `ios/Podfile` and Runner project still on iOS < 16 | Set `platform :ios, '16.0'` in `Podfile` and bump Runner's deployment target to match. |
-| `pod install` fails with "no token" | `ONRAMPER_IOS_READ_TOKEN` / `GITHUB_TOKEN` env var not set, or `gh` CLI not authenticated | Export a PAT with `Contents: Read-only` on `onramper/onramper-ios`, then re-run `pod install`. |
-| `pod install` fails with `curl: (56) 404` | Token exists but has no access to `onramper/onramper-ios` | For a fine-grained PAT: verify the repo is in the "Selected repositories" list, `Contents: Read-only` permission is granted, and the token has been **approved by an onramper org admin** (fine-grained PATs on org repos require approval). |
+| `pod install` fails with `curl: (22) 403 rate limit exceeded` | Hit GitHub's 60/hour anonymous request cap | Export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` to authenticate the request (5000/hour cap), then re-run. |
+| `pod install` fails with `curl: (22) 404` | `onramper/onramper-ios` release asset id in the podspec doesn't exist upstream | Bump `onramper_sdk` to a version whose bundled SDK release is still published, or open an issue on this repo. |
 | App crashes immediately on launch with attestation error | Missing or wrong `Runner.entitlements` | Add the `com.apple.developer.devicecheck.appattest-environment` entitlement; match `development` to debug builds, `production` to release. |
 | `OnramperError(kind: unrecoverable)` mid-flow | Both token refresh paths exhausted (rare) | Call `client.reset()`, then `client.initialize(...)` with fresh credentials. |
 | Want to map a specific BFF error code | `OnramperError.code` carries the numeric BFF code when present | Cross-reference [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts); the SDK preserves `bffErrorCode` on `OnramperError.code`. |

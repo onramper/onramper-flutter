@@ -27,7 +27,6 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 - **App Attest capability** enabled on the Runner target with a `Runner.entitlements` file setting `com.apple.developer.devicecheck.appattest-environment` to `development` (debug) or `production` (release).
 - **Real device** for testing. App Attest is not available on the iOS Simulator; attempting to initialize on a simulator surfaces as `OnramperError(kind: attestationFailed)`.
 - Your app's **bundle identifier registered with Onramper**. Unregistered bundles are rejected server-side with `attestationFailed`.
-- While `onramper/onramper-ios` is an internal repository, `pod install` requires a **GitHub PAT** with `Contents: Read-only` access to `onramper-ios`. Export it as `ONRAMPER_IOS_READ_TOKEN` (or `GITHUB_TOKEN`, or run `gh auth login`) before running `pod install`. Once `onramper-ios` becomes public, this requirement goes away.
 
 ## Install
 
@@ -50,11 +49,12 @@ Then:
 
 ```bash
 flutter pub get
-export ONRAMPER_IOS_READ_TOKEN=ghp_...   # PAT with read access to onramper/onramper-ios
 cd ios && pod install
 ```
 
-The `pod install` step downloads the pinned `OnramperSDK.xcframework` from the [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release into `ios/Frameworks/` and links it into the Runner project. The download is sha256-verified against the checksum baked into the podspec.
+The `pod install` step downloads the pinned `OnramperSDK.xcframework` from the [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release into `ios/Frameworks/` and links it into the Runner project. The download is sha256-verified against the checksum baked into the podspec, so a corrupted or unexpected binary fails install.
+
+`onramper-ios` is a public repository — no GitHub authentication is required. If you're behind a corporate proxy or hit anonymous rate limits (60/hour), export `ONRAMPER_IOS_READ_TOKEN` (or `GITHUB_TOKEN`, or run `gh auth login`) — the podspec will pick any of them up transparently.
 
 ## Quick start
 

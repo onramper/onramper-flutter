@@ -16,12 +16,16 @@ Pod::Spec.new do |s|
   s.vendored_frameworks = 'Frameworks/OnramperSDK.xcframework'
 
   # The OnramperSDK.xcframework is fetched from a pinned release of the
-  # (currently internal) onramper/onramper-ios repo at `pod install` time.
-  # Requires ONRAMPER_IOS_READ_TOKEN (falls back to GITHUB_TOKEN, or a locally-
-  # authenticated `gh` CLI) with read access to onramper/onramper-ios. In CI
-  # this is wired to the org-level RELEASE_REPO_TOKEN secret (see
-  # .github/workflows/ios-tests.yml). The zip is verified against a pinned
-  # sha256 so the podspec fully determines the binary contents.
+  # onramper/onramper-ios repo at `pod install` time. The zip is verified
+  # against a pinned sha256 so the podspec fully determines the binary
+  # contents.
+  #
+  # onramper/onramper-ios is public, so no authentication is required for
+  # anonymous downloads — a plain `pod install` on any machine works. A
+  # GitHub token is used if present (raises the anonymous rate limit from
+  # 60/hour to 5000/hour and remains compatible if the repo ever reverts
+  # to internal). Sources for a token, in order: $ONRAMPER_IOS_READ_TOKEN,
+  # $GITHUB_TOKEN, `gh auth token`.
   #
   # To bump the SDK version, update ONRAMPER_SDK_VERSION,
   # ONRAMPER_SDK_ASSET_ID (from
@@ -42,24 +46,34 @@ Pod::Spec.new do |s|
       exit 0
     fi
 
+    # Token is optional — the download works anonymously for public repos.
+    # If a token is available we send it (better rate limits, transparent
+    # fallback if the repo is ever gated again).
     TOKEN="${ONRAMPER_IOS_READ_TOKEN:-${GITHUB_TOKEN:-}}"
     if [ -z "$TOKEN" ] && command -v gh >/dev/null 2>&1; then
       TOKEN="$(gh auth token 2>/dev/null || true)"
-    fi
-    if [ -z "$TOKEN" ]; then
-      echo "error: OnramperSDK download requires ONRAMPER_IOS_READ_TOKEN (or GITHUB_TOKEN, or an authenticated gh CLI) with read access to onramper/onramper-ios" >&2
-      exit 1
     fi
 
     mkdir -p "$FRAMEWORKS_DIR"
     ZIP="$(mktemp -t OnramperSDK).zip"
     trap 'rm -f "$ZIP"' EXIT
 
-    curl -sSLf \
+    AUTH_HEADER=()
+    if [ -n "$TOKEN" ]; then
+      AUTH_HEADER=(-H "Authorization: Bearer $TOKEN")
+    fi
+
+    if ! curl -sSLf \
       -H "Accept: application/octet-stream" \
-      -H "Authorization: Bearer $TOKEN" \
+      "${AUTH_HEADER[@]}" \
       -o "$ZIP" \
-      "https://api.github.com/repos/onramper/onramper-ios/releases/assets/$ONRAMPER_SDK_ASSET_ID"
+      "https://api.github.com/repos/onramper/onramper-ios/releases/assets/$ONRAMPER_SDK_ASSET_ID"; then
+      echo "error: Failed to download OnramperSDK.xcframework." >&2
+      echo "  If onramper/onramper-ios is temporarily gated, set" >&2
+      echo "  ONRAMPER_IOS_READ_TOKEN to a GitHub PAT with Contents:read" >&2
+      echo "  on onramper/onramper-ios and re-run pod install." >&2
+      exit 1
+    fi
 
     ACTUAL_SHA="$(shasum -a 256 "$ZIP" | awk '{print $1}')"
     if [ "$ACTUAL_SHA" != "$ONRAMPER_SDK_SHA256" ]; then
