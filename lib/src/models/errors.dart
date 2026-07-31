@@ -29,6 +29,7 @@ enum OnramperErrorKind {
   configurationError,
   deviceBlocked,
   securityStorageFailed,
+  securityTrustFailed,
 }
 
 /// Public, throwable error type exposed by the SDK.
@@ -51,6 +52,7 @@ class OnramperError implements Exception {
     this.toState,
     this.expectedState,
     this.actualState,
+    this.host,
   });
 
   factory OnramperError.fromDto(OnramperErrorDto dto) => OnramperError(
@@ -67,6 +69,7 @@ class OnramperError implements Exception {
         toState: dto.toState,
         expectedState: dto.expectedState,
         actualState: dto.actualState,
+        host: dto.host,
       );
 
   final OnramperErrorKind kind;
@@ -83,36 +86,57 @@ class OnramperError implements Exception {
   final String? expectedState;
   final String? actualState;
 
+  /// Populated for [OnramperErrorKind.securityTrustFailed]. The host whose
+  /// certificate pinning check failed.
+  final String? host;
+
   @override
   String toString() => 'OnramperError(${kind.name}): $message';
 
   static OnramperErrorKind _kindFromDto(OnramperErrorKindDto dto) {
     return switch (dto) {
       OnramperErrorKindDto.notInitialized => OnramperErrorKind.notInitialized,
-      OnramperErrorKindDto.initializationFailed => OnramperErrorKind.initializationFailed,
-      OnramperErrorKindDto.attestationFailed => OnramperErrorKind.attestationFailed,
-      OnramperErrorKindDto.invalidStateTransition => OnramperErrorKind.invalidStateTransition,
+      OnramperErrorKindDto.initializationFailed =>
+        OnramperErrorKind.initializationFailed,
+      OnramperErrorKindDto.attestationFailed =>
+        OnramperErrorKind.attestationFailed,
+      OnramperErrorKindDto.invalidStateTransition =>
+        OnramperErrorKind.invalidStateTransition,
       OnramperErrorKindDto.invalidState => OnramperErrorKind.invalidState,
       OnramperErrorKindDto.networkError => OnramperErrorKind.networkError,
       OnramperErrorKindDto.decodingError => OnramperErrorKind.decodingError,
       OnramperErrorKindDto.timeout => OnramperErrorKind.timeout,
-      OnramperErrorKindDto.requirementNotSatisfied => OnramperErrorKind.requirementNotSatisfied,
-      OnramperErrorKindDto.amountOutOfRange => OnramperErrorKind.amountOutOfRange,
-      OnramperErrorKindDto.oidcFlowCancelled => OnramperErrorKind.oidcFlowCancelled,
-      OnramperErrorKindDto.oidcTokenExchangeFailed => OnramperErrorKind.oidcTokenExchangeFailed,
+      OnramperErrorKindDto.requirementNotSatisfied =>
+        OnramperErrorKind.requirementNotSatisfied,
+      OnramperErrorKindDto.amountOutOfRange =>
+        OnramperErrorKind.amountOutOfRange,
+      OnramperErrorKindDto.oidcFlowCancelled =>
+        OnramperErrorKind.oidcFlowCancelled,
+      OnramperErrorKindDto.oidcTokenExchangeFailed =>
+        OnramperErrorKind.oidcTokenExchangeFailed,
       OnramperErrorKindDto.oidcFlowFailed => OnramperErrorKind.oidcFlowFailed,
-      OnramperErrorKindDto.userTokenInvalid => OnramperErrorKind.userTokenInvalid,
-      OnramperErrorKindDto.userTokenRefreshFailed => OnramperErrorKind.userTokenRefreshFailed,
-      OnramperErrorKindDto.webviewLoadFailed => OnramperErrorKind.webviewLoadFailed,
+      OnramperErrorKindDto.userTokenInvalid =>
+        OnramperErrorKind.userTokenInvalid,
+      OnramperErrorKindDto.userTokenRefreshFailed =>
+        OnramperErrorKind.userTokenRefreshFailed,
+      OnramperErrorKindDto.webviewLoadFailed =>
+        OnramperErrorKind.webviewLoadFailed,
       OnramperErrorKindDto.deepLinkFailed => OnramperErrorKind.deepLinkFailed,
       OnramperErrorKindDto.invalidRequest => OnramperErrorKind.invalidRequest,
-      OnramperErrorKindDto.quoteUnavailable => OnramperErrorKind.quoteUnavailable,
-      OnramperErrorKindDto.checkoutForbidden => OnramperErrorKind.checkoutForbidden,
-      OnramperErrorKindDto.temporaryFailure => OnramperErrorKind.temporaryFailure,
+      OnramperErrorKindDto.quoteUnavailable =>
+        OnramperErrorKind.quoteUnavailable,
+      OnramperErrorKindDto.checkoutForbidden =>
+        OnramperErrorKind.checkoutForbidden,
+      OnramperErrorKindDto.temporaryFailure =>
+        OnramperErrorKind.temporaryFailure,
       OnramperErrorKindDto.unrecoverable => OnramperErrorKind.unrecoverable,
-      OnramperErrorKindDto.configurationError => OnramperErrorKind.configurationError,
+      OnramperErrorKindDto.configurationError =>
+        OnramperErrorKind.configurationError,
       OnramperErrorKindDto.deviceBlocked => OnramperErrorKind.deviceBlocked,
-      OnramperErrorKindDto.securityStorageFailed => OnramperErrorKind.securityStorageFailed,
+      OnramperErrorKindDto.securityStorageFailed =>
+        OnramperErrorKind.securityStorageFailed,
+      OnramperErrorKindDto.securityTrustFailed =>
+        OnramperErrorKind.securityTrustFailed,
     };
   }
 }

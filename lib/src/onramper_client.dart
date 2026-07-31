@@ -8,6 +8,7 @@ import 'models/events.dart';
 import 'models/requirements.dart';
 import 'models/state.dart';
 import 'platform/pigeon.g.dart';
+import 'widget/checkout_button_style.dart';
 
 /// Callback invoked by the SDK when the native session token has expired and
 /// a fresh [SessionCredentials] pair must be fetched from the partner backend.
@@ -137,22 +138,27 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   /// Requests a checkout intent from the BFF.
   ///
+  /// [buttonStyle] optionally overrides the appearance of the native checkout
+  /// button that will be embedded via [OnramperCheckoutButton]. Only the
+  /// visual fields (background/foreground color, border radius) are forwarded
+  /// — text/font styling for the Dart-side ToS lines lives on the widget.
+  ///
   /// Returns the mapped [CheckoutRequirementsResult] and caches its
   /// [CheckoutRequirementsResult.tos] under [tosRequirements] for downstream
   /// UI to render.
   Future<CheckoutRequirementsResult> getCheckoutRequirements(
-    CheckoutIntentRequest request,
-  ) async {
-    final dto = await _host.getCheckoutRequirements(request.toDto());
+    CheckoutIntentRequest request, {
+    CheckoutButtonStyle? buttonStyle,
+  }) async {
+    final dto = await _host.getCheckoutRequirements(
+      request.toDto(),
+      buttonStyle?.toNativeDto(),
+    );
     final result = CheckoutRequirementsResult.fromDto(dto);
     _tosRequirements = result.tos;
     notifyListeners();
     return result;
   }
-
-  /// Asks the native side to render the checkout webview on top of the
-  /// Flutter view hierarchy.
-  Future<void> presentCheckout() => _host.presentCheckout();
 
   /// Resets the native SDK and clears cached requirements / errors.
   Future<void> reset() async {
@@ -160,6 +166,27 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     _lastError = null;
     await _host.reset();
     notifyListeners();
+  }
+
+  /// Signs out of OnramperID. Distinct from [reset]: the partner session
+  /// (DPoP key + session token) is preserved so a subsequent checkout can
+  /// re-use the same native client, but any cached OIDC tokens are wiped and
+  /// the user will be re-prompted to log in on the next checkout that
+  /// requires identity.
+  Future<void> signOut() async {
+    _tosRequirements = null;
+    _lastError = null;
+    await _host.signOut();
+    notifyListeners();
+  }
+
+  /// Drops the native checkout button identified by [buttonHandle] without
+  /// tearing down the SDK client. Useful when a screen showing a prepared
+  /// intent is being replaced by another checkout screen — call this on the
+  /// old handle so its native resources are released promptly rather than
+  /// waiting for the next [reset] or [dispose].
+  Future<void> cancelPreparedIntent(String buttonHandle) {
+    return _host.cancelPreparedIntent(buttonHandle);
   }
 
   /// Tears down the client, releases native resources, and closes both

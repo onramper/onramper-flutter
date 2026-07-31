@@ -7,12 +7,9 @@ on:
 
 jobs:
   dart:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - run: git lfs pull
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
@@ -22,6 +19,10 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - name: Pigeon drift check
+        # Pigeon emits code in its own style, then we run dart format on the
+        # generated Dart file to match the repo's format. Both steps together
+        # produce the committed file; skipping either causes false drift.
         run: |
           dart run pigeon --input pigeons/onramper_api.dart
+          dart format lib/src/platform/pigeon.g.dart
           git diff --exit-code lib/src/platform/pigeon.g.dart ios/Classes/Pigeon.g.swift

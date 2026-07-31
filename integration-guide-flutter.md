@@ -4,7 +4,7 @@ A short, practical walkthrough for partners adding the Onramper Flutter plugin t
 
 ## Overview
 
-`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release), requires Apple's **App Attest** capability, and ships the underlying iOS SDK as a **vendored XCFramework** so the package is fully self-contained — `pod install` pulls everything from the package itself, no extra source repositories required.
+`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release) and requires Apple's **App Attest** capability. The bundled iOS SDK is downloaded from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release binaries at `pod install` time (sha256-pinned to a specific SDK version) — no authentication required.
 
 ## 1. iOS app prerequisites
 
@@ -27,28 +27,24 @@ Before writing any Dart code, the iOS Runner target must be configured for App A
 - **Set iOS deployment target to 16.0 or higher** in both `ios/Podfile` (`platform :ios, '16.0'`) and the Runner Xcode project (Build Settings → iOS Deployment Target).
 - **Register your Flutter app's bundle identifier with Onramper** so the attestation service accepts it. Bundle IDs are validated server-side; an unregistered bundle ID is rejected with `OnramperErrorKind.attestationFailed`.
 - **Run on a real device.** App Attest is unavailable on the iOS Simulator. Attempting to attest on a simulator surfaces as `OnramperError(kind: attestationUnavailable)` (mapped to `attestationFailed`); test on a physical device throughout integration.
-- **Run `git lfs install` and `git lfs pull` after cloning** if you are working on the plugin source locally. The vendored XCFramework is tracked with Git LFS — without LFS hydration, you will see pointer text files instead of the binary framework and `pod install` will fail.
 
 ## 2. Install
 
-Add the plugin to your app's `pubspec.yaml`. The repository is private during integration; integrators are issued a deploy key and pull over SSH.
+Add the plugin to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_sdk:
-    git:
-      url: https://github.com/onramper/onramper-flutter.git
-      ref: v1.0.0
+  onramper_sdk: ^1.1.0
 ```
 
-While the repository remains private, use the SSH URL with your deploy key:
+While the repository remains private, use a git dependency with your deploy key:
 
 ```yaml
 dependencies:
   onramper_sdk:
     git:
       url: git@github.com:onramper/onramper-flutter.git
-      ref: v1.0.0
+      ref: v1.1.0
 ```
 
 Then fetch packages and pods:
@@ -58,7 +54,7 @@ flutter pub get
 cd ios && pod install
 ```
 
-The `pod install` step links the vendored XCFramework into the Runner project. If you see pointer-file errors, run `git lfs pull` in the plugin checkout before `pod install`.
+The `pod install` step downloads the pinned OnramperSDK.xcframework from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release into `ios/Frameworks/` and links it into the Runner project. The download is sha256-verified against the checksum baked into the podspec, so a corrupted or unexpected binary fails install. No GitHub authentication is required for the anonymous download; if you hit rate limits (60/hour anonymous), export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` to bump the ceiling to 5000/hour.
 
 ## 3. Configure the client
 
@@ -113,7 +109,6 @@ Build a `CheckoutIntentRequest` describing what the user wants to buy and call `
 final requirements = await client.getCheckoutRequirements(
   CheckoutIntentRequest(
     transactionData: OnramperTransactionData(
-      onramp: 'transak',
       source: 'usd',
       destination: 'btc',
       amount: 100,
@@ -126,6 +121,14 @@ final requirements = await client.getCheckoutRequirements(
         address: 'bc1q...',
       ),
     ),
+    // Optional: restrict the checkout to a specific set of provider ids.
+    // onlyOnramps: ['moonpay', 'paybis'],
+  ),
+  // Optional: style the native checkout button. Omit to use the SDK default.
+  buttonStyle: const CheckoutButtonStyle(
+    backgroundColor: Color(0xFF0050FF),
+    foregroundColor: Colors.white,
+    borderRadius: 24,
   ),
 );
 
@@ -136,31 +139,38 @@ print('Requirements: ${requirements.requirements.length}');
 
 The returned `CheckoutRequirementsResult` carries:
 
-- `quote` — the computed onramp quote (rate, fees, receive amount).
-- `requirements` — tagged-union list of `tos`, `amountLimit`, and `userInfo` requirements to surface to the user.
+- `quote` — the computed onramp quote (rate, fees, receive amount). Every field is non-null; a missing quote surfaces as `OnramperErrorKind.quoteUnavailable` instead.
+- `requirements` — tagged-union list of `tos`, `amountLimit`, `userInfo`, and `reverification` requirements to surface to the user.
 - `headlessCheckoutId` — opaque id you can log alongside your own telemetry.
+- `buttonHandle` — opaque id addressing the native checkout button; `OnramperCheckoutButton` looks it up automatically, but if you need to embed the raw native button yourself you can pass this to `OnramperNativeCheckoutButton(buttonHandle: ...)`.
 
 The convenience getter `requirements.tos` returns just the ToS entries for direct rendering.
 
 ## 6. Render the button
 
-Embed `OnramperCheckoutButton` anywhere a regular Flutter widget would go. It rebuilds automatically as the client's state changes and renders the ToS sentence underneath itself.
+Embed `OnramperCheckoutButton` anywhere a regular Flutter widget would go. It renders the native SwiftUI checkout button (via a Flutter platform view) with any unsatisfied ToS lines above it.
 
 ```dart
 OnramperCheckoutButton(
-  client: client,
   requirements: requirements,
-  style: const CheckoutButtonStyle(borderRadius: 8),
+  // Optional: styling for the ToS text below the button.
+  // The button's own colors / border radius are set via
+  // getCheckoutRequirements(buttonStyle:) earlier — see §5.
+  style: CheckoutButtonStyle(
+    tosStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+  ),
 )
 ```
 
-Tapping the button calls `client.presentCheckout()` natively, which presents a modal that handles:
+Tapping the button drives the native checkout flow internally:
 
-1. The OnramperID OIDC login flow (in a `WKWebView`), if user authentication is required.
-2. The payment surface — Apple Pay, card form, or provider-hosted page — chosen by the BFF based on the request and provider response.
-3. Silent re-authentication if any token expires mid-flow.
+1. Records the ToS acceptance timestamp.
+2. Presents the OnramperID login sheet (in a native `WKWebView`) if the provider requires identity — the same sheet also drives phone reverification.
+3. Finalizes the intent with the BFF.
+4. Presents the payment surface (Apple Pay, card webview, deep-link) chosen from the finalize response.
+5. Silently re-authenticates if any token expires mid-flow.
 
-Both `client` (a `ChangeNotifier`) and `client.events` (a `Stream<CheckoutEvent>`) emit updates throughout, so the rest of your UI can react in parallel.
+The button owns the whole loop — no `presentCheckout()` call is needed. Both `client` (a `ChangeNotifier`) and `client.events` (a `Stream<CheckoutEvent>`) emit updates throughout, so the rest of your UI can react in parallel.
 
 ## 7. Observe state and events
 
@@ -190,6 +200,17 @@ The terminal events you'll typically wire into analytics are:
 
 - `CheckoutEventKind.completed` — happy path; `event.checkoutId` is populated.
 - `CheckoutEventKind.failed` — `event.error` is populated with the typed `OnramperError`.
+
+Provider-lifecycle events forwarded from the third-party checkout webview (not every provider emits every kind):
+
+- `checkoutCancelled` — user dismissed the payment sheet before completing.
+- `providerReady` — provider's page finished loading.
+- `paymentAuthorized` — user authorized payment in the provider's native sheet (e.g. Apple Pay). Not terminal.
+- `paymentProcessing` — provider is settling.
+- `paymentCancelled` — provider reports the user cancelled (distinct from `checkoutCancelled`).
+- `providerError` — provider reported a non-recoverable failure; `event.providerReason` carries a short human-readable string.
+
+`checkoutFinalized` events additionally carry `event.finalizeResponse` — the full `CheckoutFinalizeResponse` including `headlessCheckoutData` (payment URL, render type, payment type) — if you need more than the `renderContext` summary.
 
 ## 8. Error handling
 
@@ -222,6 +243,7 @@ All errors thrown across the Flutter boundary are `OnramperError` instances. `ki
 | `configurationError` | Partner setup error (bad API key, missing scope). | false | Not user-actionable; surface as a developer/support issue. |
 | `deviceBlocked` | The BFF terminally rejected the device. | false | Show a "unable to continue on this device" message. |
 | `securityStorageFailed` | Keychain read/write on the native side failed. | false | Rare; log `debugInfo` and surface a generic error. |
+| `securityTrustFailed` | Certificate pinning check failed for a host. `host` names the affected server. | false | Rare; log `host` and surface as a generic error. |
 
 Catch `OnramperError` directly when you need to branch on `kind`:
 
@@ -255,28 +277,40 @@ The native SDK preserves the BFF's numeric error code on `OnramperError.code` wh
 
 ## 9. Theming
 
-`CheckoutButtonStyle` exposes the surface area needed to fit the button into your design system:
+`CheckoutButtonStyle` splits its fields between two places:
+
+**Native button appearance** — passed to `getCheckoutRequirements(buttonStyle:)` (see §5) and rendered inside the SwiftUI checkout button:
+
+| Property | Type | Default | Bridged as |
+|---|---|---|---|
+| `backgroundColor` | `Color?` | SDK default (system blue) | Hex string `#RRGGBBAA` |
+| `foregroundColor` | `Color?` | SDK default (white) | Hex string `#RRGGBBAA` |
+| `borderRadius` | `double` | `12` | Points |
+
+**ToS-line text styling** — passed to `OnramperCheckoutButton(style:)` for the Dart-drawn text above the button:
 
 | Property | Type | Default |
 |---|---|---|
-| `backgroundColor` | `Color` | `Colors.black` |
-| `foregroundColor` | `Color` | `Colors.white` |
-| `borderRadius` | `double` | `12` |
-| `labelStyle` | `TextStyle?` | `null` (theme default) |
-| `tosStyle` | `TextStyle?` | `null` (theme default) |
-| `tosLinkStyle` | `TextStyle?` | `null` (theme default, underlined) |
+| `tosStyle` | `TextStyle?` | `TextStyle(fontSize: 12)` |
+| `tosLinkStyle` | `TextStyle?` | inherits from `tosStyle` with underline + blue color |
 
 A custom-styled example:
 
 ```dart
-OnramperCheckoutButton(
-  client: client,
-  requirements: requirements,
-  style: CheckoutButtonStyle(
-    backgroundColor: const Color(0xFF0050FF),
+// Native button appearance goes to getCheckoutRequirements.
+final requirements = await client.getCheckoutRequirements(
+  request,
+  buttonStyle: const CheckoutButtonStyle(
+    backgroundColor: Color(0xFF0050FF),
     foregroundColor: Colors.white,
     borderRadius: 24,
-    labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  ),
+);
+
+// ToS text styling goes to the widget.
+OnramperCheckoutButton(
+  requirements: requirements,
+  style: CheckoutButtonStyle(
     tosStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
     tosLinkStyle: const TextStyle(
       fontSize: 12,
@@ -284,14 +318,18 @@ OnramperCheckoutButton(
       decoration: TextDecoration.underline,
     ),
   ),
+  // Optional: route ToS link taps through your own in-app browser.
+  onLinkTap: (uri) => YourInAppBrowser.open(uri),
 )
 ```
 
-The button also accepts a `label` (defaults to `'Buy'`) and an optional `onLinkTap` callback for routing ToS link taps through your own in-app browser.
+The native button's label text ("Buy") is fixed by the SDK and not currently overridable from Dart.
 
-## 10. Lifecycle: reset and dispose
+## 10. Lifecycle: reset, signOut, cancelPreparedIntent, dispose
 
 - **`client.reset()`** clears cached checkout state on both sides of the bridge. Call it before starting a fresh `getCheckoutRequirements` with inputs that aren't a continuation of the previous flow (e.g., user navigated back and changed the amount). After reset the client returns to `OnramperStateKind.ready` and is immediately reusable.
+- **`client.signOut()`** wipes cached OnramperID (OIDC) tokens. Distinct from `reset()`: the partner session (DPoP key + session token) is preserved, but the next checkout that requires identity re-prompts the login sheet. Call this from an "Sign out" button in your app.
+- **`client.cancelPreparedIntent(buttonHandle)`** drops a specific stored native checkout button by handle without tearing down the client. Useful when your UI navigates away from a prepared intent without ever showing the button — call this on the previous `requirements.buttonHandle` so the native resources are released promptly.
 - **`client.dispose()`** shuts the plugin down, detaches Pigeon callbacks, and closes the broadcast streams. Call it from the consumer widget's `State.dispose()`. The method is idempotent.
 - **Do not** instantiate a new `OnramperClient` for each checkout intent. One client per app session is the intended lifecycle; `reset()` exists precisely so you don't have to recreate it.
 
@@ -311,7 +349,8 @@ See `example/lib/main.dart` for a full working example that wires `initialize`, 
 |---|---|---|
 | `OnramperError(kind: attestationFailed)` on first call | Running on iOS Simulator, or bundle ID not registered with Onramper | Run on a real device; confirm bundle ID is registered. |
 | `pod install` fails with deployment target error | `ios/Podfile` and Runner project still on iOS < 16 | Set `platform :ios, '16.0'` in `Podfile` and bump Runner's deployment target to match. |
-| `pod install` fails with "framework not found" | Git LFS pointer file present instead of the real XCFramework | Run `git lfs install && git lfs pull` in the plugin checkout, then `pod install` again. |
+| `pod install` fails with `curl: (22) 403 rate limit exceeded` | Hit GitHub's 60/hour anonymous request cap | Export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` to authenticate the request (5000/hour cap), then re-run. |
+| `pod install` fails with `curl: (22) 404` | `onramper/onramper-ios` release asset id in the podspec doesn't exist upstream | Bump `onramper_sdk` to a version whose bundled SDK release is still published, or open an issue on this repo. |
 | App crashes immediately on launch with attestation error | Missing or wrong `Runner.entitlements` | Add the `com.apple.developer.devicecheck.appattest-environment` entitlement; match `development` to debug builds, `production` to release. |
 | `OnramperError(kind: unrecoverable)` mid-flow | Both token refresh paths exhausted (rare) | Call `client.reset()`, then `client.initialize(...)` with fresh credentials. |
 | Want to map a specific BFF error code | `OnramperError.code` carries the numeric BFF code when present | Cross-reference [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts); the SDK preserves `bffErrorCode` on `OnramperError.code`. |

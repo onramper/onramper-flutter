@@ -9,7 +9,8 @@ class IosDiagnostics {
   static const _channel = MethodChannel('onramper_sdk_example/diagnostics');
 
   static Future<IosAppIdentifiers> readAppIdentifiers() async {
-    final raw = await _channel.invokeMapMethod<String, dynamic>('getAppIdentifiers');
+    final raw =
+        await _channel.invokeMapMethod<String, dynamic>('getAppIdentifiers');
     return IosAppIdentifiers(
       bundleId: raw?['bundleId'] as String? ?? 'unknown',
       teamId: raw?['teamId'] as String? ?? 'unknown',

@@ -25,32 +25,33 @@ class WalletInfo {
 }
 
 /// Transaction parameters for a single checkout intent.
+///
+/// `destination` was made required in v1.1.0 of the native SDK — every
+/// checkout must name the target asset (e.g. `"BTC"`, `"ETH"`).
 class OnramperTransactionData {
   const OnramperTransactionData({
-    required this.onramp,
     required this.source,
+    required this.destination,
     required this.amount,
     required this.type,
     required this.paymentMethod,
     required this.wallet,
-    this.destination,
     this.country,
     this.subdivision,
   });
 
-  final String onramp;
   final String source;
+  final String destination;
   final double amount;
   final TransactionType type;
   final String paymentMethod;
   final WalletInfo wallet;
-  final String? destination;
   final String? country;
   final String? subdivision;
 
   OnramperTransactionDataDto toDto() => OnramperTransactionDataDto(
-        onramp: onramp,
         source: source,
+        destination: destination,
         amount: amount,
         type: switch (type) {
           TransactionType.buy => TransactionTypeDto.buy,
@@ -58,7 +59,6 @@ class OnramperTransactionData {
         },
         paymentMethod: paymentMethod,
         wallet: wallet.toDto(),
-        destination: destination,
         country: country,
         subdivision: subdivision,
       );
@@ -86,8 +86,11 @@ class CheckoutIntentRequest {
 // Outputs (Pigeon -> Dart)
 // ---------------------------------------------------------------------------
 
-/// Discriminator for the three [CheckoutRequirement] variants.
-enum CheckoutRequirementKind { tos, amountLimit, userInfo }
+/// Discriminator for the four [CheckoutRequirement] variants.
+enum CheckoutRequirementKind { tos, amountLimit, userInfo, reverification }
+
+/// Which identity field a [ReverificationRequirement] applies to.
+enum ReverificationField { email, phone }
 
 /// Specific Terms of Service style document the user must accept.
 enum TosItemType { tos, privacyPolicy, userAgreement }
@@ -163,9 +166,15 @@ class TosRequirement {
 }
 
 /// Amount-bounds requirement for a specific provider.
+///
+/// `amountLimitSatisfied` is a v1.1.0+ signal: when true, the requested
+/// amount already falls within the provider's min/max bounds and no
+/// consumer-facing UI action is needed. When false, the consumer should
+/// prompt the user to adjust the amount (or select a different provider).
 class AmountLimitRequirement {
   const AmountLimitRequirement({
     required this.providerId,
+    required this.amountLimitSatisfied,
     this.minAmountLimit,
     this.maxAmountLimit,
   });
@@ -173,11 +182,13 @@ class AmountLimitRequirement {
   factory AmountLimitRequirement.fromDto(AmountLimitRequirementDto dto) =>
       AmountLimitRequirement(
         providerId: dto.providerId,
+        amountLimitSatisfied: dto.amountLimitSatisfied,
         minAmountLimit: dto.minAmountLimit,
         maxAmountLimit: dto.maxAmountLimit,
       );
 
   final String providerId;
+  final bool amountLimitSatisfied;
   final double? minAmountLimit;
   final double? maxAmountLimit;
 }
@@ -228,16 +239,51 @@ class UserInfoRequirement {
   final List<UserInfoField> fields;
 }
 
-/// Tagged union of the three requirement variants the BFF can return.
+/// Re-verification requirement: the SDK asks the user to re-confirm a
+/// previously-collected identity field (usually a phone number) because
+/// enough time has elapsed relative to the provider's recency policy.
+///
+/// - [field] is the identity field to re-verify (`email` or `phone`).
+/// - [requiredRecencyDays] is how recent the last verification must be for
+///   the provider to accept it without re-verification.
+/// - [lastVerifiedAt] is an ISO-8601 timestamp of the last verification, or
+///   null if the user has never verified this field.
+class ReverificationRequirement {
+  const ReverificationRequirement({
+    required this.providerId,
+    required this.field,
+    required this.requiredRecencyDays,
+    this.lastVerifiedAt,
+  });
+
+  factory ReverificationRequirement.fromDto(ReverificationRequirementDto dto) =>
+      ReverificationRequirement(
+        providerId: dto.providerId,
+        field: switch (dto.field) {
+          ReverificationFieldDto.email => ReverificationField.email,
+          ReverificationFieldDto.phone => ReverificationField.phone,
+        },
+        requiredRecencyDays: dto.requiredRecencyDays,
+        lastVerifiedAt: dto.lastVerifiedAt,
+      );
+
+  final String providerId;
+  final ReverificationField field;
+  final int requiredRecencyDays;
+  final String? lastVerifiedAt;
+}
+
+/// Tagged union of the four requirement variants the BFF can return.
 ///
 /// Inspect [kind] then read the matching payload ([tos], [amountLimit],
-/// [userInfo]). Exactly one payload is non-null per instance.
+/// [userInfo], [reverification]). Exactly one payload is non-null per instance.
 class CheckoutRequirement {
   const CheckoutRequirement({
     required this.kind,
     this.tos,
     this.amountLimit,
     this.userInfo,
+    this.reverification,
   });
 
   factory CheckoutRequirement.fromDto(CheckoutRequirementDto dto) {
@@ -247,13 +293,19 @@ class CheckoutRequirement {
         CheckoutRequirementTypeDto.amountLimit =>
           CheckoutRequirementKind.amountLimit,
         CheckoutRequirementTypeDto.userInfo => CheckoutRequirementKind.userInfo,
+        CheckoutRequirementTypeDto.reverification =>
+          CheckoutRequirementKind.reverification,
       },
       tos: dto.tos == null ? null : TosRequirement.fromDto(dto.tos!),
       amountLimit: dto.amountLimit == null
           ? null
           : AmountLimitRequirement.fromDto(dto.amountLimit!),
-      userInfo:
-          dto.userInfo == null ? null : UserInfoRequirement.fromDto(dto.userInfo!),
+      userInfo: dto.userInfo == null
+          ? null
+          : UserInfoRequirement.fromDto(dto.userInfo!),
+      reverification: dto.reverification == null
+          ? null
+          : ReverificationRequirement.fromDto(dto.reverification!),
     );
   }
 
@@ -261,14 +313,16 @@ class CheckoutRequirement {
   final TosRequirement? tos;
   final AmountLimitRequirement? amountLimit;
   final UserInfoRequirement? userInfo;
+  final ReverificationRequirement? reverification;
 }
 
-/// Aggregated response: a checkout id, requirements to satisfy, and the quote.
+/// Aggregated response: a checkout id, requirements, quote, and the native button.
 class CheckoutRequirementsResult {
-  const CheckoutRequirementsResult({
+  CheckoutRequirementsResult({
     required this.headlessCheckoutId,
     required this.requirements,
     required this.quote,
+    required this.buttonHandle,
   });
 
   factory CheckoutRequirementsResult.fromDto(
@@ -280,11 +334,15 @@ class CheckoutRequirementsResult {
           dto.requirements.map(CheckoutRequirement.fromDto),
         ),
         quote: QuoteResponse.fromDto(dto.quote),
+        buttonHandle: dto.buttonHandle,
       );
 
   final String headlessCheckoutId;
   final List<CheckoutRequirement> requirements;
   final QuoteResponse quote;
+
+  /// Opaque handle for the native checkout button stored in the platform registry.
+  final String buttonHandle;
 
   /// Convenience: only the ToS requirements (if any).
   List<TosRequirement> get tos => requirements

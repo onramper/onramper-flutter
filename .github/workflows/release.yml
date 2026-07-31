@@ -1,38 +1,65 @@
 name: release
 
+# Manual-dispatch release cutter. Bumps versions in pubspec.yaml and the
+# podspec, verifies pub.dev would accept the package, then commits, tags,
+# and pushes. Automated pub.dev publication is left to a separate workflow
+# — see `publish.yml`.
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Plugin version (e.g. 1.0.0 or 1.0.0+1)'
+        description: 'Plugin version (e.g. 1.1.0). Must match onramper-ios SDK version.'
         required: true
 
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: macos-15
+    permissions:
+      # Push the release commit + tag, create the GitHub release.
+      contents: write
     env:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          lfs: true
-      - run: git lfs pull
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+
       - name: Update pubspec version
         run: |
           sed -i '' "s/^version:.*/version: ${VERSION}/" pubspec.yaml
+
       - name: Update podspec version
         run: |
           sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_sdk.podspec
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # Dry-run publish gates tag creation on pub.dev acceptance. If pub.dev
+      # would reject the package (bad metadata, dependency issues, format
+      # violations), this step fails and the tag is never pushed. Cheap
+      # safety net — running it here means we find out before creating a
+      # permanent tag rather than after.
+      - name: dart pub publish --dry-run
+        run: dart pub publish --dry-run
+
       - name: Configure git
         run: |
           git config user.name 'github-actions'
           git config user.email 'actions@github.com'
-      - name: Commit + tag
+
+      - name: Commit + tag + push
         run: |
           git commit -am "chore: release v${VERSION}"
           git tag "v${VERSION}"
           git push origin master "v${VERSION}"
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}

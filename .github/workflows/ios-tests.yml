@@ -7,15 +7,21 @@ on:
 
 jobs:
   pod-lib-lint:
-    runs-on: macos-14
+    # macos-26 for Xcode 26 / Swift 6.2, which the v1.1.0 xcframework needs.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - run: git lfs pull
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
           channel: stable
       - run: flutter pub get
-      - run: pod lib lint ios/onramper_sdk.podspec --allow-warnings
+      - name: pod lib lint
+        # onramper/onramper-ios is public; the podspec's prepare_command
+        # can fetch the xcframework anonymously. The token below is
+        # passed through when RELEASE_REPO_TOKEN is set (bumps GitHub's
+        # anonymous rate limit from 60/h to 5000/h) but the lint works
+        # even if the secret is absent.
+        env:
+          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: pod lib lint ios/onramper_sdk.podspec --allow-warnings

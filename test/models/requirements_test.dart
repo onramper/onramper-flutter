@@ -3,6 +3,16 @@ import 'package:onramper_sdk/src/models/quote.dart';
 import 'package:onramper_sdk/src/models/requirements.dart';
 import 'package:onramper_sdk/src/platform/pigeon.g.dart';
 
+QuoteDto _quoteDto({String quoteId = 'q'}) => QuoteDto(
+      quoteId: quoteId,
+      ramp: 'r',
+      rate: 1,
+      networkFee: 0,
+      transactionFee: 0,
+      payout: 1,
+      paymentMethod: 'pm',
+    );
+
 void main() {
   group('WalletInfo.toDto', () {
     test('round-trips required + optional fields', () {
@@ -23,33 +33,31 @@ void main() {
   group('OnramperTransactionData.toDto', () {
     test('round-trips all fields and maps TransactionType', () {
       const data = OnramperTransactionData(
-        onramp: 'moonpay',
         source: 'USD',
+        destination: 'BTC',
         amount: 100.0,
         type: TransactionType.buy,
         paymentMethod: 'credit_card',
         wallet: WalletInfo(network: 'BTC', address: 'bc1...'),
-        destination: 'BTC',
         country: 'US',
         subdivision: 'CA',
       );
 
       final dto = data.toDto();
-      expect(dto.onramp, 'moonpay');
       expect(dto.source, 'USD');
+      expect(dto.destination, 'BTC');
       expect(dto.amount, 100.0);
       expect(dto.type, TransactionTypeDto.buy);
       expect(dto.paymentMethod, 'credit_card');
       expect(dto.wallet.address, 'bc1...');
-      expect(dto.destination, 'BTC');
       expect(dto.country, 'US');
       expect(dto.subdivision, 'CA');
     });
 
     test('sell type maps to TransactionTypeDto.sell', () {
       const data = OnramperTransactionData(
-        onramp: 'm',
         source: 's',
+        destination: 'd',
         amount: 1.0,
         type: TransactionType.sell,
         paymentMethod: 'p',
@@ -63,8 +71,8 @@ void main() {
     test('passes through transactionData and onlyOnramps', () {
       const req = CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          onramp: 'mp',
           source: 'USD',
+          destination: 'BTC',
           amount: 50,
           type: TransactionType.buy,
           paymentMethod: 'cc',
@@ -74,15 +82,14 @@ void main() {
       );
 
       final dto = req.toDto();
-      expect(dto.transactionData.onramp, 'mp');
       expect(dto.onlyOnramps, <String>['moonpay', 'transak']);
     });
 
     test('onlyOnramps null is preserved', () {
       const req = CheckoutIntentRequest(
         transactionData: OnramperTransactionData(
-          onramp: 'mp',
           source: 'USD',
+          destination: 'BTC',
           amount: 50,
           type: TransactionType.buy,
           paymentMethod: 'cc',
@@ -145,23 +152,27 @@ void main() {
   });
 
   group('AmountLimitRequirement.fromDto', () {
-    test('preserves providerId and limits', () {
+    test('preserves providerId, limits, and satisfied flag', () {
       final r = AmountLimitRequirement.fromDto(AmountLimitRequirementDto(
         providerId: 'moonpay',
+        amountLimitSatisfied: true,
         minAmountLimit: 10,
         maxAmountLimit: 1000,
       ));
       expect(r.providerId, 'moonpay');
       expect(r.minAmountLimit, 10);
       expect(r.maxAmountLimit, 1000);
+      expect(r.amountLimitSatisfied, isTrue);
     });
 
-    test('preserves null limits', () {
+    test('preserves null limits + unsatisfied flag', () {
       final r = AmountLimitRequirement.fromDto(
-        AmountLimitRequirementDto(providerId: 'mp'),
+        AmountLimitRequirementDto(
+            providerId: 'mp', amountLimitSatisfied: false),
       );
       expect(r.minAmountLimit, isNull);
       expect(r.maxAmountLimit, isNull);
+      expect(r.amountLimitSatisfied, isFalse);
     });
   });
 
@@ -179,7 +190,8 @@ void main() {
     });
 
     test('all counts match', () {
-      expect(UserInfoFieldType.values.length, UserInfoFieldTypeDto.values.length);
+      expect(
+          UserInfoFieldType.values.length, UserInfoFieldTypeDto.values.length);
     });
   });
 
@@ -199,6 +211,33 @@ void main() {
       expect(r.providerId, 'mp');
       expect(r.fields, hasLength(1));
       expect(r.fields.first.type, UserInfoFieldType.email);
+    });
+  });
+
+  group('ReverificationRequirement.fromDto', () {
+    test('maps phone reverification with lastVerifiedAt', () {
+      final dto = ReverificationRequirementDto(
+        providerId: 'moonpay',
+        field: ReverificationFieldDto.phone,
+        requiredRecencyDays: 90,
+        lastVerifiedAt: '2026-05-01T00:00:00Z',
+      );
+      final r = ReverificationRequirement.fromDto(dto);
+      expect(r.providerId, 'moonpay');
+      expect(r.field, ReverificationField.phone);
+      expect(r.requiredRecencyDays, 90);
+      expect(r.lastVerifiedAt, '2026-05-01T00:00:00Z');
+    });
+
+    test('maps email reverification without lastVerifiedAt', () {
+      final dto = ReverificationRequirementDto(
+        providerId: 'moonpay',
+        field: ReverificationFieldDto.email,
+        requiredRecencyDays: 30,
+      );
+      final r = ReverificationRequirement.fromDto(dto);
+      expect(r.field, ReverificationField.email);
+      expect(r.lastVerifiedAt, isNull);
     });
   });
 
@@ -222,17 +261,23 @@ void main() {
       expect(r.tos, isNotNull);
       expect(r.amountLimit, isNull);
       expect(r.userInfo, isNull);
+      expect(r.reverification, isNull);
     });
 
     test('amountLimit variant', () {
       final dto = CheckoutRequirementDto(
         type: CheckoutRequirementTypeDto.amountLimit,
-        amountLimit: AmountLimitRequirementDto(providerId: 'mp', minAmountLimit: 1),
+        amountLimit: AmountLimitRequirementDto(
+          providerId: 'mp',
+          amountLimitSatisfied: false,
+          minAmountLimit: 1,
+        ),
       );
       final r = CheckoutRequirement.fromDto(dto);
       expect(r.kind, CheckoutRequirementKind.amountLimit);
       expect(r.amountLimit, isNotNull);
       expect(r.amountLimit!.minAmountLimit, 1);
+      expect(r.amountLimit!.amountLimitSatisfied, isFalse);
     });
 
     test('userInfo variant', () {
@@ -252,6 +297,22 @@ void main() {
       final r = CheckoutRequirement.fromDto(dto);
       expect(r.kind, CheckoutRequirementKind.userInfo);
       expect(r.userInfo, isNotNull);
+      expect(r.reverification, isNull);
+    });
+
+    test('reverification variant', () {
+      final dto = CheckoutRequirementDto(
+        type: CheckoutRequirementTypeDto.reverification,
+        reverification: ReverificationRequirementDto(
+          providerId: 'mp',
+          field: ReverificationFieldDto.phone,
+          requiredRecencyDays: 30,
+        ),
+      );
+      final r = CheckoutRequirement.fromDto(dto);
+      expect(r.kind, CheckoutRequirementKind.reverification);
+      expect(r.reverification, isNotNull);
+      expect(r.reverification!.field, ReverificationField.phone);
     });
 
     test('all CheckoutRequirementKind counts match dto', () {
@@ -281,10 +342,14 @@ void main() {
           ),
           CheckoutRequirementDto(
             type: CheckoutRequirementTypeDto.amountLimit,
-            amountLimit: AmountLimitRequirementDto(providerId: 'mp'),
+            amountLimit: AmountLimitRequirementDto(
+              providerId: 'mp',
+              amountLimitSatisfied: true,
+            ),
           ),
         ],
-        quote: QuoteDto(quoteId: 'q'),
+        quote: _quoteDto(),
+        buttonHandle: 'handle-1',
       );
 
       final r = CheckoutRequirementsResult.fromDto(dto);
@@ -293,6 +358,7 @@ void main() {
       expect(r.requirements, hasLength(2));
       expect(r.quote, isA<QuoteResponse>());
       expect(r.quote.quoteId, 'q');
+      expect(r.buttonHandle, 'handle-1');
     });
 
     test('tos convenience getter filters non-tos and missing payloads', () {
@@ -305,14 +371,18 @@ void main() {
           ),
           CheckoutRequirementDto(
             type: CheckoutRequirementTypeDto.amountLimit,
-            amountLimit: AmountLimitRequirementDto(providerId: 'b'),
+            amountLimit: AmountLimitRequirementDto(
+              providerId: 'b',
+              amountLimitSatisfied: false,
+            ),
           ),
           CheckoutRequirementDto(
             type: CheckoutRequirementTypeDto.tos,
             tos: TosRequirementDto(providerId: 'c', items: <TosItemDto>[]),
           ),
         ],
-        quote: QuoteDto(),
+        quote: _quoteDto(),
+        buttonHandle: 'handle-2',
       );
 
       final r = CheckoutRequirementsResult.fromDto(dto);

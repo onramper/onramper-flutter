@@ -26,6 +26,14 @@ void main() {
       expect(ctx.paymentType, CheckoutPaymentType.revolutPay);
     });
 
+    test('paymentType is nullable and defaults to null when omitted', () {
+      final ctx = RenderContext.fromDto(RenderContextDto(
+        url: 'u',
+        renderType: RenderTypeDto.webview,
+      ));
+      expect(ctx.paymentType, isNull);
+    });
+
     test('all RenderType / CheckoutPaymentType counts match dto', () {
       expect(RenderType.values.length, RenderTypeDto.values.length);
       expect(CheckoutPaymentType.values.length,
@@ -39,7 +47,8 @@ void main() {
         final s = OnramperState.fromDto(OnramperStateDto(kind: k));
         expect(s.kind, isA<OnramperStateKind>());
       }
-      expect(OnramperStateKind.values.length, OnramperStateKindDto.values.length);
+      expect(
+          OnramperStateKind.values.length, OnramperStateKindDto.values.length);
     });
 
     test('rendering state carries non-null renderContext', () {

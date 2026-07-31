@@ -23,12 +23,17 @@ enum RenderType { webview, deeplink }
 /// Specific payment surface used inside the checkout view.
 enum CheckoutPaymentType { applePay, revolutPay }
 
-/// Render payload attached to [OnramperStateKind.rendering].
+/// Render payload attached to [OnramperStateKind.rendering] and the
+/// `renderingStarted` / `checkoutFinalized` events.
+///
+/// [paymentType] is nullable because the native `renderingStarted` event
+/// carries only url + renderType; it becomes non-null once the SDK reaches
+/// `state.rendering` or `checkoutFinalized`, which do include the type.
 class RenderContext {
   const RenderContext({
     required this.url,
     required this.renderType,
-    required this.paymentType,
+    this.paymentType,
   });
 
   factory RenderContext.fromDto(RenderContextDto dto) => RenderContext(
@@ -37,15 +42,18 @@ class RenderContext {
           RenderTypeDto.webview => RenderType.webview,
           RenderTypeDto.deeplink => RenderType.deeplink,
         },
-        paymentType: switch (dto.paymentType) {
-          CheckoutPaymentTypeDto.applePay => CheckoutPaymentType.applePay,
-          CheckoutPaymentTypeDto.revolutPay => CheckoutPaymentType.revolutPay,
-        },
+        paymentType: dto.paymentType == null
+            ? null
+            : switch (dto.paymentType!) {
+                CheckoutPaymentTypeDto.applePay => CheckoutPaymentType.applePay,
+                CheckoutPaymentTypeDto.revolutPay =>
+                  CheckoutPaymentType.revolutPay,
+              },
       );
 
   final String url;
   final RenderType renderType;
-  final CheckoutPaymentType paymentType;
+  final CheckoutPaymentType? paymentType;
 }
 
 /// Snapshot of the SDK state with whatever payload that state carries.

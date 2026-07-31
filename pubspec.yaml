@@ -1,8 +1,10 @@
 name: onramper_sdk
-description: Flutter plugin wrapping the iOS OnramperSDK for crypto on-ramping.
-version: 1.0.0
+description: Official Flutter plugin for the Onramper crypto on-ramp. Configures, initializes, and embeds a native SwiftUI checkout button. iOS-only, requires iOS 16+ and App Attest.
+version: 1.1.0
 homepage: https://github.com/onramper/onramper-flutter
-publish_to: 'none'
+repository: https://github.com/onramper/onramper-flutter
+issue_tracker: https://github.com/onramper/onramper-flutter/issues
+documentation: https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -17,7 +19,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  pigeon: ^22.0.0
+  # Pinned rather than caret-versioned because pigeon writes its own version
+  # into the generated file header, so any bump causes the CI drift check to
+  # fail. 22.7.2 is the last release compatible with the Dart 3.4.0 that
+  # ships with Flutter 3.22.0 (used by CI).
+  pigeon: 22.7.2
 
 flutter:
   plugin:

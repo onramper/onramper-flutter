@@ -14,8 +14,8 @@ void main() {
     });
 
     test('all CheckoutEventKind counts match dto', () {
-      expect(CheckoutEventKind.values.length,
-          CheckoutEventKindDto.values.length);
+      expect(
+          CheckoutEventKind.values.length, CheckoutEventKindDto.values.length);
     });
 
     test('stateChanged carries state', () {
@@ -109,6 +109,72 @@ void main() {
       expect(e.requirementType, isNull);
       expect(e.renderContext, isNull);
       expect(e.error, isNull);
+      expect(e.finalizeResponse, isNull);
+      expect(e.providerReason, isNull);
+    });
+
+    test('checkoutFinalized carries both renderContext and finalizeResponse',
+        () {
+      final e = CheckoutEvent.fromDto(CheckoutEventDto(
+        kind: CheckoutEventKindDto.checkoutFinalized,
+        checkoutId: 'co_xyz',
+        renderContext: RenderContextDto(
+          url: 'https://pay.example.com',
+          renderType: RenderTypeDto.deeplink,
+          paymentType: CheckoutPaymentTypeDto.revolutPay,
+        ),
+        finalizeResponse: CheckoutFinalizeResponseDto(
+          headlessCheckoutId: 'co_xyz',
+          headlessCheckoutData: HeadlessCheckoutDataDto(
+            url: 'https://pay.example.com',
+            renderType: RenderTypeDto.deeplink,
+            checkoutPaymentType: CheckoutPaymentTypeDto.revolutPay,
+          ),
+        ),
+      ));
+      expect(e.kind, CheckoutEventKind.checkoutFinalized);
+      expect(e.checkoutId, 'co_xyz');
+      expect(e.finalizeResponse, isNotNull);
+      expect(e.finalizeResponse!.headlessCheckoutId, 'co_xyz');
+      expect(e.finalizeResponse!.headlessCheckoutData.checkoutPaymentType,
+          CheckoutPaymentType.revolutPay);
+    });
+
+    test('renderingStarted with null paymentType round-trips as nullable', () {
+      final e = CheckoutEvent.fromDto(CheckoutEventDto(
+        kind: CheckoutEventKindDto.renderingStarted,
+        renderContext: RenderContextDto(
+          url: 'u',
+          renderType: RenderTypeDto.webview,
+        ),
+      ));
+      expect(e.renderContext, isNotNull);
+      expect(e.renderContext!.paymentType, isNull);
+    });
+
+    test('providerError carries providerReason', () {
+      final e = CheckoutEvent.fromDto(CheckoutEventDto(
+        kind: CheckoutEventKindDto.providerError,
+        providerReason: 'timeout',
+      ));
+      expect(e.kind, CheckoutEventKind.providerError);
+      expect(e.providerReason, 'timeout');
+    });
+
+    test('provider-lifecycle events without payload map cleanly', () {
+      const lifecycles = <CheckoutEventKindDto>[
+        CheckoutEventKindDto.checkoutCancelled,
+        CheckoutEventKindDto.providerReady,
+        CheckoutEventKindDto.paymentAuthorized,
+        CheckoutEventKindDto.paymentProcessing,
+        CheckoutEventKindDto.paymentCancelled,
+      ];
+      for (final k in lifecycles) {
+        final e = CheckoutEvent.fromDto(CheckoutEventDto(kind: k));
+        expect(e.state, isNull);
+        expect(e.checkoutId, isNull);
+        expect(e.error, isNull);
+      }
     });
   });
 }

@@ -4,35 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/requirements.dart';
-import '../models/state.dart';
-import '../onramper_client.dart';
 import 'checkout_button_style.dart';
+import 'native_checkout_button.dart';
 
-/// Consumer-facing Buy button + ToS renderer for the Onramper checkout flow.
+/// Consumer-facing wrapper that renders any unsatisfied ToS items above the
+/// native [OnramperNativeCheckoutButton].
 ///
-/// Listens to [client] (a [ChangeNotifier]) and rebuilds on state changes.
-/// Tapping the button calls [OnramperClient.presentCheckout]; the native side
-/// renders the checkout webview. ToS items from [requirements] are rendered
-/// underneath the button and (when they carry a `url`) opened with
-/// `url_launcher` in an external browser.
+/// The native button is embedded inline via a Flutter platform view and handles
+/// the full checkout flow (OIDC login, finalize, payment webview) without a
+/// separate `presentCheckout()` call.
 ///
-/// While the client is in a "busy" state (`checkoutPreparing`,
-/// `authenticating`, `finalizing`, or `rendering`), the button is disabled
-/// and displays a small progress indicator.
+/// ToS links (when they carry a `url`) are opened with `url_launcher` in an
+/// external browser, or routed through [onLinkTap] if provided.
 class OnramperCheckoutButton extends StatefulWidget {
   const OnramperCheckoutButton({
     super.key,
-    required this.client,
     required this.requirements,
     this.style = const CheckoutButtonStyle(),
-    this.label = 'Buy',
     this.onLinkTap,
   });
 
-  final OnramperClient client;
   final CheckoutRequirementsResult requirements;
   final CheckoutButtonStyle style;
-  final String label;
 
   /// Optional override for opening ToS links. Useful in tests + custom in-app
   /// routing. When `null`, links are opened via `launchUrl` in an external
@@ -46,64 +39,32 @@ class OnramperCheckoutButton extends StatefulWidget {
 class _OnramperCheckoutButtonState extends State<OnramperCheckoutButton> {
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.client,
-      builder: (context, _) {
-        final busy = _isBusy(widget.client.state.kind);
-        final tosItems = _tosItems;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ElevatedButton(
-              onPressed: busy
-                  ? null
-                  : () => unawaited(widget.client.presentCheckout()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: widget.style.backgroundColor,
-                foregroundColor: widget.style.foregroundColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(widget.style.borderRadius),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: busy
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(widget.label, style: widget.style.labelStyle),
+    final tosItems = _tosItems;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OnramperNativeCheckoutButton(
+          buttonHandle: widget.requirements.buttonHandle,
+          height: 56,
+        ),
+        if (tosItems.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ...tosItems.map(
+            (item) => _TosLine(
+              item: item,
+              style: widget.style,
+              onLinkTap: widget.onLinkTap,
             ),
-            if (tosItems.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...tosItems.map(
-                (item) => _TosLine(
-                  item: item,
-                  style: widget.style,
-                  onLinkTap: widget.onLinkTap,
-                ),
-              ),
-            ],
-          ],
-        );
-      },
+          ),
+        ],
+      ],
     );
   }
 
   List<TosItem> get _tosItems => widget.requirements.tos
       .expand((req) => req.items.where((i) => i.required && !i.satisfied))
       .toList(growable: false);
-
-  bool _isBusy(OnramperStateKind kind) => switch (kind) {
-        OnramperStateKind.checkoutPreparing ||
-        OnramperStateKind.authenticating ||
-        OnramperStateKind.finalizing ||
-        OnramperStateKind.rendering =>
-          true,
-        _ => false,
-      };
 }
 
 class _TosLine extends StatelessWidget {

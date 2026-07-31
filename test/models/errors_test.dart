@@ -4,7 +4,7 @@ import 'package:onramper_sdk/src/platform/pigeon.g.dart';
 
 void main() {
   group('OnramperError.fromDto', () {
-    test('preserves all 13 fields', () {
+    test('preserves all fields', () {
       final dto = OnramperErrorDto(
         kind: OnramperErrorKindDto.amountOutOfRange,
         message: 'amount too low',
@@ -19,6 +19,7 @@ void main() {
         toState: 'failed',
         expectedState: 'rendering',
         actualState: 'completed',
+        host: 'api.example.com',
       );
 
       final err = OnramperError.fromDto(dto);
@@ -36,6 +37,19 @@ void main() {
       expect(err.toState, 'failed');
       expect(err.expectedState, 'rendering');
       expect(err.actualState, 'completed');
+      expect(err.host, 'api.example.com');
+    });
+
+    test('securityTrustFailed carries host', () {
+      final dto = OnramperErrorDto(
+        kind: OnramperErrorKindDto.securityTrustFailed,
+        message: 'trust',
+        recoverable: false,
+        host: 'api.onramper.com',
+      );
+      final err = OnramperError.fromDto(dto);
+      expect(err.kind, OnramperErrorKind.securityTrustFailed);
+      expect(err.host, 'api.onramper.com');
     });
 
     test('preserves null optional payloads', () {
@@ -57,6 +71,7 @@ void main() {
       expect(err.toState, isNull);
       expect(err.expectedState, isNull);
       expect(err.actualState, isNull);
+      expect(err.host, isNull);
     });
 
     test('every OnramperErrorKindDto maps to a non-null OnramperErrorKind', () {
@@ -72,7 +87,8 @@ void main() {
     });
 
     test('all kinds have complete mappings (counts match)', () {
-      expect(OnramperErrorKind.values.length, OnramperErrorKindDto.values.length);
+      expect(
+          OnramperErrorKind.values.length, OnramperErrorKindDto.values.length);
     });
 
     test('is an Exception', () {

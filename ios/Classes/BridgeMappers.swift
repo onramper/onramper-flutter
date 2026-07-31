@@ -1,5 +1,6 @@
 import Foundation
 import OnramperSDK
+import SwiftUI
 
 enum BridgeMappers {
     static func toNative(
@@ -39,9 +40,6 @@ enum BridgeMappers {
     /// aliased to the closest available native level:
     ///   - `warning` collapses to `error` (next-most-severe level the SDK emits).
     ///   - `trace` collapses to `debug` (most-verbose level the SDK supports).
-    ///
-    /// If/when the native SDK adds explicit `warning`/`trace` cases, update this
-    /// mapping to a 1:1 correspondence.
     static func toNative(_ dto: LogLevelDto) -> LogLevel {
         switch dto {
         case .off:     return .off
@@ -64,13 +62,8 @@ enum BridgeMappers {
             transactionFee: native.transactionFee,
             payout: native.payout,
             paymentMethod: native.paymentMethod,
-            recommendations: native.recommendations,
-            errors: native.errors?.map(fromNative)
+            recommendations: native.recommendations
         )
-    }
-
-    static func fromNative(_ native: QuoteError) -> QuoteErrorDto {
-        QuoteErrorDto(type: native.type, message: native.message)
     }
 
     // MARK: - CheckoutIntentRequest inputs (Dart -> Swift)
@@ -83,10 +76,7 @@ enum BridgeMappers {
     }
 
     static func toNative(_ dto: OnramperTransactionDataDto) -> OnramperTransactionData {
-        // Pass values through unchanged; `OnramperTransactionData.init`
-        // lowercases source/destination/country/subdivision itself.
         OnramperTransactionData(
-            onramp: dto.onramp,
             source: dto.source,
             destination: dto.destination,
             amount: dto.amount,
@@ -111,22 +101,25 @@ enum BridgeMappers {
 
     // MARK: - Checkout Requirements (Swift -> Dart)
 
-    static func fromNative(_ native: CheckoutIntentResponse) -> CheckoutRequirementsResultDto {
-        CheckoutRequirementsResultDto(
-            headlessCheckoutId: native.headlessCheckoutId,
-            requirements: native.checkoutRequirements.map(fromNative),
-            quote: fromNative(native.quote)
-        )
-    }
-
     static func fromNative(_ native: CheckoutRequirement) -> CheckoutRequirementDto {
         switch native {
         case .tos(let r):
-            return CheckoutRequirementDto(type: .tos, tos: fromNative(r), amountLimit: nil, userInfo: nil)
+            return CheckoutRequirementDto(type: .tos, tos: fromNative(r))
         case .amountLimit(let r):
-            return CheckoutRequirementDto(type: .amountLimit, tos: nil, amountLimit: fromNative(r), userInfo: nil)
+            return CheckoutRequirementDto(type: .amountLimit, amountLimit: fromNative(r))
         case .userInfo(let r):
-            return CheckoutRequirementDto(type: .userInfo, tos: nil, amountLimit: nil, userInfo: fromNative(r))
+            return CheckoutRequirementDto(type: .userInfo, userInfo: fromNative(r))
+        case .reverification(let r):
+            return CheckoutRequirementDto(type: .reverification, reverification: fromNative(r))
+        @unknown default:
+            // A newer SDK snapshot introduced a case we can't map. Represent it
+            // as `tos` with an empty items list so the state machine can still
+            // proceed to `readyToCheckout`; consumers observing this shape
+            // should treat it as "unknown requirement, upgrade the plugin".
+            return CheckoutRequirementDto(
+                type: .tos,
+                tos: TosRequirementDto(providerId: "unknown", items: [])
+            )
         }
     }
 
@@ -152,12 +145,14 @@ enum BridgeMappers {
         case .tos:           return .tos
         case .privacyPolicy: return .privacyPolicy
         case .userAgreement: return .userAgreement
+        @unknown default:    return .tos
         }
     }
 
     static func fromNative(_ native: AmountLimitRequirement) -> AmountLimitRequirementDto {
         AmountLimitRequirementDto(
             providerId: native.providerId,
+            amountLimitSatisfied: native.amountLimitSatisfied,
             minAmountLimit: native.minAmountLimit,
             maxAmountLimit: native.maxAmountLimit
         )
@@ -188,22 +183,43 @@ enum BridgeMappers {
         case .phoneVerification: return .phoneVerification
         case .ssnLastFour:       return .ssnLastFour
         case .address:           return .address
+        @unknown default:        return .firstName
+        }
+    }
+
+    static func fromNative(_ native: ReverificationRequirement) -> ReverificationRequirementDto {
+        ReverificationRequirementDto(
+            providerId: native.providerId,
+            field: fromNative(native.field),
+            requiredRecencyDays: Int64(native.requiredRecencyDays),
+            lastVerifiedAt: native.lastVerifiedAt
+        )
+    }
+
+    static func fromNative(_ native: ReverificationField) -> ReverificationFieldDto {
+        switch native {
+        case .email:      return .email
+        case .phone:      return .phone
+        @unknown default: return .email
         }
     }
 
     static func fromNative(_ native: CheckoutRequirementType) -> CheckoutRequirementTypeDto {
         switch native {
-        case .tos:         return .tos
-        case .amountLimit: return .amountLimit
-        case .userInfo:    return .userInfo
+        case .tos:            return .tos
+        case .amountLimit:    return .amountLimit
+        case .userInfo:       return .userInfo
+        case .reverification: return .reverification
+        @unknown default:     return .tos
         }
     }
 
     static func toNative(_ dto: CheckoutRequirementTypeDto) -> CheckoutRequirementType {
         switch dto {
-        case .tos:         return .tos
-        case .amountLimit: return .amountLimit
-        case .userInfo:    return .userInfo
+        case .tos:            return .tos
+        case .amountLimit:    return .amountLimit
+        case .userInfo:       return .userInfo
+        case .reverification: return .reverification
         }
     }
 
@@ -242,6 +258,8 @@ enum BridgeMappers {
                 kind: .failed,
                 failedError: fromNative(err)
             )
+        @unknown default:
+            return OnramperStateDto(kind: .idle)
         }
     }
 
@@ -255,8 +273,9 @@ enum BridgeMappers {
 
     static func fromNative(_ native: RenderType) -> RenderTypeDto {
         switch native {
-        case .webview:  return .webview
-        case .deeplink: return .deeplink
+        case .webview:    return .webview
+        case .deeplink:   return .deeplink
+        @unknown default: return .webview
         }
     }
 
@@ -264,11 +283,31 @@ enum BridgeMappers {
         switch native {
         case .applePay:   return .applePay
         case .revolutPay: return .revolutPay
+        @unknown default: return .applePay
         }
+    }
+
+    // MARK: - CheckoutFinalizeResponse
+
+    static func fromNative(_ native: CheckoutFinalizeResponse) -> CheckoutFinalizeResponseDto {
+        CheckoutFinalizeResponseDto(
+            headlessCheckoutId: native.headlessCheckoutId,
+            headlessCheckoutData: fromNative(native.headlessCheckoutData)
+        )
+    }
+
+    static func fromNative(_ native: HeadlessCheckoutData) -> HeadlessCheckoutDataDto {
+        HeadlessCheckoutDataDto(
+            url: native.url,
+            renderType: fromNative(native.renderType),
+            checkoutPaymentType: fromNative(native.checkoutPaymentType)
+        )
     }
 
     // MARK: - CheckoutEvent (Swift -> Dart)
 
+    /// Maps every native `CheckoutEvent` case to a Pigeon DTO. Callers always
+    /// forward the result — there are no dropped events.
     static func fromNative(_ native: CheckoutEvent) -> CheckoutEventDto {
         switch native {
         case .stateChanged(let state):
@@ -276,56 +315,100 @@ enum BridgeMappers {
         case .checkoutStarted(let id):
             return CheckoutEventDto(kind: .checkoutStarted, checkoutId: id)
         case .loginRequired(let reqs):
-            return CheckoutEventDto(kind: .loginRequired, loginRequirements: reqs.map(fromNative))
+            return CheckoutEventDto(
+                kind: .loginRequired,
+                loginRequirements: reqs.map(fromNative)
+            )
         case .readyToCheckout:
             return CheckoutEventDto(kind: .readyToCheckout)
         case .requirementSatisfied(let type):
             return CheckoutEventDto(kind: .requirementSatisfied, requirementType: fromNative(type))
         case .checkoutFinalized(let response):
-            let data = response.headlessCheckoutData
+            let dtoResponse = fromNative(response)
+            // Also populate `renderContext` (without paymentType, since this
+            // event's HeadlessCheckoutData carries a String url that becomes
+            // available on the .rendering state anyway).
             let renderCtx = RenderContextDto(
-                url: data.url,
-                renderType: fromNative(data.renderType),
-                paymentType: fromNative(data.checkoutPaymentType)
+                url: response.headlessCheckoutData.url,
+                renderType: fromNative(response.headlessCheckoutData.renderType),
+                paymentType: fromNative(response.headlessCheckoutData.checkoutPaymentType)
             )
             return CheckoutEventDto(
                 kind: .checkoutFinalized,
                 checkoutId: response.headlessCheckoutId,
-                renderContext: renderCtx
+                renderContext: renderCtx,
+                finalizeResponse: dtoResponse
             )
         case .renderingStarted(let url, let renderType):
-            // The native `renderingStarted` event has no paymentType. We
-            // default to `.applePay` here since it is the most common path
-            // for hosted checkout URLs; revolutPay flows are typically
-            // handled via `checkoutFinalized` which carries the explicit
-            // type.
+            // The native `renderingStarted` event carries only url + renderType.
+            // The payment type is not part of this event's payload — it can be
+            // read off `state.rendering.paymentType` if needed.
             let renderCtx = RenderContextDto(
                 url: url.absoluteString,
                 renderType: fromNative(renderType),
-                paymentType: .applePay
+                paymentType: nil
             )
             return CheckoutEventDto(kind: .renderingStarted, renderContext: renderCtx)
         case .completed(let checkoutId):
             return CheckoutEventDto(kind: .completed, checkoutId: checkoutId)
         case .failed(let err):
             return CheckoutEventDto(kind: .failed, error: fromNative(err))
+        case .checkoutCancelled:
+            return CheckoutEventDto(kind: .checkoutCancelled)
+        case .providerReady:
+            return CheckoutEventDto(kind: .providerReady)
+        case .paymentAuthorized:
+            return CheckoutEventDto(kind: .paymentAuthorized)
+        case .paymentProcessing:
+            return CheckoutEventDto(kind: .paymentProcessing)
+        case .paymentCancelled:
+            return CheckoutEventDto(kind: .paymentCancelled)
+        case .providerError(let reason):
+            return CheckoutEventDto(kind: .providerError, providerReason: reason)
+        @unknown default:
+            // Unknown provider-lifecycle events map to `providerError` with a
+            // generic reason so consumers still get some signal.
+            return CheckoutEventDto(
+                kind: .providerError,
+                providerReason: "Unknown checkout event"
+            )
         }
     }
 
+    // MARK: - Button style (Dart -> Swift)
+
+    /// Parses a hex color string like `#RRGGBB` or `#RRGGBBAA` into a SwiftUI
+    /// `Color`. Returns `nil` on parse failure so the caller can fall back to
+    /// the SDK's default.
+    static func parseHexColor(_ hex: String) -> Color? {
+        var trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("#") { trimmed.removeFirst() }
+        guard trimmed.count == 6 || trimmed.count == 8,
+              let value = UInt64(trimmed, radix: 16) else {
+            return nil
+        }
+        let hasAlpha = trimmed.count == 8
+        let r = Double((value >> (hasAlpha ? 24 : 16)) & 0xFF) / 255.0
+        let g = Double((value >> (hasAlpha ?  16 :  8)) & 0xFF) / 255.0
+        let b = Double((value >> (hasAlpha ?   8 :  0)) & 0xFF) / 255.0
+        let a = hasAlpha ? Double(value & 0xFF) / 255.0 : 1.0
+        return Color(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
+
+    static func toNative(_ dto: CheckoutButtonStyleDto?) -> CheckoutButtonStyle {
+        let defaults = CheckoutButtonStyle()
+        guard let dto else { return defaults }
+        return CheckoutButtonStyle(
+            backgroundColor: dto.backgroundColor.flatMap(parseHexColor) ?? defaults.backgroundColor,
+            foregroundColor: dto.foregroundColor.flatMap(parseHexColor) ?? defaults.foregroundColor,
+            borderRadius: dto.borderRadius.map { CGFloat($0) } ?? defaults.borderRadius
+        )
+    }
+
     // MARK: - OnramperError (Swift -> Dart)
-    // Full coverage + tests live in the Error mapper commit; this stub keeps
-    // the State/Event mappers compilable. The implementation here already
-    // handles every case but is exercised more broadly by the Error tests.
 
     static func fromNative(_ native: OnramperError) -> OnramperErrorDto {
         let message = native.errorDescription ?? "Unknown error"
-        // covers: notInitialized, initializationFailed, attestationFailed,
-        // invalidStateTransition, invalidState, networkError, decodingError,
-        // timeout, requirementNotSatisfied, amountOutOfRange, oidcFlowCancelled,
-        // oidcTokenExchangeFailed, oidcFlowFailed, userTokenInvalid,
-        // userTokenRefreshFailed, webviewLoadFailed, deepLinkFailed,
-        // invalidRequest, quoteUnavailable, checkoutForbidden, temporaryFailure,
-        // unrecoverable, configurationError, deviceBlocked, securityStorageFailed
         switch native {
         case .notInitialized:
             return OnramperErrorDto(kind: .notInitialized, message: message, recoverable: false)
@@ -377,6 +460,10 @@ enum BridgeMappers {
             return OnramperErrorDto(kind: .deviceBlocked, message: message, recoverable: false)
         case .securityStorageFailed(let status):
             return OnramperErrorDto(kind: .securityStorageFailed, message: message, recoverable: false, code: Int64(status))
+        case .securityTrustFailed(let host):
+            return OnramperErrorDto(kind: .securityTrustFailed, message: message, recoverable: false, host: host)
+        @unknown default:
+            return OnramperErrorDto(kind: .unrecoverable, message: message, recoverable: false, debugInfo: "unknown error: \(String(describing: native))")
         }
     }
 }
