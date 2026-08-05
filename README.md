@@ -32,7 +32,7 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 
 ```yaml
 dependencies:
-  onramper_sdk: ^1.1.0
+  onramper_sdk: ^1.1.1
 ```
 
 Or, while consuming from git:
@@ -42,7 +42,7 @@ dependencies:
   onramper_sdk:
     git:
       url: git@github.com:onramper/onramper-flutter.git
-      ref: v1.1.0
+      ref: v1.1.1
 ```
 
 Then:
@@ -112,7 +112,7 @@ final requirements = await client.getCheckoutRequirements(
 OnramperCheckoutButton(requirements: requirements)
 ```
 
-See [`example/`](example/) for a runnable app that wires all four steps end-to-end.
+See [`example/`](https://github.com/onramper/onramper-flutter/tree/master/example) for a runnable app that wires all four steps end-to-end.
 
 ## Events + errors
 
@@ -124,13 +124,13 @@ Terminal events:
 
 Provider-lifecycle events (`checkoutCancelled`, `providerReady`, `paymentAuthorized`, `paymentProcessing`, `paymentCancelled`, `providerError`) surface everything the underlying provider emits — not every provider emits every one.
 
-Errors are typed by `OnramperErrorKind` (25 kinds) with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). See the [full error table in the integration guide](integration-guide-flutter.md#8-error-handling).
+Errors are typed by `OnramperErrorKind` (25 kinds) with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). See the [full error table in the integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md#8-error-handling).
 
 ## Documentation
 
-- [Integration guide](integration-guide-flutter.md) — end-to-end walkthrough including App Attest setup, error handling, theming, and troubleshooting.
-- [Backend session endpoint](doc/BACKEND_SESSION_ENDPOINT.md) — reference implementation of the server-side call that mints `(sessionId, sessionToken)` pairs for `initialize` and `sessionExpirationHandler`.
-- [`CHANGELOG.md`](CHANGELOG.md) — release notes.
+- [Integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md) — end-to-end walkthrough including App Attest setup, error handling, theming, and troubleshooting.
+- [Backend session endpoint](https://github.com/onramper/onramper-flutter/blob/master/doc/BACKEND_SESSION_ENDPOINT.md) — reference implementation of the server-side call that mints `(sessionId, sessionToken)` pairs for `initialize` and `sessionExpirationHandler`.
+- [CHANGELOG](https://github.com/onramper/onramper-flutter/blob/master/CHANGELOG.md) — release notes.
 
 ## License
 

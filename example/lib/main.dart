@@ -1,3 +1,14 @@
+// Minimal example demonstrating the four-step onramper_sdk integration:
+//
+//   1. Create an OnramperClient with your API key, client ID, and a
+//      sessionExpirationHandler that mints credentials from your backend.
+//   2. Call client.initialize() with a fresh (sessionId, sessionToken) pair.
+//   3. Call client.getCheckoutRequirements() to fetch the quote + requirements.
+//   4. Embed OnramperCheckoutButton — it handles login, finalize, and payment.
+//
+// Credentials are injected at build time via --dart-define-from-file=.env.
+// See the README for setup instructions.
+
 import 'package:flutter/material.dart';
 import 'package:onramper_sdk/onramper_sdk.dart';
 
