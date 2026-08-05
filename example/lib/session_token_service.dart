@@ -5,9 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:onramper_sdk/onramper_sdk.dart';
 
-/// Mints demo `sessionId`/`sessionToken` pairs by hitting the same endpoint the
-/// native iOS demo uses (see `oid-ios-demo/SessionTokenService.swift`). The
-/// bearer token is injected at build time via `--dart-define`, never hard-coded.
+/// Mints demo `sessionId`/`sessionToken` pairs by hitting the Onramper staging
+/// demo BFF. The bearer token is injected at build time via `--dart-define`,
+/// never hard-coded.
+///
+/// In production your backend would call
+/// `POST {upstream}/partners/v2/{apiKey}/client-sessions` signed with your
+/// Ed25519 partner key — see `doc/BACKEND_SESSION_ENDPOINT.md` in the plugin
+/// repo for a reference implementation.
 class SessionTokenService {
   static const _endpoint = 'https://demo-stg.onramper.dev/demo/create-session';
 
@@ -27,8 +32,12 @@ class SessionTokenService {
       Uri.parse(_endpoint),
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
         'Authorization': 'Bearer $authToken',
       },
+      body: jsonEncode({
+        'scope': ['quotes:read', 'checkout:write'],
+      }),
     );
 
     if (response.statusCode != 201) {
