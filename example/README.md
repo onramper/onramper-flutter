@@ -1,17 +1,30 @@
-# onramper_flutter_example
+# onramper_flutter — example app
 
-Demonstrates how to use the onramper_flutter plugin.
+A minimal Flutter app demonstrating the full `onramper_flutter` plugin integration:
+configure → initialize → getCheckoutRequirements → OnramperCheckoutButton.
 
-## Getting Started
+## Running the example
 
-This project is a starting point for a Flutter application.
+Prerequisites: real iOS device, Xcode 26+, bundle ID registered with Onramper.
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+cd example
+flutter pub get
+cd ios && pod install && cd ..
+# Copy the env template and fill in your credentials:
+cp .env.example .env
+flutter run --release
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Use `--release` (not `--debug`) — the Flutter debug overlay renders over the native
+`WKWebView` and can obscure the payment sheet.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## What it covers
+
+- Wiring `sessionExpirationHandler` to a local mock session service
+- Observing `client.events` and `client.stateStream` in real time
+- Rendering `OnramperCheckoutButton` with custom `CheckoutButtonStyle`
+- Handling `OnramperError` kinds in the UI
+
+For the full integration walkthrough, see the
+[integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md).

@@ -113,7 +113,7 @@ final requirements = await client.getCheckoutRequirements(
       destination: 'btc',
       amount: 100,
       type: TransactionType.buy,
-      paymentMethod: 'creditcard',
+      paymentMethod: 'applepay',
       country: 'us',
       subdivision: 'us-ca',
       wallet: const WalletInfo(
