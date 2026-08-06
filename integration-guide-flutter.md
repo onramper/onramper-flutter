@@ -34,17 +34,17 @@ Add the plugin to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_flutter: ^1.1.0
+  onramper_flutter: ^1.1.2
 ```
 
-While the repository remains private, use a git dependency with your deploy key:
+Or, to consume from git:
 
 ```yaml
 dependencies:
   onramper_flutter:
     git:
       url: git@github.com:onramper/onramper-flutter.git
-      ref: v1.1.0
+      ref: v1.1.2
 ```
 
 Then fetch packages and pods:
@@ -84,7 +84,7 @@ final client = OnramperClient(
 );
 ```
 
-The handler is invoked from the native side via a Pigeon callback. If it throws, the native SDK surfaces the failure as an `OnramperError` with `kind == initializationFailed`.
+The handler is invoked from the native side via a Pigeon callback. If it throws, the native SDK surfaces the failure as `OnramperError(kind: userTokenRefreshFailed)` — the refresh is considered terminally failed and the SDK re-enters the login flow.
 
 ## 4. Initialize
 

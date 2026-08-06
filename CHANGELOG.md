@@ -47,4 +47,4 @@ First tagged release. Bundles [OnramperSDK](https://github.com/onramper/onramper
 
 - Flutter 3.22+, Dart 3.4+
 - iOS 16+ deployment target, App Attest capability, physical device for testing
-- `ONRAMPER_IOS_READ_TOKEN` / `GITHUB_TOKEN` / `gh auth login` at `pod install` time while `onramper/onramper-ios` remains internal
+- Export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` at `pod install` time to raise GitHub's anonymous rate limit from 60 to 5,000 requests/hour (optional)

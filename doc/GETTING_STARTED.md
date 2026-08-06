@@ -59,17 +59,17 @@ Add the plugin to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_flutter: ^1.1.1
+  onramper_flutter: ^1.1.2
 ```
 
-While the repository remains private, use a git dependency:
+Or, to consume from git:
 
 ```yaml
 dependencies:
   onramper_flutter:
     git:
       url: git@github.com:onramper/onramper-flutter.git
-      ref: v1.1.1
+      ref: v1.1.2
 ```
 
 Fetch packages and install pods:
@@ -87,7 +87,7 @@ The `pod install` step downloads the pinned `OnramperSDK.xcframework` from the p
 
 The iOS prerequisites — App Attest capability, entitlements plist, deployment target, and Podfile configuration — are covered in a dedicated guide.
 
-➡️ **See iOS build setup**
+➡️ **See [iOS build setup](IOS_BUILD_SETUP.md)**
 
 Complete that guide before your first build, then return here for usage.
 
@@ -143,7 +143,7 @@ await client.initialize(
 
 `initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent BFF calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
 
-➡️ **See Backend session endpoint** for the upstream API contract and a reference implementation.
+➡️ **See [Backend session endpoint](BACKEND_SESSION_ENDPOINT.md)** for the upstream API contract and a reference implementation.
 
 ---
 
