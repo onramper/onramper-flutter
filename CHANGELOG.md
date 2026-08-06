@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## 1.1.2 — License correction
+
+### Changed
+
+- License updated from MIT to **Apache License 2.0** to match the
+  React Native wrapper and the bundled `OnramperSDK` iOS framework.
+- Added `NOTICE` file attributing `OnramperSDK` (Copyright 2026
+  Onramper Technologies B.V.) per Apache 2.0 redistribution terms.
+
 ## 1.1.1 — Mandatory security update
 
 Bumps the bundled [OnramperSDK](https://github.com/onramper/onramper-ios) to v1.1.1. The upstream release notes describe this as required for continued operation of existing partner integrations, following a security enhancement in the headless-service backend.
