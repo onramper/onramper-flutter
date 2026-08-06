@@ -95,7 +95,7 @@ final requirements = await client.getCheckoutRequirements(
       destination: 'btc',
       amount: 100,
       type: TransactionType.buy,
-      paymentMethod: 'creditcard',
+      paymentMethod: 'applepay',
       country: 'us',
       subdivision: 'us-ca',
       wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
@@ -134,4 +134,4 @@ Errors are typed by `OnramperErrorKind` (25 kinds) with structured payloads (`mi
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+Apache 2.0. See [`LICENSE`](LICENSE).
