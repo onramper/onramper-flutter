@@ -5,7 +5,7 @@ import 'package:pigeon/pigeon.dart';
   dartOptions: DartOptions(),
   swiftOut: 'ios/Classes/Pigeon.g.swift',
   swiftOptions: SwiftOptions(),
-  dartPackageName: 'onramper_sdk',
+  dartPackageName: 'onramper_flutter',
 ))
 
 // ---- Configuration ----

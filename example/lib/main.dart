@@ -10,7 +10,7 @@
 // See the README for setup instructions.
 
 import 'package:flutter/material.dart';
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 import 'ios_diagnostics.dart';
 import 'session_token_service.dart';

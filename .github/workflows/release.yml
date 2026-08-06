@@ -36,7 +36,7 @@ jobs:
 
       - name: Update podspec version
         run: |
-          sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_sdk.podspec
+          sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_flutter.podspec
 
       - name: flutter pub get
         run: flutter pub get

@@ -175,7 +175,7 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.18.0"
-  onramper_sdk:
+  onramper_flutter:
     dependency: "direct main"
     description:
       path: ".."

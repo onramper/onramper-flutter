@@ -1,6 +1,6 @@
-# onramper_sdk_example
+# onramper_flutter_example
 
-Demonstrates how to use the onramper_sdk plugin.
+Demonstrates how to use the onramper_flutter plugin.
 
 ## Getting Started
 

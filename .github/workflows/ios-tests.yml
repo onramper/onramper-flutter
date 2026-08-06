@@ -24,4 +24,4 @@ jobs:
         # even if the secret is absent.
         env:
           ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
-        run: pod lib lint ios/onramper_sdk.podspec --allow-warnings
+        run: pod lib lint ios/onramper_flutter.podspec --allow-warnings

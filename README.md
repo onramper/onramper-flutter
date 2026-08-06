@@ -1,4 +1,4 @@
-# onramper_sdk
+# onramper_flutter
 
 [![CI](https://github.com/onramper/onramper-flutter/actions/workflows/ci.yml/badge.svg)](https://github.com/onramper/onramper-flutter/actions/workflows/ci.yml)
 [![iOS tests](https://github.com/onramper/onramper-flutter/actions/workflows/ios-tests.yml/badge.svg)](https://github.com/onramper/onramper-flutter/actions/workflows/ios-tests.yml)
@@ -18,7 +18,7 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 
 ## Versioning
 
-`onramper_sdk` X.Y.Z bundles `OnramperSDK` X.Y.Z. Wrapper-only patch releases ship as `X.Y.Z+N` where `N` is the patch counter.
+`onramper_flutter` X.Y.Z bundles `OnramperSDK` X.Y.Z. Wrapper-only patch releases ship as `X.Y.Z+N` where `N` is the patch counter.
 
 ## Requirements
 
@@ -32,14 +32,14 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 
 ```yaml
 dependencies:
-  onramper_sdk: ^1.1.1
+  onramper_flutter: ^1.1.1
 ```
 
 Or, while consuming from git:
 
 ```yaml
 dependencies:
-  onramper_sdk:
+  onramper_flutter:
     git:
       url: git@github.com:onramper/onramper-flutter.git
       ref: v1.1.1
@@ -59,7 +59,7 @@ The `pod install` step downloads the pinned `OnramperSDK.xcframework` from the [
 ## Quick start
 
 ```dart
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 // 1) Create one client per app session.
 final client = OnramperClient(

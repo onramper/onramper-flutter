@@ -5,7 +5,7 @@
 // iOS, empty SizedBox on other platforms) above any unsatisfied ToS lines.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 void main() {
   // Helper: build a minimal CheckoutRequirementsResult for tests.

@@ -1,6 +1,6 @@
 # Type reference
 
-Consolidated reference for every consumer-facing Dart type exported by `onramper_sdk`. Each type mirrors a Swift `OnramperSDK` model transported across the Pigeon bridge. Internal types (Pigeon DTOs, `*.g.dart`) are intentionally not exposed and not listed here.
+Consolidated reference for every consumer-facing Dart type exported by `onramper_flutter`. Each type mirrors a Swift `OnramperSDK` model transported across the Pigeon bridge. Internal types (Pigeon DTOs, `*.g.dart`) are intentionally not exposed and not listed here.
 
 > ℹ️ **iOS only.** The plugin is a no-op on Android; all methods throw if called on a non-iOS platform.
 

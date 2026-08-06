@@ -1,6 +1,6 @@
 # Coverage
 
-What `onramper_sdk` supports in this release — regions, payment methods, providers, and platform requirements. For the full integration walkthrough, see Getting started.
+What `onramper_flutter` supports in this release — regions, payment methods, providers, and platform requirements. For the full integration walkthrough, see Getting started.
 
 ---
 

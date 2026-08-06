@@ -1,4 +1,4 @@
-# iOS build setup for `onramper_sdk`
+# iOS build setup for `onramper_flutter`
 
 Build-time configuration for embedding the Onramper iOS SDK in a Flutter app: deployment target, App Attest capability, entitlements, Podfile, and first-build tips. For the full integration walkthrough — install, usage, error handling, API reference — see Getting started.
 

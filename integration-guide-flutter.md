@@ -4,7 +4,7 @@ A short, practical walkthrough for partners adding the Onramper Flutter plugin t
 
 ## Overview
 
-`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release) and requires Apple's **App Attest** capability. The bundled iOS SDK is downloaded from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release binaries at `pod install` time (sha256-pinned to a specific SDK version) — no authentication required.
+`onramper_flutter` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS OnramperSDK and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button. The plugin is **iOS-only** (Android is not supported in this release) and requires Apple's **App Attest** capability. The bundled iOS SDK is downloaded from the public [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) release binaries at `pod install` time (sha256-pinned to a specific SDK version) — no authentication required.
 
 ## 1. iOS app prerequisites
 
@@ -34,14 +34,14 @@ Add the plugin to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_sdk: ^1.1.0
+  onramper_flutter: ^1.1.0
 ```
 
 While the repository remains private, use a git dependency with your deploy key:
 
 ```yaml
 dependencies:
-  onramper_sdk:
+  onramper_flutter:
     git:
       url: git@github.com:onramper/onramper-flutter.git
       ref: v1.1.0
@@ -61,7 +61,7 @@ The `pod install` step downloads the pinned OnramperSDK.xcframework from the pub
 Create one `OnramperClient` per app session. Pass an `OnramperConfiguration` and a `sessionExpirationHandler` that returns fresh `SessionCredentials` minted by your backend.
 
 ```dart
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 final client = OnramperClient(
   configuration: const OnramperConfiguration(
@@ -350,7 +350,7 @@ See `example/lib/main.dart` for a full working example that wires `initialize`, 
 | `OnramperError(kind: attestationFailed)` on first call | Running on iOS Simulator, or bundle ID not registered with Onramper | Run on a real device; confirm bundle ID is registered. |
 | `pod install` fails with deployment target error | `ios/Podfile` and Runner project still on iOS < 16 | Set `platform :ios, '16.0'` in `Podfile` and bump Runner's deployment target to match. |
 | `pod install` fails with `curl: (22) 403 rate limit exceeded` | Hit GitHub's 60/hour anonymous request cap | Export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN` to authenticate the request (5000/hour cap), then re-run. |
-| `pod install` fails with `curl: (22) 404` | `onramper/onramper-ios` release asset id in the podspec doesn't exist upstream | Bump `onramper_sdk` to a version whose bundled SDK release is still published, or open an issue on this repo. |
+| `pod install` fails with `curl: (22) 404` | `onramper/onramper-ios` release asset id in the podspec doesn't exist upstream | Bump `onramper_flutter` to a version whose bundled SDK release is still published, or open an issue on this repo. |
 | App crashes immediately on launch with attestation error | Missing or wrong `Runner.entitlements` | Add the `com.apple.developer.devicecheck.appattest-environment` entitlement; match `development` to debug builds, `production` to release. |
 | `OnramperError(kind: unrecoverable)` mid-flow | Both token refresh paths exhausted (rare) | Call `client.reset()`, then `client.initialize(...)` with fresh credentials. |
 | Want to map a specific BFF error code | `OnramperError.code` carries the numeric BFF code when present | Cross-reference [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts); the SDK preserves `bffErrorCode` on `OnramperError.code`. |

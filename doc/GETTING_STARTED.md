@@ -1,6 +1,6 @@
-# Getting started with `onramper_sdk`
+# Getting started with `onramper_flutter`
 
-`onramper_sdk` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS `OnramperSDK.xcframework` and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button.
+`onramper_flutter` is the official Flutter plugin for the Onramper crypto onramping platform. It wraps the native iOS `OnramperSDK.xcframework` and exposes an idiomatic Dart API for configuring the SDK, requesting a checkout, observing state, and embedding a self-contained checkout button.
 
 > ℹ️ **iOS only.** Android is not supported in this release. The plugin renders an empty `SizedBox` on non-iOS targets — guard call sites with a platform check if your app targets Android.
 
@@ -59,14 +59,14 @@ Add the plugin to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_sdk: ^1.1.1
+  onramper_flutter: ^1.1.1
 ```
 
 While the repository remains private, use a git dependency:
 
 ```yaml
 dependencies:
-  onramper_sdk:
+  onramper_flutter:
     git:
       url: git@github.com:onramper/onramper-flutter.git
       ref: v1.1.1
@@ -98,7 +98,7 @@ Complete that guide before your first build, then return here for usage.
 Create one `OnramperClient` per app session. Pass an `OnramperConfiguration` and a `sessionExpirationHandler` that returns fresh credentials minted by your backend.
 
 ```dart
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 final client = OnramperClient(
   configuration: const OnramperConfiguration(

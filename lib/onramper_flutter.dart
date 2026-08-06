@@ -3,7 +3,7 @@
 /// Exports the idiomatic Dart wrappers around the Pigeon-generated DTOs
 /// (`lib/src/platform/pigeon.g.dart`) plus the top-level [OnramperClient]
 /// facade and the checkout button widget.
-library onramper_sdk;
+library onramper_flutter;
 
 export 'src/models/configuration.dart';
 export 'src/models/errors.dart';

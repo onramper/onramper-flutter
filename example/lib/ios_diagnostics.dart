@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 /// allowlists off (teamId, bundleId), so seeing the values the app actually
 /// launched with avoids guessing.
 class IosDiagnostics {
-  static const _channel = MethodChannel('onramper_sdk_example/diagnostics');
+  static const _channel = MethodChannel('onramper_flutter_example/diagnostics');
 
   static Future<IosAppIdentifiers> readAppIdentifiers() async {
     final raw =

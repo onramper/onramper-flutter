@@ -1,5 +1,5 @@
 import XCTest
-@testable import onramper_sdk
+@testable import onramper_flutter
 import OnramperSDK
 import SwiftUI
 

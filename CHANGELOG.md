@@ -10,7 +10,7 @@ Bumps the bundled [OnramperSDK](https://github.com/onramper/onramper-ios) to v1.
 
 ### Changed
 
-- `ios/onramper_sdk.podspec` — pinned to OnramperSDK v1.1.1 (asset id `492870955`, sha256 `88235fa50561422ba3276f8008ff0a2229cff760f75f36f3f424ff5f26e2b2e2`).
+- `ios/onramper_flutter.podspec` — pinned to OnramperSDK v1.1.1 (asset id `492870955`, sha256 `88235fa50561422ba3276f8008ff0a2229cff760f75f36f3f424ff5f26e2b2e2`).
 
 ### Plugin surface
 

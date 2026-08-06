@@ -1202,7 +1202,7 @@ class OnramperHostApi {
 
   Future<void> configure(ConfigurationDto config) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.configure$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.configure$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1226,7 +1226,7 @@ class OnramperHostApi {
 
   Future<void> initialize(SessionCredentialsDto credentials) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.initialize$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.initialize$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1252,7 +1252,7 @@ class OnramperHostApi {
       CheckoutIntentRequestDto request,
       CheckoutButtonStyleDto? buttonStyle) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1281,7 +1281,7 @@ class OnramperHostApi {
 
   Future<void> reset() async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.reset$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1308,7 +1308,7 @@ class OnramperHostApi {
   /// will re-prompt for OnramperID login.
   Future<void> signOut() async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.signOut$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.signOut$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1335,7 +1335,7 @@ class OnramperHostApi {
   /// prepared intent without dismissing it.
   Future<void> cancelPreparedIntent(String buttonHandle) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.cancelPreparedIntent$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.cancelPreparedIntent$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1359,7 +1359,7 @@ class OnramperHostApi {
 
   Future<void> dispose() async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.dispose$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.dispose$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1384,7 +1384,7 @@ class OnramperHostApi {
   Future<void> provideRefreshedSession(
       SessionCredentialsDto credentials) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.provideRefreshedSession$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.provideRefreshedSession$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1408,7 +1408,7 @@ class OnramperHostApi {
 
   Future<void> failRefreshedSession(String reason) async {
     final String pigeonVar_channelName =
-        'dev.flutter.pigeon.onramper_sdk.OnramperHostApi.failRefreshedSession$pigeonVar_messageChannelSuffix';
+        'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.failRefreshedSession$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
         BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -1453,7 +1453,7 @@ abstract class OnramperFlutterApi {
       final BasicMessageChannel<
           Object?> pigeonVar_channel = BasicMessageChannel<
               Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged$messageChannelSuffix',
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onStateChanged$messageChannelSuffix',
           pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
@@ -1461,11 +1461,11 @@ abstract class OnramperFlutterApi {
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged was null.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onStateChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final OnramperStateDto? arg_state = (args[0] as OnramperStateDto?);
           assert(arg_state != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged was null, expected non-null OnramperStateDto.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onStateChanged was null, expected non-null OnramperStateDto.');
           try {
             api.onStateChanged(arg_state!);
             return wrapResponse(empty: true);
@@ -1482,7 +1482,7 @@ abstract class OnramperFlutterApi {
       final BasicMessageChannel<
           Object?> pigeonVar_channel = BasicMessageChannel<
               Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent$messageChannelSuffix',
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onEvent$messageChannelSuffix',
           pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
@@ -1490,11 +1490,11 @@ abstract class OnramperFlutterApi {
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent was null.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onEvent was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final CheckoutEventDto? arg_event = (args[0] as CheckoutEventDto?);
           assert(arg_event != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent was null, expected non-null CheckoutEventDto.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onEvent was null, expected non-null CheckoutEventDto.');
           try {
             api.onEvent(arg_event!);
             return wrapResponse(empty: true);
@@ -1511,7 +1511,7 @@ abstract class OnramperFlutterApi {
       final BasicMessageChannel<
           Object?> pigeonVar_channel = BasicMessageChannel<
               Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError$messageChannelSuffix',
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onError$messageChannelSuffix',
           pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
@@ -1519,11 +1519,11 @@ abstract class OnramperFlutterApi {
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError was null.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onError was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final OnramperErrorDto? arg_error = (args[0] as OnramperErrorDto?);
           assert(arg_error != null,
-              'Argument for dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError was null, expected non-null OnramperErrorDto.');
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onError was null, expected non-null OnramperErrorDto.');
           try {
             api.onError(arg_error!);
             return wrapResponse(empty: true);
@@ -1540,7 +1540,7 @@ abstract class OnramperFlutterApi {
       final BasicMessageChannel<
           Object?> pigeonVar_channel = BasicMessageChannel<
               Object?>(
-          'dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onSessionExpired$messageChannelSuffix',
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onSessionExpired$messageChannelSuffix',
           pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {

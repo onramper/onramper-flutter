@@ -1,6 +1,6 @@
 # Debugging your integration
 
-Known limitations and gotchas when integrating `onramper_sdk`. For the full integration walkthrough — install, usage, error handling — see Getting started.
+Known limitations and gotchas when integrating `onramper_flutter`. For the full integration walkthrough — install, usage, error handling — see Getting started.
 
 ---
 
@@ -79,9 +79,9 @@ curl: (22) The requested URL returned error: 404
 The release asset referenced by the podspec's checksum does not exist in the upstream [`onramper/onramper-ios`](https://github.com/onramper/onramper-ios) repository. This can happen if:
 
 - The pin in the podspec references an asset that has since been removed, **or**
-- You are using an older version of `onramper_sdk` whose bundled iOS SDK release is no longer published.
+- You are using an older version of `onramper_flutter` whose bundled iOS SDK release is no longer published.
 
-Bump `onramper_sdk` to the latest version in `pubspec.yaml`, run `flutter pub get`, then re-run `pod install`. If the problem persists on the latest version, open an issue on the Flutter plugin repository.
+Bump `onramper_flutter` to the latest version in `pubspec.yaml`, run `flutter pub get`, then re-run `pod install`. If the problem persists on the latest version, open an issue on the Flutter plugin repository.
 
 ### Deployment target error
 
@@ -104,7 +104,7 @@ This error indicates a version skew between the Flutter plugin and the Onramper 
 
 Check that:
 
-1. You are on `onramper_sdk` v1.1.1 or later in `pubspec.yaml`.
+1. You are on `onramper_flutter` v1.1.1 or later in `pubspec.yaml`.
 2. The BFF environment you are targeting (staging or production) has been deployed with the `encryption` field on `CheckoutIntentResponse`. Staging is typically deployed ahead of production — if staging works but production does not, the production BFF deployment is pending.
 3. You are not mixing staging credentials with the production BFF or vice versa — set `OnramperEnvironment.development` for staging and `OnramperEnvironment.production` for production.
 
@@ -175,10 +175,10 @@ For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is 
 |---|---|---|
 | `attestationFailed` on first call | Simulator, or missing/wrong entitlement, or unregistered bundle ID | Run on real device; check `Runner.entitlements`; confirm bundle ID with Onramper. |
 | `pod install` 403 | GitHub anonymous rate limit | Export `ONRAMPER_IOS_READ_TOKEN` or `GITHUB_TOKEN`. |
-| `pod install` 404 | Release asset removed or version too old | Bump `onramper_sdk` to latest. |
+| `pod install` 404 | Release asset removed or version too old | Bump `onramper_flutter` to latest. |
 | `pod install` deployment target error | iOS target < 16.0 in Podfile or Xcode | Set `platform :ios, '16.0'` in Podfile; update Runner target in Xcode. |
 | App crashes on launch with attestation error | Missing entitlement | Add `com.apple.developer.devicecheck.appattest-environment` to `Runner.entitlements`. |
-| `decodingError: encryption key not found` | Plugin/BFF version skew | Upgrade to `onramper_sdk` v1.1.1+; confirm BFF environment matches `OnramperEnvironment`. |
+| `decodingError: encryption key not found` | Plugin/BFF version skew | Upgrade to `onramper_flutter` v1.1.1+; confirm BFF environment matches `OnramperEnvironment`. |
 | `networkError` (code 403) on `getCheckoutRequirements` | Session token missing `checkout:write` scope | Add `checkout:write` to the scope list in your backend session-mint call. |
 | `unrecoverable` mid-flow | Recovery chain exhausted | Call `reset()`, fetch fresh credentials, call `initialize()`. |
 | Build fails — Swift module not found | Xcode < 26 | Update to Xcode 26+. |

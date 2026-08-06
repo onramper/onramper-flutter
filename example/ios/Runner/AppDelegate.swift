@@ -16,7 +16,7 @@ import UIKit
 
     let messenger = engineBridge.pluginRegistry.registrar(forPlugin: "ios_diagnostics")!.messenger()
     let channel = FlutterMethodChannel(
-      name: "onramper_sdk_example/diagnostics",
+      name: "onramper_flutter_example/diagnostics",
       binaryMessenger: messenger
     )
     channel.setMethodCallHandler { call, result in

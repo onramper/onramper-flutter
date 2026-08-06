@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:onramper_sdk/onramper_sdk.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
 
 /// Mints demo `sessionId`/`sessionToken` pairs by hitting the Onramper staging
 /// demo BFF. The bearer token is injected at build time via `--dart-define`,

@@ -1,6 +1,6 @@
 # Checkout flow
 
-How a checkout flows through `onramper_sdk`. For the full integration walkthrough — install, usage, error handling — see Getting started.
+How a checkout flows through `onramper_flutter`. For the full integration walkthrough — install, usage, error handling — see Getting started.
 
 ---
 

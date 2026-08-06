@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onramper_sdk/src/models/state.dart';
-import 'package:onramper_sdk/src/platform/pigeon.g.dart';
+import 'package:onramper_flutter/src/models/state.dart';
+import 'package:onramper_flutter/src/platform/pigeon.g.dart';
 
 void main() {
   group('RenderContext.fromDto', () {

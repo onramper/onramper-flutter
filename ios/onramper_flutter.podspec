@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name             = 'onramper_sdk'
+  s.name             = 'onramper_flutter'
   s.version          = '1.1.1'
   s.summary          = 'Flutter plugin wrapping OnramperSDK (iOS).'
   s.description      = 'iOS-only Flutter plugin for the Onramper crypto on-ramp.'

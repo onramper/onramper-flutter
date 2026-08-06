@@ -1205,7 +1205,7 @@ class OnramperHostApiSetup {
   /// Sets up an instance of `OnramperHostApi` to handle messages through the `binaryMessenger`.
   static func setUp(binaryMessenger: FlutterBinaryMessenger, api: OnramperHostApi?, messageChannelSuffix: String = "") {
     let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
-    let configureChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.configure\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let configureChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.configure\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       configureChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1220,7 +1220,7 @@ class OnramperHostApiSetup {
     } else {
       configureChannel.setMessageHandler(nil)
     }
-    let initializeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.initialize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let initializeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.initialize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       initializeChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1237,7 +1237,7 @@ class OnramperHostApiSetup {
     } else {
       initializeChannel.setMessageHandler(nil)
     }
-    let getCheckoutRequirementsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.getCheckoutRequirements\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let getCheckoutRequirementsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.getCheckoutRequirements\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       getCheckoutRequirementsChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1255,7 +1255,7 @@ class OnramperHostApiSetup {
     } else {
       getCheckoutRequirementsChannel.setMessageHandler(nil)
     }
-    let resetChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.reset\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let resetChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.reset\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       resetChannel.setMessageHandler { _, reply in
         api.reset { result in
@@ -1273,7 +1273,7 @@ class OnramperHostApiSetup {
     /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
     /// session (DPoP key + session token) is preserved, but the next checkout
     /// will re-prompt for OnramperID login.
-    let signOutChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.signOut\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let signOutChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.signOut\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       signOutChannel.setMessageHandler { _, reply in
         api.signOut { result in
@@ -1291,7 +1291,7 @@ class OnramperHostApiSetup {
     /// Drops a stored native checkout button by handle without tearing down the
     /// whole SDK client. Useful when the consumer's UI navigates away from a
     /// prepared intent without dismissing it.
-    let cancelPreparedIntentChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.cancelPreparedIntent\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let cancelPreparedIntentChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.cancelPreparedIntent\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       cancelPreparedIntentChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1306,7 +1306,7 @@ class OnramperHostApiSetup {
     } else {
       cancelPreparedIntentChannel.setMessageHandler(nil)
     }
-    let disposeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.dispose\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let disposeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.dispose\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       disposeChannel.setMessageHandler { _, reply in
         api.dispose { result in
@@ -1321,7 +1321,7 @@ class OnramperHostApiSetup {
     } else {
       disposeChannel.setMessageHandler(nil)
     }
-    let provideRefreshedSessionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.provideRefreshedSession\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let provideRefreshedSessionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.provideRefreshedSession\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       provideRefreshedSessionChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1336,7 +1336,7 @@ class OnramperHostApiSetup {
     } else {
       provideRefreshedSessionChannel.setMessageHandler(nil)
     }
-    let failRefreshedSessionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_sdk.OnramperHostApi.failRefreshedSession\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let failRefreshedSessionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.failRefreshedSession\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       failRefreshedSessionChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
@@ -1371,7 +1371,7 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
     return PigeonPigeonCodec.shared
   }
   func onStateChanged(state stateArg: OnramperStateDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onStateChanged\(messageChannelSuffix)"
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onStateChanged\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([stateArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
@@ -1389,7 +1389,7 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
     }
   }
   func onEvent(event eventArg: CheckoutEventDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onEvent\(messageChannelSuffix)"
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onEvent\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([eventArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
@@ -1407,7 +1407,7 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
     }
   }
   func onError(error errorArg: OnramperErrorDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onError\(messageChannelSuffix)"
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onError\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([errorArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
@@ -1425,7 +1425,7 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
     }
   }
   func onSessionExpired(completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.onramper_sdk.OnramperFlutterApi.onSessionExpired\(messageChannelSuffix)"
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onSessionExpired\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage(nil) { response in
       guard let listResponse = response as? [Any?] else {

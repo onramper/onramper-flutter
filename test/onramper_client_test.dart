@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onramper_sdk/onramper_sdk.dart';
-import 'package:onramper_sdk/src/platform/pigeon.g.dart';
+import 'package:onramper_flutter/onramper_flutter.dart';
+import 'package:onramper_flutter/src/platform/pigeon.g.dart';
 
 QuoteDto _sampleQuoteDto() => QuoteDto(
       quoteId: 'q-stub',

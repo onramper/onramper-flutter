@@ -1,5 +1,5 @@
 import XCTest
-@testable import onramper_sdk
+@testable import onramper_flutter
 import OnramperSDK
 
 /// Captures every callback the plugin sends Dart-side so tests can assert on
