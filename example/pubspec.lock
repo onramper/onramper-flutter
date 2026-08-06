@@ -178,10 +178,11 @@ packages:
   onramper_flutter:
     dependency: "direct main"
     description:
-      path: ".."
-      relative: true
-    source: path
-    version: "1.1.1"
+      name: onramper_flutter
+      sha256: "5d6d4e5bef9c781219d280e0e32a2b79e1e7fc47abccc832243fd7e07ad91adf"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.2"
   path:
     dependency: transitive
     description:

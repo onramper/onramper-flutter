@@ -62,13 +62,13 @@ dependencies:
   onramper_flutter: ^1.1.2
 ```
 
-Or, to consume from git:
+Or pin a specific tag (useful for preview releases before they reach pub.dev):
 
 ```yaml
 dependencies:
   onramper_flutter:
     git:
-      url: git@github.com:onramper/onramper-flutter.git
+      url: https://github.com/onramper/onramper-flutter.git
       ref: v1.1.2
 ```
 
