@@ -35,7 +35,6 @@ What `onramper_flutter` supports in this release — regions, payment methods, p
 | Payment method | Supported |
 |---|---|
 | Apple Pay | Yes |
-| Revolut Pay | Yes |
 
 ---
 

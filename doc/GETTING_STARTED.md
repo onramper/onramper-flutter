@@ -402,7 +402,6 @@ void dispose() {
 - App Attest entitlement set to `production` in your release provisioning profile.
 - Backend session-mint endpoint deployed and reachable from the production app; returns both `sessionId` and `sessionToken`.
 - `sessionExpirationHandler` wired and tested end-to-end.
-- `logLevel: OnramperLogLevel.off` in production builds.
 - Tested on a real device — attestation path verified.
 - Error UI covers at minimum `amountOutOfRange`, `quoteUnavailable`, `checkoutForbidden`, `temporaryFailure`, `networkError`, `deviceBlocked`, `configurationError`, and `unrecoverable`.
 - Analytics hooked into `client.events` or `client.stateStream`.
