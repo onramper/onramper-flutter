@@ -33,7 +33,7 @@ mint session  →  initialize()  →  attestation + DPoP bootstrap
                                   user taps Buy
                                →  ToS acceptance recorded
                                →  OnramperID login (if needed)
-                               →  finalize intent with BFF
+                               →  finalize intent with Onramper's backend
                                →  present payment surface
                  observe events ← completed / failed
 ```
@@ -48,7 +48,7 @@ Step by step:
 
 4. **App embeds `OnramperCheckoutButton`.** The user sees the native Buy button and any Terms-of-Service text the plugin rendered for the selected provider.
 
-5. **User taps Buy.** The button records ToS consent, presents the OnramperID login sheet if the provider needs user identity (and the same sheet handles phone re-verification), then finalizes the intent with the BFF.
+5. **User taps Buy.** The button records ToS consent, presents the OnramperID login sheet if the provider needs user identity (and the same sheet handles phone re-verification), then finalizes the intent with Onramper's backend.
 
 6. **Plugin renders the payment surface.** Apple Pay, card webview, or other surface — chosen automatically from the provider's finalize response. State transitions through `finalizing` → `rendering`.
 
@@ -69,7 +69,7 @@ Step by step:
 | `requireLogin` | Intent created; the provider requires user identity or phone re-verification. The OnramperID sheet will present on Buy tap. | `requireLoginRequirements: List<CheckoutRequirement>` |
 | `authenticating` | OnramperID login sheet is on screen. | — |
 | `readyToCheckout` | All requirements satisfied; tapping Buy goes straight to finalize. | — |
-| `finalizing` | BFF finalize call is in flight. | — |
+| `finalizing` | backend finalize call is in flight. | — |
 | `rendering` | Payment surface is on screen. | `renderContext: RenderContext` |
 | `completed` | Terminal success. | — |
 | `failed` | Terminal failure. | `failedError: OnramperError` |

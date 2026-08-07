@@ -46,4 +46,4 @@ What `onramper_flutter` supports in this release — regions, payment methods, p
 | Coinbase | Available in supported regions subject to partner configuration. |
 | Paybis | Available in supported regions subject to partner configuration. |
 
-Other providers may appear based on region, requested amount, and payment method. The set of eligible providers is resolved at `getCheckoutRequirements` time from the BFF — the list above reflects providers available in this release, not an exhaustive list of what any single request returns. Use `onlyOnramps` in `CheckoutIntentRequest` to restrict to a specific subset.
+Other providers may appear based on region, requested amount, and payment method. The set of eligible providers is resolved at `getCheckoutRequirements` time from Onramper's backend — the list above reflects providers available in this release, not an exhaustive list of what any single request returns. Use `onlyOnramps` in `CheckoutIntentRequest` to restrict to a specific subset.

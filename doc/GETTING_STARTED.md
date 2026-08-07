@@ -141,13 +141,13 @@ await client.initialize(
 // client.state.kind == OnramperStateKind.ready
 ```
 
-`initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent BFF calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
+`initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent backend calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
 
 ➡️ **See [Backend session endpoint](BACKEND_SESSION_ENDPOINT.md)** for the upstream API contract and a reference implementation.
 
 ---
 
-## 5. Prepare a checkout
+## 5. Get a quote and prepare checkout
 
 Build a `CheckoutIntentRequest` and call `getCheckoutRequirements`. The SDK validates the request, computes a quote, and returns the requirements (Terms of Service, amount limits, user info) that must be reflected in the UI before the user can complete checkout.
 
@@ -214,7 +214,7 @@ Tapping the button drives the native checkout flow internally:
 
 1. Records the ToS acceptance timestamp.
 2. Presents the OnramperID login sheet (a native `WKWebView`) if the provider requires identity. The same sheet also handles phone re-verification.
-3. Finalizes the intent with the BFF.
+3. Finalizes the intent with Onramper's backend.
 4. Presents the payment surface (Apple Pay, card webview, deep-link) chosen from the finalize response.
 5. Silently re-authenticates if any token expires mid-flow.
 
@@ -327,7 +327,7 @@ try {
 | `securityStorageFailed` | false | Rare; log `debugInfo` and surface a generic error. |
 | `securityTrustFailed` | false | Rare; log `error.host` and surface a generic error. |
 
-The numeric BFF error code is preserved on `OnramperError.code` when one was present. Switch on `kind`, not the numeric code.
+The numeric backend error code is preserved on `OnramperError.code` when one was present. Switch on `kind`, not the numeric code.
 
 ---
 

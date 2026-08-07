@@ -1,6 +1,6 @@
 # OnramperSDK for Flutter — Integration Guide
 
-A short, practical walkthrough for partners adding the Onramper Flutter plugin to an iOS app. For the underlying native reference (state machine, error catalogue, BFF contract), see the native iOS SDK's [`integration-guide.md`](https://github.com/onramper/onramper-ios/blob/master/integration-guide.md).
+A short, practical walkthrough for partners adding the Onramper Flutter plugin to an iOS app. For the underlying native reference (state machine, error catalogue, backend contract), see the native iOS SDK's [`integration-guide.md`](https://github.com/onramper/onramper-ios/blob/master/integration-guide.md).
 
 ## Overview
 
@@ -99,9 +99,9 @@ await client.initialize(
 );
 ```
 
-`initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent BFF calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
+`initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent backend calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
 
-## 5. Prepare a checkout
+## 5. Get a quote and prepare checkout
 
 Build a `CheckoutIntentRequest` describing what the user wants to buy and call `getCheckoutRequirements`. The SDK validates the request, computes a quote, and returns the requirements (Terms of Service, amount limits, user info) the integrator must reflect in the UI before the user can complete checkout.
 
@@ -166,7 +166,7 @@ Tapping the button drives the native checkout flow internally:
 
 1. Records the ToS acceptance timestamp.
 2. Presents the OnramperID login sheet (in a native `WKWebView`) if the provider requires identity — the same sheet also drives phone reverification.
-3. Finalizes the intent with the BFF.
+3. Finalizes the intent with Onramper's backend.
 4. Presents the payment surface (Apple Pay, card webview, deep-link) chosen from the finalize response.
 5. Silently re-authenticates if any token expires mid-flow.
 
@@ -224,24 +224,24 @@ All errors thrown across the Flutter boundary are `OnramperError` instances. `ki
 | `invalidStateTransition` | The native state machine rejected a transition (developer error). `fromState`/`toState` are populated. | false | Log to crash reporting; this indicates a bug in the integration. |
 | `invalidState` | A method was called from an inappropriate state. `expectedState`/`actualState` are populated. | false | Check `client.state.kind` before calling and gate UI accordingly. |
 | `networkError` | Transport-level failure (DNS, TLS, offline). `code` may carry the HTTP status. | true | Show a retry affordance with a "check your connection" message. |
-| `decodingError` | The BFF returned a payload the SDK could not decode. | false | Log `debugInfo`; surface as a generic failure. |
-| `timeout` | A BFF call exceeded its timeout. | true | Offer a retry; the network may be slow. |
+| `decodingError` | The backend returned a payload the SDK could not decode. | false | Log `debugInfo`; surface as a generic failure. |
+| `timeout` | A backend call exceeded its timeout. | true | Offer a retry; the network may be slow. |
 | `requirementNotSatisfied` | Checkout was attempted while a requirement (ToS, user info, amount) was still unsatisfied. | true | Re-call `getCheckoutRequirements` and surface the outstanding requirement. |
 | `amountOutOfRange` | Amount falls outside the provider's bounds. `minAmount` and `maxAmount` are populated. | true | Prompt the user to enter a new amount; display `minAmount`/`maxAmount` from the error. |
 | `oidcFlowCancelled` | User dismissed the OnramperID login sheet. | true | Tapping Buy again retries; usually no UI action needed. |
 | `oidcTokenExchangeFailed` | The OIDC authorization code → token exchange failed. | true | Offer a retry; verify `clientId` configuration if it persists. |
 | `oidcFlowFailed` | The OIDC webview hit a terminal error (load failure, invalid response). | true | Offer a retry; log `debugInfo`. |
-| `userTokenInvalid` | The OnramperID user token was rejected by the BFF and could not be refreshed. | true | The SDK will re-present login automatically; surface only if you want to log. |
+| `userTokenInvalid` | The OnramperID user token was rejected by Onramper's backend and could not be refreshed. | true | The SDK will re-present login automatically; surface only if you want to log. |
 | `userTokenRefreshFailed` | OnramperID refresh token terminally rejected. SDK has already re-entered the login flow. | true | Usually no action; the button re-presents the login sheet. |
 | `webviewLoadFailed` | The payment webview failed to load. | true | Offer a retry; check connectivity. |
 | `deepLinkFailed` | A deep-link return from the payment surface failed. | true | Offer a retry. |
-| `invalidRequest` | A 4xx validation error from the BFF. `field` names the offending input where known. | true | Fix the offending parameter (e.g., `amount`, `wallet.address`) and retry. |
+| `invalidRequest` | A 4xx validation error from Onramper's backend. `field` names the offending input where known. | true | Fix the offending parameter (e.g., `amount`, `wallet.address`) and retry. |
 | `quoteUnavailable` | No provider returned a usable quote for this request. | true | Suggest a different amount, currency, or payment method. |
 | `checkoutForbidden` | Region, KYC tier, or partner policy blocks this checkout. | false | Show a "not available for this configuration" message. |
 | `temporaryFailure` | Server-side 5xx. `retryAfterSeconds` may be populated. | true | Show a retry affordance; respect `retryAfterSeconds` if present. |
 | `unrecoverable` | Internal recovery (refresh + re-bootstrap) was exhausted. | false | Show an error, call `reset()`, then re-`initialize()`. |
 | `configurationError` | Partner setup error (bad API key, missing scope). | false | Not user-actionable; surface as a developer/support issue. |
-| `deviceBlocked` | The BFF terminally rejected the device. | false | Show a "unable to continue on this device" message. |
+| `deviceBlocked` | Onramper's backend terminally rejected the device. | false | Show a "unable to continue on this device" message. |
 | `securityStorageFailed` | Keychain read/write on the native side failed. | false | Rare; log `debugInfo` and surface a generic error. |
 | `securityTrustFailed` | Certificate pinning check failed for a host. `host` names the affected server. | false | Rare; log `host` and surface as a generic error. |
 
@@ -273,7 +273,7 @@ try {
 }
 ```
 
-The native SDK preserves the BFF's numeric error code on `OnramperError.code` when one was present. See the headless-service catalogue at [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts) for the canonical mapping (the SDK translates these to typed `OnramperErrorKind`s — you should not switch on the numeric code directly).
+The native SDK preserves Onramper's backend's numeric error code on `OnramperError.code` when one was present. See the headless-service catalogue at [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts) for the canonical mapping (the SDK translates these to typed `OnramperErrorKind`s — you should not switch on the numeric code directly).
 
 ## 9. Theming
 
@@ -353,7 +353,7 @@ See `example/lib/main.dart` for a full working example that wires `initialize`, 
 | `pod install` fails with `curl: (22) 404` | `onramper/onramper-ios` release asset id in the podspec doesn't exist upstream | Bump `onramper_flutter` to a version whose bundled SDK release is still published, or open an issue on this repo. |
 | App crashes immediately on launch with attestation error | Missing or wrong `Runner.entitlements` | Add the `com.apple.developer.devicecheck.appattest-environment` entitlement; match `development` to debug builds, `production` to release. |
 | `OnramperError(kind: unrecoverable)` mid-flow | Both token refresh paths exhausted (rare) | Call `client.reset()`, then `client.initialize(...)` with fresh credentials. |
-| Want to map a specific BFF error code | `OnramperError.code` carries the numeric BFF code when present | Cross-reference [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts); the SDK preserves `bffErrorCode` on `OnramperError.code`. |
+| Want to map a specific backend error code | `OnramperError.code` carries the numeric backend error code when present | Cross-reference [`headless-service/src/errors/index.ts`](https://github.com/onramper/onramper-services/blob/master/headless-service/src/errors/index.ts); the SDK preserves it on `OnramperError.code`. |
 
 ## 12. Reference: example app
 

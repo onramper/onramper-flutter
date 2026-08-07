@@ -42,7 +42,7 @@ Passed to `OnramperClient(configuration:)`.
 | `off` | Nothing. Use in production. |
 | `error` | Failed requests only — non-2xx status and decoded error code. |
 | `warning` | Degraded-path warnings in addition to errors. _(Collapsed to `error` on the Swift side — the native SDK has no distinct warning level.)_ |
-| `info` | HTTP method, URL path, and status for every BFF and security call. |
+| `info` | HTTP method, URL path, and status for every backend and security call. |
 | `debug` | Low-level bridge and state machine detail. |
 | `trace` | Maximum verbosity. _(Collapsed to `debug` on the Swift side.)_ |
 
@@ -128,7 +128,7 @@ Snapshot of the SDK state. At most one payload field is non-null per instance, m
 | `requireLogin` | Provider requires user identity or phone re-verification. OnramperID sheet will present on Buy tap. |
 | `authenticating` | OnramperID login sheet is on screen. |
 | `readyToCheckout` | All requirements satisfied; Buy goes straight to finalize. |
-| `finalizing` | BFF finalize call is in flight. |
+| `finalizing` | backend finalize call is in flight. |
 | `rendering` | Payment surface is on screen. |
 | `completed` | Terminal success. |
 | `failed` | Terminal failure. |
@@ -186,7 +186,7 @@ Domain event observed from the native SDK. Inspect `kind` to decide which payloa
 | `loginRequired` | Provider requires user identity or re-verification. | `loginRequirements` |
 | `readyToCheckout` | All requirements satisfied. | — |
 | `requirementSatisfied` | One requirement type passed (tos, amountLimit, userInfo, reverification). | `requirementType` |
-| `checkoutFinalized` | BFF finalized; payment surface about to render. | `renderContext`, `finalizeResponse` |
+| `checkoutFinalized` | backend finalized; payment surface about to render. | `renderContext`, `finalizeResponse` |
 | `renderingStarted` | Payment surface on screen. | `renderContext` |
 | `completed` | Terminal success. | `checkoutId` |
 | `failed` | Terminal failure. | `error` |
@@ -402,7 +402,7 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `kind` | `OnramperErrorKind` | Discriminator — always set. |
 | `message` | `String` | Human-readable description (English, non-localized). |
 | `recoverable` | `bool` | SDK's assessment of whether a retry is worthwhile. |
-| `code` | `int?` | Numeric BFF error code when one was present. Do not switch on this; use `kind`. |
+| `code` | `int?` | Numeric backend error code when one was present. Do not switch on this; use `kind`. |
 | `minAmount` | `double?` | Populated for `amountOutOfRange`. |
 | `maxAmount` | `double?` | Populated for `amountOutOfRange`. |
 | `retryAfterSeconds` | `double?` | Populated for `temporaryFailure` when the server specified a retry delay. |

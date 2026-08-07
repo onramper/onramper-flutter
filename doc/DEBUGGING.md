@@ -8,7 +8,7 @@ Known limitations and gotchas when integrating `onramper_flutter`. For the full 
 
 Always returns `OnramperError(kind: attestationFailed)`. Apple's `DCAppAttestService` only works on physical iOS devices. There is no workaround for simulator testing of the full attestation path — use a real device for any end-to-end test.
 
-To confirm the error is simulator-specific, look for `attestationUnavailable` in the native SDK logs (set `logLevel: OnramperLogLevel.debug` on the client). The Dart layer maps this to `attestationFailed`.
+To confirm the error is simulator-specific, look for `attestationUnavailable` in the native SDK logs — set `logLevel: OnramperLogLevel.debug` in your `OnramperConfiguration` to enable them. The Dart layer maps this to `attestationFailed`.
 
 ---
 
@@ -100,13 +100,13 @@ Both `ios/Podfile` and the Runner Xcode project must have their iOS deployment t
 OnramperError(kind: decodingError): encryption key not found
 ```
 
-This error indicates a version skew between the Flutter plugin and the Onramper BFF. SDK v1.1.1 added a required `encryption: EncryptedPayload` field to `CheckoutIntentResponse`. If the BFF has not yet been deployed with that field, the SDK's `Codable` decoder throws `keyNotFound` and the plugin surfaces it as `decodingError`.
+This error indicates a version skew between the Flutter plugin and Onramper's backend. SDK v1.1.1 added a required `encryption: EncryptedPayload` field to `CheckoutIntentResponse`. If Onramper's backend has not yet been deployed with that field, the SDK's `Codable` decoder throws `keyNotFound` and the plugin surfaces it as `decodingError`.
 
 Check that:
 
 1. You are on `onramper_flutter` v1.1.1 or later in `pubspec.yaml`.
-2. The BFF environment you are targeting (staging or production) has been deployed with the `encryption` field on `CheckoutIntentResponse`. Staging is typically deployed ahead of production — if staging works but production does not, the production BFF deployment is pending.
-3. You are not mixing staging credentials with the production BFF or vice versa — set `OnramperEnvironment.development` for staging and `OnramperEnvironment.production` for production.
+2. The backend environment you are targeting (staging or production) has been deployed with the `encryption` field on `CheckoutIntentResponse`. Staging is typically deployed ahead of production — if staging works but production does not, the production backend deployment is pending.
+3. You are not mixing staging credentials with the production backend or vice versa — set `OnramperEnvironment.development` for staging and `OnramperEnvironment.production` for production.
 
 If the error persists after updating both the plugin and confirming the environment, contact Onramper support with the `debugInfo` string from the error.
 
@@ -158,10 +158,10 @@ The `example/` app ships an event log widget that surfaces every `CheckoutEvent`
 cd example
 flutter pub get
 cd ios && pod install && cd ..
-flutter run --debug
+flutter run --dart-define-from-file=.env --debug
 ```
 
-3. In `main.dart`, set `logLevel: OnramperLogLevel.debug` on the `OnramperConfiguration`. This emits HTTP method, URL path, and status for every BFF and security call to the device console.
+3. In `main.dart`, set `logLevel: OnramperLogLevel.debug` on the `OnramperConfiguration`. This emits HTTP method, URL path, and status for every backend and security call to the device console.
 
 4. Observe the event stream. Every state transition, event, and error emitted by the native SDK is printed to the on-screen log, alongside the raw `OnramperError` fields (`kind`, `code`, `message`, `debugInfo`) when an error is present.
 
@@ -178,7 +178,7 @@ For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is 
 | `pod install` 404 | Release asset removed or version too old | Bump `onramper_flutter` to latest. |
 | `pod install` deployment target error | iOS target < 16.0 in Podfile or Xcode | Set `platform :ios, '16.0'` in Podfile; update Runner target in Xcode. |
 | App crashes on launch with attestation error | Missing entitlement | Add `com.apple.developer.devicecheck.appattest-environment` to `Runner.entitlements`. |
-| `decodingError: encryption key not found` | Plugin/BFF version skew | Upgrade to `onramper_flutter` v1.1.1+; confirm BFF environment matches `OnramperEnvironment`. |
+| `decodingError: encryption key not found` | Plugin/backend version skew | Upgrade to `onramper_flutter` v1.1.1+; confirm backend environment matches `OnramperEnvironment`. |
 | `networkError` (code 403) on `getCheckoutRequirements` | Session token missing `checkout:write` scope | Add `checkout:write` to the scope list in your backend session-mint call. |
 | `unrecoverable` mid-flow | Recovery chain exhausted | Call `reset()`, fetch fresh credentials, call `initialize()`. |
 | Build fails — Swift module not found | Xcode < 26 | Update to Xcode 26+. |

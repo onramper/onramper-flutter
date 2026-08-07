@@ -27,7 +27,7 @@ Body:
 }
 ```
 
-Headers (SigV2 signing — see the [Onramper partner API docs](https://api.onramper.com) for full detail):
+Headers (SigV2 signing — see the [Onramper partner API docs](https://onramper.com/docs) for full detail):
 
 - `X-Onramper-Signature-Version: v2`
 - `X-Onramper-Timestamp: <unix seconds>`
