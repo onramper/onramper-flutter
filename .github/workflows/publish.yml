@@ -1,42 +1,19 @@
-# ---------------------------------------------------------------------------
-# Auto-publish to pub.dev — SKELETON, no live trigger.
+# Auto-publish to pub.dev via OIDC trusted publisher.
 #
-# Currently wired to `workflow_dispatch` only, so nothing fires automatically.
-# QA + first-tag dry-run will be done via `release.yml` (which creates the tag
-# without publishing). Once the flow is verified on-device, enable auto-publish
-# by swapping the trigger to `push: tags:` per the block below.
+# Fires automatically on every version tag (`v*.*.*`) pushed by release.yml.
+# Uses pub.dev's OIDC "trusted publisher" flow — no long-lived credentials.
 #
-# Uses pub.dev's OIDC "trusted publisher" flow (the current Dart-recommended
-# path — no long-lived credentials in secrets). Setup, one time:
-#
-#   1. Log into pub.dev as a maintainer of the `onramper_sdk` package.
-#      (First manual publish must happen from a maintainer machine to claim
-#      the package name; only then can trusted publishing be configured.)
-#   2. Package Admin tab → "Automated publishing" → Enable publishing from
-#      GitHub Actions.
-#   3. Repository:     onramper/onramper-flutter
-#      Tag pattern:    v{{version}}
-#   4. Optional but recommended: also configure a GitHub Deployment
-#      Environment named `pub.dev` and add `environment: pub.dev` under
-#      `with:` below. Grants an extra layer of manual review gating.
-#   5. In this file, flip the `on:` trigger from `workflow_dispatch` to:
-#
-#        on:
-#          push:
-#            tags:
-#              - 'v[0-9]+.[0-9]+.[0-9]+'
-#
-#      Now every `v<X>.<Y>.<Z>` tag pushed by `release.yml` auto-publishes.
-# ---------------------------------------------------------------------------
+# Trusted publisher configured at:
+#   pub.dev/packages/onramper_flutter/admin → Automated publishing
+#   Repository:   onramper/onramper-flutter
+#   Tag pattern:  v{{version}}
 
 name: publish
 
 on:
-  # Manual-only until the flow above is walked through and QA-signed off.
-  workflow_dispatch:
-  # push:
-  #   tags:
-  #     - 'v[0-9]+.[0-9]+.[0-9]+'
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   publish:
@@ -44,5 +21,3 @@ jobs:
       # Required for pub.dev OIDC token exchange. Do not remove.
       id-token: write
     uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    # with:
-    #   environment: pub.dev
