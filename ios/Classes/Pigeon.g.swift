@@ -353,6 +353,42 @@ struct CheckoutIntentRequestDto {
   }
 }
 
+/// Values the integrator already knows about the user, used to pre-populate
+/// the OnramperID sign-in and additional-info screens. All optional.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct UserPrefillDto {
+  var email: String? = nil
+  var firstName: String? = nil
+  var lastName: String? = nil
+  /// E.164, e.g. `+3712345678`.
+  var phoneNumber: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> UserPrefillDto? {
+    let email: String? = nilOrValue(pigeonVar_list[0])
+    let firstName: String? = nilOrValue(pigeonVar_list[1])
+    let lastName: String? = nilOrValue(pigeonVar_list[2])
+    let phoneNumber: String? = nilOrValue(pigeonVar_list[3])
+
+    return UserPrefillDto(
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: phoneNumber
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+    ]
+  }
+}
+
 /// Generated class from Pigeon that represents data sent in messages.
 struct QuoteDto {
   var quoteId: String
@@ -1018,36 +1054,38 @@ private class PigeonPigeonCodecReader: FlutterStandardReader {
     case 146:
       return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
     case 147:
-      return QuoteDto.fromList(self.readValue() as! [Any?])
+      return UserPrefillDto.fromList(self.readValue() as! [Any?])
     case 148:
-      return TosItemDto.fromList(self.readValue() as! [Any?])
+      return QuoteDto.fromList(self.readValue() as! [Any?])
     case 149:
-      return TosRequirementDto.fromList(self.readValue() as! [Any?])
+      return TosItemDto.fromList(self.readValue() as! [Any?])
     case 150:
-      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
+      return TosRequirementDto.fromList(self.readValue() as! [Any?])
     case 151:
-      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
+      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
     case 152:
-      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
     case 153:
-      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
     case 154:
-      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
+      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
     case 155:
-      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
     case 156:
-      return RenderContextDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
     case 157:
-      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
+      return RenderContextDto.fromList(self.readValue() as! [Any?])
     case 158:
-      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
+      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
     case 159:
-      return OnramperStateDto.fromList(self.readValue() as! [Any?])
+      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
     case 160:
-      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+      return OnramperStateDto.fromList(self.readValue() as! [Any?])
     case 161:
-      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
     case 162:
+      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+    case 163:
       return CheckoutButtonStyleDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1111,53 +1149,56 @@ private class PigeonPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? CheckoutIntentRequestDto {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? QuoteDto {
+    } else if let value = value as? UserPrefillDto {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? TosItemDto {
+    } else if let value = value as? QuoteDto {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? TosRequirementDto {
+    } else if let value = value as? TosItemDto {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? AmountLimitRequirementDto {
+    } else if let value = value as? TosRequirementDto {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoFieldDto {
+    } else if let value = value as? AmountLimitRequirementDto {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoRequirementDto {
+    } else if let value = value as? UserInfoFieldDto {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? ReverificationRequirementDto {
+    } else if let value = value as? UserInfoRequirementDto {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementDto {
+    } else if let value = value as? ReverificationRequirementDto {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementsResultDto {
+    } else if let value = value as? CheckoutRequirementDto {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? RenderContextDto {
+    } else if let value = value as? CheckoutRequirementsResultDto {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? HeadlessCheckoutDataDto {
+    } else if let value = value as? RenderContextDto {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutFinalizeResponseDto {
+    } else if let value = value as? HeadlessCheckoutDataDto {
       super.writeByte(158)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperStateDto {
+    } else if let value = value as? CheckoutFinalizeResponseDto {
       super.writeByte(159)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutEventDto {
+    } else if let value = value as? OnramperStateDto {
       super.writeByte(160)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperErrorDto {
+    } else if let value = value as? CheckoutEventDto {
       super.writeByte(161)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutButtonStyleDto {
+    } else if let value = value as? OnramperErrorDto {
       super.writeByte(162)
+      super.writeValue(value.toList())
+    } else if let value = value as? CheckoutButtonStyleDto {
+      super.writeByte(163)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1184,7 +1225,7 @@ class PigeonPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 protocol OnramperHostApi {
   func configure(config: ConfigurationDto) throws
   func initialize(credentials: SessionCredentialsDto, completion: @escaping (Result<Void, Error>) -> Void)
-  func getCheckoutRequirements(request: CheckoutIntentRequestDto, buttonStyle: CheckoutButtonStyleDto?, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
+  func getCheckoutRequirements(request: CheckoutIntentRequestDto, prefill: UserPrefillDto?, buttonStyle: CheckoutButtonStyleDto?, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
   func reset(completion: @escaping (Result<Void, Error>) -> Void)
   /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
   /// session (DPoP key + session token) is preserved, but the next checkout
@@ -1242,8 +1283,9 @@ class OnramperHostApiSetup {
       getCheckoutRequirementsChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let requestArg = args[0] as! CheckoutIntentRequestDto
-        let buttonStyleArg: CheckoutButtonStyleDto? = nilOrValue(args[1])
-        api.getCheckoutRequirements(request: requestArg, buttonStyle: buttonStyleArg) { result in
+        let prefillArg: UserPrefillDto? = nilOrValue(args[1])
+        let buttonStyleArg: CheckoutButtonStyleDto? = nilOrValue(args[2])
+        api.getCheckoutRequirements(request: requestArg, prefill: prefillArg, buttonStyle: buttonStyleArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))

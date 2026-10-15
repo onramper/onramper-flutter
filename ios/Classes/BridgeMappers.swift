@@ -75,6 +75,16 @@ enum BridgeMappers {
         )
     }
 
+    static func toNative(_ dto: UserPrefillDto?) -> OnramperUserPrefill? {
+        guard let dto else { return nil }
+        return OnramperUserPrefill(
+            email: dto.email,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            phoneNumber: dto.phoneNumber
+        )
+    }
+
     static func toNative(_ dto: OnramperTransactionDataDto) -> OnramperTransactionData {
         OnramperTransactionData(
             source: dto.source,

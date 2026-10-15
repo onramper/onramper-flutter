@@ -244,6 +244,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
 
     func getCheckoutRequirements(
         request: CheckoutIntentRequestDto,
+        prefill: UserPrefillDto?,
         buttonStyle: CheckoutButtonStyleDto?,
         completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void
     ) {
@@ -252,6 +253,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
             return
         }
         let nativeRequest = BridgeMappers.toNative(request)
+        let nativePrefill = BridgeMappers.toNative(prefill)
         let nativeStyle = BridgeMappers.toNative(buttonStyle)
         let collector = CheckoutRequirementsCollector()
         self.inFlightRequirements = collector
@@ -265,6 +267,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // consumer didn't override.
                 let result = try await client.getCheckoutRequirements(
                     nativeRequest,
+                    prefill: nativePrefill,
                     buttonStyle: nativeStyle
                 )
 

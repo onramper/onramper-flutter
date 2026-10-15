@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'models/configuration.dart';
 import 'models/errors.dart';
 import 'models/events.dart';
+import 'models/prefill.dart';
 import 'models/requirements.dart';
 import 'models/state.dart';
 import 'platform/pigeon.g.dart';
@@ -138,20 +139,24 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   /// Requests a checkout intent from the BFF.
   ///
-  /// [buttonStyle] optionally overrides the appearance of the native checkout
-  /// button that will be embedded via [OnramperCheckoutButton]. Only the
-  /// visual fields (background/foreground color, border radius) are forwarded
-  /// — text/font styling for the Dart-side ToS lines lives on the widget.
+  /// [prefill] optionally pre-populates OnramperID screens; see
+  /// [OnramperUserPrefill] for the email caveat. [buttonStyle] optionally
+  /// overrides the appearance of the native checkout button embedded via
+  /// [OnramperCheckoutButton]. Only the visual fields (background/foreground
+  /// color, border radius) are forwarded — text/font styling for the
+  /// Dart-side ToS lines lives on the widget.
   ///
   /// Returns the mapped [CheckoutRequirementsResult] and caches its
   /// [CheckoutRequirementsResult.tos] under [tosRequirements] for downstream
   /// UI to render.
   Future<CheckoutRequirementsResult> getCheckoutRequirements(
     CheckoutIntentRequest request, {
+    OnramperUserPrefill? prefill,
     CheckoutButtonStyle? buttonStyle,
   }) async {
     final dto = await _host.getCheckoutRequirements(
       request.toDto(),
+      prefill?.toDto(),
       buttonStyle?.toNativeDto(),
     );
     final result = CheckoutRequirementsResult.fromDto(dto);

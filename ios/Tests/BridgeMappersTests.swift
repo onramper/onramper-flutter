@@ -884,4 +884,19 @@ final class BridgeMappersTests: XCTestCase {
             XCTAssertFalse(dto.message.isEmpty, "Empty message for native case: \(native)")
         }
     }
+
+    // MARK: - Prefill
+
+    func test_userPrefillDto_toNative_mapsAllFields() {
+        let native = BridgeMappers.toNative(UserPrefillDto(
+            email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phoneNumber: "+3712345678"
+        ))
+        XCTAssertEqual(native, OnramperUserPrefill(
+            email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phoneNumber: "+3712345678"
+        ))
+    }
+
+    func test_userPrefillDto_nil_mapsToNil() {
+        XCTAssertNil(BridgeMappers.toNative(nil as UserPrefillDto?))
+    }
 }

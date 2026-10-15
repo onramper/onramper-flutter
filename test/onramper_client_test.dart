@@ -13,6 +13,17 @@ QuoteDto _sampleQuoteDto() => QuoteDto(
       paymentMethod: 'credit_debit_card',
     );
 
+CheckoutIntentRequest _sampleRequest() => const CheckoutIntentRequest(
+      transactionData: OnramperTransactionData(
+        source: 'usd',
+        destination: 'btc',
+        amount: 100,
+        type: TransactionType.buy,
+        paymentMethod: 'credit_debit_card',
+        wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
+      ),
+    );
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -95,6 +106,24 @@ void main() {
       ));
       expect(result.headlessCheckoutId, 'co_123');
       expect(client.tosRequirements, isEmpty);
+      await client.dispose();
+    });
+
+    test('getCheckoutRequirements forwards prefill', () async {
+      final fakeHost = FakeOnramperHostApi();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await client.getCheckoutRequirements(
+        _sampleRequest(),
+        prefill: const OnramperUserPrefill(firstName: 'Ada'),
+      );
+      expect(fakeHost.lastPrefillDto?.firstName, 'Ada');
+
+      await client.getCheckoutRequirements(_sampleRequest());
+      expect(fakeHost.lastPrefillDto, isNull);
       await client.dispose();
     });
 
@@ -305,6 +334,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
   SessionCredentialsDto? lastInitializeCredentials;
   CheckoutRequirementsResultDto? nextRequirementsResult;
   CheckoutButtonStyleDto? lastButtonStyleDto;
+  UserPrefillDto? lastPrefillDto;
   SessionCredentialsDto? lastProvidedCredentials;
   String? lastFailReason;
   String? lastCancelledHandle;
@@ -331,8 +361,10 @@ class FakeOnramperHostApi implements OnramperHostApi {
   @override
   Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
     CheckoutIntentRequestDto request,
+    UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   ) async {
+    lastPrefillDto = prefill;
     lastButtonStyleDto = buttonStyle;
     return nextRequirementsResult ??
         CheckoutRequirementsResultDto(

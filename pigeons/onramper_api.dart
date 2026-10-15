@@ -75,6 +75,18 @@ class CheckoutIntentRequestDto {
   final List<String>? onlyOnramps;
 }
 
+/// Values the integrator already knows about the user, used to pre-populate
+/// the OnramperID sign-in and additional-info screens. All optional.
+class UserPrefillDto {
+  UserPrefillDto({this.email, this.firstName, this.lastName, this.phoneNumber});
+  final String? email;
+  final String? firstName;
+  final String? lastName;
+
+  /// E.164, e.g. `+3712345678`.
+  final String? phoneNumber;
+}
+
 // ---- Quote ----
 
 class QuoteDto {
@@ -431,6 +443,7 @@ abstract class OnramperHostApi {
   @async
   CheckoutRequirementsResultDto getCheckoutRequirements(
     CheckoutIntentRequestDto request,
+    UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   );
   @async

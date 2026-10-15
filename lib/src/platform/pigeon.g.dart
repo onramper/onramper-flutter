@@ -331,6 +331,45 @@ class CheckoutIntentRequestDto {
   }
 }
 
+/// Values the integrator already knows about the user, used to pre-populate
+/// the OnramperID sign-in and additional-info screens. All optional.
+class UserPrefillDto {
+  UserPrefillDto({
+    this.email,
+    this.firstName,
+    this.lastName,
+    this.phoneNumber,
+  });
+
+  String? email;
+
+  String? firstName;
+
+  String? lastName;
+
+  /// E.164, e.g. `+3712345678`.
+  String? phoneNumber;
+
+  Object encode() {
+    return <Object?>[
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+    ];
+  }
+
+  static UserPrefillDto decode(Object result) {
+    result as List<Object?>;
+    return UserPrefillDto(
+      email: result[0] as String?,
+      firstName: result[1] as String?,
+      lastName: result[2] as String?,
+      phoneNumber: result[3] as String?,
+    );
+  }
+}
+
 class QuoteDto {
   QuoteDto({
     required this.quoteId,
@@ -1042,53 +1081,56 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is CheckoutIntentRequestDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is QuoteDto) {
+    } else if (value is UserPrefillDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    } else if (value is TosItemDto) {
+    } else if (value is QuoteDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    } else if (value is TosRequirementDto) {
+    } else if (value is TosItemDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    } else if (value is AmountLimitRequirementDto) {
+    } else if (value is TosRequirementDto) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    } else if (value is UserInfoFieldDto) {
+    } else if (value is AmountLimitRequirementDto) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    } else if (value is UserInfoRequirementDto) {
+    } else if (value is UserInfoFieldDto) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    } else if (value is ReverificationRequirementDto) {
+    } else if (value is UserInfoRequirementDto) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementDto) {
+    } else if (value is ReverificationRequirementDto) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementsResultDto) {
+    } else if (value is CheckoutRequirementDto) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    } else if (value is RenderContextDto) {
+    } else if (value is CheckoutRequirementsResultDto) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    } else if (value is HeadlessCheckoutDataDto) {
+    } else if (value is RenderContextDto) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutFinalizeResponseDto) {
+    } else if (value is HeadlessCheckoutDataDto) {
       buffer.putUint8(158);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperStateDto) {
+    } else if (value is CheckoutFinalizeResponseDto) {
       buffer.putUint8(159);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutEventDto) {
+    } else if (value is OnramperStateDto) {
       buffer.putUint8(160);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperErrorDto) {
+    } else if (value is CheckoutEventDto) {
       buffer.putUint8(161);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutButtonStyleDto) {
+    } else if (value is OnramperErrorDto) {
       buffer.putUint8(162);
+      writeValue(buffer, value.encode());
+    } else if (value is CheckoutButtonStyleDto) {
+      buffer.putUint8(163);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1148,36 +1190,38 @@ class _PigeonCodec extends StandardMessageCodec {
       case 146:
         return CheckoutIntentRequestDto.decode(readValue(buffer)!);
       case 147:
-        return QuoteDto.decode(readValue(buffer)!);
+        return UserPrefillDto.decode(readValue(buffer)!);
       case 148:
-        return TosItemDto.decode(readValue(buffer)!);
+        return QuoteDto.decode(readValue(buffer)!);
       case 149:
-        return TosRequirementDto.decode(readValue(buffer)!);
+        return TosItemDto.decode(readValue(buffer)!);
       case 150:
-        return AmountLimitRequirementDto.decode(readValue(buffer)!);
+        return TosRequirementDto.decode(readValue(buffer)!);
       case 151:
-        return UserInfoFieldDto.decode(readValue(buffer)!);
+        return AmountLimitRequirementDto.decode(readValue(buffer)!);
       case 152:
-        return UserInfoRequirementDto.decode(readValue(buffer)!);
+        return UserInfoFieldDto.decode(readValue(buffer)!);
       case 153:
-        return ReverificationRequirementDto.decode(readValue(buffer)!);
+        return UserInfoRequirementDto.decode(readValue(buffer)!);
       case 154:
-        return CheckoutRequirementDto.decode(readValue(buffer)!);
+        return ReverificationRequirementDto.decode(readValue(buffer)!);
       case 155:
-        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
+        return CheckoutRequirementDto.decode(readValue(buffer)!);
       case 156:
-        return RenderContextDto.decode(readValue(buffer)!);
+        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
       case 157:
-        return HeadlessCheckoutDataDto.decode(readValue(buffer)!);
+        return RenderContextDto.decode(readValue(buffer)!);
       case 158:
-        return CheckoutFinalizeResponseDto.decode(readValue(buffer)!);
+        return HeadlessCheckoutDataDto.decode(readValue(buffer)!);
       case 159:
-        return OnramperStateDto.decode(readValue(buffer)!);
+        return CheckoutFinalizeResponseDto.decode(readValue(buffer)!);
       case 160:
-        return CheckoutEventDto.decode(readValue(buffer)!);
+        return OnramperStateDto.decode(readValue(buffer)!);
       case 161:
-        return OnramperErrorDto.decode(readValue(buffer)!);
+        return CheckoutEventDto.decode(readValue(buffer)!);
       case 162:
+        return OnramperErrorDto.decode(readValue(buffer)!);
+      case 163:
         return CheckoutButtonStyleDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1250,6 +1294,7 @@ class OnramperHostApi {
 
   Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
       CheckoutIntentRequestDto request,
+      UserPrefillDto? prefill,
       CheckoutButtonStyleDto? buttonStyle) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.getCheckoutRequirements$pigeonVar_messageChannelSuffix';
@@ -1260,7 +1305,7 @@ class OnramperHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final List<Object?>? pigeonVar_replyList = await pigeonVar_channel
-        .send(<Object?>[request, buttonStyle]) as List<Object?>?;
+        .send(<Object?>[request, prefill, buttonStyle]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
