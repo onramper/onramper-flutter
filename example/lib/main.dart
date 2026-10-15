@@ -17,9 +17,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
 import 'buy_form.dart';
+import 'checkout_outcome.dart';
 import 'demo_environment.dart';
 import 'ios_diagnostics.dart';
 import 'log_buffer.dart';
@@ -92,6 +94,8 @@ class _ExampleHomeState extends State<ExampleHome> {
   BuyForm _form = const BuyForm(wallet: _walletAddress);
   SessionInitializer _session = SessionInitializer();
   int _prepareGeneration = 0;
+  CheckoutOutcome? _outcome;
+  TransactionIdLog _txLog = TransactionIdLog();
   String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
   String? _statusMessage;
@@ -139,6 +143,8 @@ class _ExampleHomeState extends State<ExampleHome> {
       sessionExpirationHandler: _fetchSessionCredentials,
     );
     _eventSub = client.events.listen(_onEvent);
+    _txLog = TransactionIdLog();
+    client.addListener(() => _logTransactionId(client));
     _session = SessionInitializer();
     return client;
   }
@@ -164,6 +170,7 @@ class _ExampleHomeState extends State<ExampleHome> {
       _update(() {
         _client = null;
         _requirements = null;
+        _outcome = null;
         apply();
         _statusMessage = '$reason; prepare a new quote';
       });
@@ -201,6 +208,7 @@ class _ExampleHomeState extends State<ExampleHome> {
     setState(() {
       _busy = true;
       _requirements = null;
+      _outcome = null;
       _errorMessage = null;
     });
     try {
@@ -236,8 +244,25 @@ class _ExampleHomeState extends State<ExampleHome> {
     super.dispose();
   }
 
+  /// Mirrors `currentTransactionId` changes into the log, like the native demo.
+  void _logTransactionId(OnramperClient client) {
+    final line = _txLog.next(client.currentTransactionId);
+    if (line == null) return;
+    _logs.add(OnramperLogRecord(
+      timestamp: DateTime.now().toUtc(),
+      level: OnramperLogLevel.info,
+      category: 'Demo',
+      event: 'transactionId',
+      context: const {},
+      message: line,
+    ));
+  }
+
   void _onEvent(CheckoutEvent event) {
     final client = _client;
+    final outcome =
+        CheckoutOutcome.fromEvent(event.kind, client?.currentTransactionId);
+    if (outcome != null) _outcome = outcome;
     _update(() {
       switch (event.kind) {
         case CheckoutEventKind.paymentPending:
@@ -275,6 +300,7 @@ class _ExampleHomeState extends State<ExampleHome> {
       // Hide the previous button: once a new preparation starts, the old one
       // no longer addresses the current checkout.
       _requirements = null;
+      _outcome = null;
       _errorMessage = null;
       _statusMessage = 'preparing…';
     });
@@ -399,6 +425,7 @@ class _ExampleHomeState extends State<ExampleHome> {
                   // The prepared button still targets the previous purchase.
                   // Require a new quote before allowing checkout again.
                   _requirements = null;
+                  _outcome = null;
                   _statusMessage = null;
                   _errorMessage = null;
                 }),
@@ -418,6 +445,15 @@ class _ExampleHomeState extends State<ExampleHome> {
                 TextButton(
                   onPressed: _busy ? null : _prepareCheckout,
                   child: const Text('New quote'),
+                ),
+              ],
+              if (_outcome != null) ...[
+                const SizedBox(height: 12),
+                _OutcomePanel(
+                  outcome: _outcome!,
+                  onNewTransaction: _busy || client == null
+                      ? null
+                      : () => _runAction('reset', (c) => c.reset()),
                 ),
               ],
               const SizedBox(height: 8),
@@ -719,6 +755,82 @@ class _LabeledDropdown<T> extends StatelessWidget {
         Expanded(child: Text(label)),
         DropdownButton<T>(value: value, items: items, onChanged: onChanged),
       ],
+    );
+  }
+}
+
+/// Terminal outcome with its transaction id, like the native demo's
+/// "Transaction Complete" panel. Tap the id to copy it.
+class _OutcomePanel extends StatelessWidget {
+  const _OutcomePanel({required this.outcome, required this.onNewTransaction});
+
+  final CheckoutOutcome outcome;
+  final VoidCallback? onNewTransaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final id = outcome.transactionId;
+    final color = outcome.pending ? scheme.tertiary : Colors.green;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withAlpha(31), // ~12%
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(outcome.pending ? Icons.hourglass_top : Icons.check_circle,
+              color: color, size: 32),
+          const SizedBox(height: 4),
+          Text(
+            outcome.pending ? 'Payment processing' : 'Transaction complete',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (outcome.pending)
+            const Text(
+              'Accepted but not settled yet. Track it before starting another '
+              'payment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12),
+            ),
+          const SizedBox(height: 8),
+          if (id == null)
+            Text('Transaction ID unavailable',
+                style: TextStyle(fontSize: 12, color: scheme.error))
+          else
+            InkWell(
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: id));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Transaction ID copied')),
+                  );
+                }
+              },
+              child: Column(
+                children: [
+                  const Text('Transaction ID', style: TextStyle(fontSize: 11)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(id,
+                          style: const TextStyle(
+                              fontSize: 12, fontFamily: 'Courier')),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.copy, size: 14),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: onNewTransaction,
+            child: const Text('New transaction'),
+          ),
+        ],
+      ),
     );
   }
 }
