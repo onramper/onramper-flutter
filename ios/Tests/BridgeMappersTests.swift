@@ -494,6 +494,7 @@ final class BridgeMappersTests: XCTestCase {
         let dto = BridgeMappers.fromNative(native)
 
         XCTAssertEqual(dto.headlessCheckoutId, "co_1")
+        XCTAssertEqual(dto.onramperTransactionId, "01JTXN0000000000000000000")
         XCTAssertEqual(dto.headlessCheckoutData.url, "https://pay.example.com/co_1")
         XCTAssertEqual(dto.headlessCheckoutData.renderType, .webview)
         XCTAssertEqual(dto.headlessCheckoutData.checkoutPaymentType, .applePay)

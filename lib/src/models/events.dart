@@ -33,17 +33,23 @@ enum CheckoutEventKind {
 class CheckoutFinalizeResponse {
   const CheckoutFinalizeResponse({
     required this.headlessCheckoutId,
+    required this.onramperTransactionId,
     required this.headlessCheckoutData,
   });
 
   factory CheckoutFinalizeResponse.fromDto(CheckoutFinalizeResponseDto dto) =>
       CheckoutFinalizeResponse(
         headlessCheckoutId: dto.headlessCheckoutId,
+        onramperTransactionId: dto.onramperTransactionId,
         headlessCheckoutData:
             HeadlessCheckoutData.fromDto(dto.headlessCheckoutData),
       );
 
   final String headlessCheckoutId;
+
+  /// Onramper's durable transaction id. Same value as
+  /// [OnramperClient.currentTransactionId] for this checkout.
+  final String onramperTransactionId;
   final HeadlessCheckoutData headlessCheckoutData;
 }
 

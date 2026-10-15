@@ -775,16 +775,22 @@ class HeadlessCheckoutDataDto {
 class CheckoutFinalizeResponseDto {
   CheckoutFinalizeResponseDto({
     required this.headlessCheckoutId,
+    required this.onramperTransactionId,
     required this.headlessCheckoutData,
   });
 
   String headlessCheckoutId;
+
+  /// Onramper's durable transaction id (ULID). The id to store and quote to
+  /// support. Distinct from the per-attempt checkout id.
+  String onramperTransactionId;
 
   HeadlessCheckoutDataDto headlessCheckoutData;
 
   Object encode() {
     return <Object?>[
       headlessCheckoutId,
+      onramperTransactionId,
       headlessCheckoutData,
     ];
   }
@@ -793,7 +799,8 @@ class CheckoutFinalizeResponseDto {
     result as List<Object?>;
     return CheckoutFinalizeResponseDto(
       headlessCheckoutId: result[0]! as String,
-      headlessCheckoutData: result[1]! as HeadlessCheckoutDataDto,
+      onramperTransactionId: result[1]! as String,
+      headlessCheckoutData: result[2]! as HeadlessCheckoutDataDto,
     );
   }
 }
@@ -1487,6 +1494,8 @@ abstract class OnramperFlutterApi {
 
   void onSessionExpired();
 
+  void onTransactionIdChanged(String? transactionId);
+
   static void setUp(
     OnramperFlutterApi? api, {
     BinaryMessenger? binaryMessenger,
@@ -1594,6 +1603,33 @@ abstract class OnramperFlutterApi {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           try {
             api.onSessionExpired();
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged$messageChannelSuffix',
+          pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final String? arg_transactionId = (args[0] as String?);
+          try {
+            api.onTransactionIdChanged(arg_transactionId);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

@@ -1,3 +1,4 @@
+import Combine
 import Flutter
 import SwiftUI
 import UIKit
@@ -116,6 +117,10 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // on dispose / reconfigure.
     private var eventForwardingTask: Task<Void, Never>?
 
+    // Mirrors `client.$currentTransactionId` to Dart. Cancelled on dispose /
+    // reconfigure.
+    private var transactionIdCancellable: AnyCancellable?
+
     // Handle of the most recent button stored in CheckoutButtonRegistry.
     // Cleared on reset / dispose so stale handles don't linger.
     private var lastButtonHandle: String?
@@ -150,6 +155,7 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     /// Cancels the event-forwarding task. Called on dispose / reconfigure.
     private func tearDownObservers() {
         eventForwardingTask?.cancel(); eventForwardingTask = nil
+        transactionIdCancellable?.cancel(); transactionIdCancellable = nil
     }
 
 }
@@ -194,6 +200,14 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 self?.observeEventForRequirementsCollector(event)
             }
         }
+
+        // Mirror the @Published transaction id to Dart.
+        transactionIdCancellable = newClient.$currentTransactionId
+            .removeDuplicates()
+            .dropFirst() // initial nil; Dart starts at null too
+            .sink { id in
+                api?.onTransactionIdChanged(transactionId: id) { _ in }
+            }
     }
 
     /// Side-channel for the per-call requirements collector. The delegate

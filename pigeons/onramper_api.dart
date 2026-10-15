@@ -265,9 +265,14 @@ class HeadlessCheckoutDataDto {
 class CheckoutFinalizeResponseDto {
   CheckoutFinalizeResponseDto({
     required this.headlessCheckoutId,
+    required this.onramperTransactionId,
     required this.headlessCheckoutData,
   });
   final String headlessCheckoutId;
+
+  /// Onramper's durable transaction id (ULID). The id to store and quote to
+  /// support. Distinct from the per-attempt checkout id.
+  final String onramperTransactionId;
   final HeadlessCheckoutDataDto headlessCheckoutData;
 }
 
@@ -477,4 +482,8 @@ abstract class OnramperFlutterApi {
   // Fired when the native SDK Session expires; Dart MUST respond with either
   // provideRefreshedSession or failRefreshedSession or the in-flight call hangs.
   void onSessionExpired();
+
+  // Mirrors native `@Published currentTransactionId`. Null when cleared (new
+  // intent or reset).
+  void onTransactionIdChanged(String? transactionId);
 }

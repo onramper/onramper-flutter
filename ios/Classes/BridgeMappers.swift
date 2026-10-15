@@ -302,6 +302,7 @@ enum BridgeMappers {
     static func fromNative(_ native: CheckoutFinalizeResponse) -> CheckoutFinalizeResponseDto {
         CheckoutFinalizeResponseDto(
             headlessCheckoutId: native.headlessCheckoutId,
+            onramperTransactionId: native.onramperTransactionId,
             headlessCheckoutData: fromNative(native.headlessCheckoutData)
         )
     }

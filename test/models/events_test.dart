@@ -125,6 +125,7 @@ void main() {
         ),
         finalizeResponse: CheckoutFinalizeResponseDto(
           headlessCheckoutId: 'co_xyz',
+          onramperTransactionId: '01JTXN',
           headlessCheckoutData: HeadlessCheckoutDataDto(
             url: 'https://pay.example.com',
             renderType: RenderTypeDto.deeplink,
@@ -136,6 +137,7 @@ void main() {
       expect(e.checkoutId, 'co_xyz');
       expect(e.finalizeResponse, isNotNull);
       expect(e.finalizeResponse!.headlessCheckoutId, 'co_xyz');
+      expect(e.finalizeResponse!.onramperTransactionId, '01JTXN');
       expect(e.finalizeResponse!.headlessCheckoutData.checkoutPaymentType,
           CheckoutPaymentType.revolutPay);
     });

@@ -99,6 +99,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
       StreamController<CheckoutEvent>.broadcast();
   OnramperError? _lastError;
   List<TosRequirement>? _tosRequirements;
+  String? _currentTransactionId;
   bool _disposed = false;
 
   /// Configuration this client was constructed with.
@@ -123,6 +124,15 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// Cached Terms-of-Service requirements from the latest
   /// [getCheckoutRequirements] response (or `null` if none requested yet).
   List<TosRequirement>? get tosRequirements => _tosRequirements;
+
+  /// Onramper's durable id for the current transaction, or `null`.
+  ///
+  /// Set when the checkout is finalized, before the payment surface renders.
+  /// Cleared when a new checkout starts or on [reset]. **Store this id and
+  /// quote it to Onramper support.** It's distinct from the per-attempt
+  /// checkout id on `checkoutStarted` / `completed` events. Read it before
+  /// calling [reset].
+  String? get currentTransactionId => _currentTransactionId;
 
   // ---- Public API (Dart -> native) -----------------------------------------
 
@@ -169,6 +179,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> reset() async {
     _tosRequirements = null;
     _lastError = null;
+    _currentTransactionId = null;
     await _host.reset();
     notifyListeners();
   }
@@ -228,6 +239,13 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   @override
   void onError(OnramperErrorDto error) {
     _lastError = OnramperError.fromDto(error);
+    notifyListeners();
+  }
+
+  @override
+  void onTransactionIdChanged(String? transactionId) {
+    if (transactionId == _currentTransactionId) return;
+    _currentTransactionId = transactionId;
     notifyListeners();
   }
 

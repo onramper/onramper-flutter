@@ -29,6 +29,13 @@ final class MockOnramperFlutterApi: OnramperFlutterApiProtocol {
         sessionExpiredCallCount += 1
         completion(.success(()))
     }
+
+    var transactionIds: [String?] = []
+
+    func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+        transactionIds.append(transactionIdArg)
+        completion(.success(()))
+    }
 }
 
 @MainActor

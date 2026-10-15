@@ -109,6 +109,27 @@ void main() {
       await client.dispose();
     });
 
+    test('currentTransactionId mirrors native and notifies once per change',
+        () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      var notifications = 0;
+      client.addListener(() => notifications++);
+
+      expect(client.currentTransactionId, isNull);
+      client.onTransactionIdChanged('01JTXN');
+      client.onTransactionIdChanged('01JTXN');
+      expect(client.currentTransactionId, '01JTXN');
+      expect(notifications, 1);
+
+      await client.reset();
+      expect(client.currentTransactionId, isNull);
+      await client.dispose();
+    });
+
     test('getCheckoutRequirements forwards prefill', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
