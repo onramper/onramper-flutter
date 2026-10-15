@@ -25,6 +25,9 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
 - Observing `client.events` in real time, with pending payments shown separately
   from completion and failures shown as `userMessage` + support code
 - Rendering the self-sizing `OnramperCheckoutButton`
+- **Crypto** selector (BTC / ETH / SOL) with predefined demo wallets, plus
+  editable **amount** and **wallet** fields (switching crypto restores its
+  demo wallet)
 - **Dark mode** switch (starts from the device appearance): sets the app theme
   and passes an explicit `OnramperTheme.light`/`.dark` to the SDK (rebuilds
   the client)

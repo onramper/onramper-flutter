@@ -3,10 +3,10 @@ import 'package:onramper_flutter_example/buy_form.dart';
 
 void main() {
   test('default form sends no country, subdivision or onramp filter', () {
-    final data = const BuyForm().toRequest().transactionData;
+    final data = const BuyForm().toRequest()!.transactionData;
     expect(data.country, isNull);
     expect(data.subdivision, isNull);
-    expect(const BuyForm().toRequest().onlyOnramps, isNull);
+    expect(const BuyForm().toRequest()!.onlyOnramps, isNull);
     expect(data.source, 'usd');
     expect(data.destination, 'sol');
     expect(data.paymentMethod, 'applepay');
@@ -14,7 +14,7 @@ void main() {
 
   test('US override sends country and us-<state> subdivision', () {
     const form = BuyForm(countryOverride: true, usState: 'NY');
-    final data = form.toRequest().transactionData;
+    final data = form.toRequest()!.transactionData;
     expect(data.country, 'us');
     expect(data.subdivision, 'us-ny');
   });
@@ -23,7 +23,7 @@ void main() {
     final form = const BuyForm()
         .withCountry(DemoCountry.es)
         .copyWith(countryOverride: true);
-    final data = form.toRequest().transactionData;
+    final data = form.toRequest()!.transactionData;
     expect(data.country, 'es');
     expect(data.subdivision, isNull);
   });
@@ -32,18 +32,54 @@ void main() {
       () {
     final es = const BuyForm().withCountry(DemoCountry.es);
     expect(es.fiat, DemoFiat.eur);
-    expect(es.copyWith(fiat: DemoFiat.usd).toRequest().transactionData.source,
+    expect(es.copyWith(fiat: DemoFiat.usd).toRequest()!.transactionData.source,
         'usd');
     expect(es.withCountry(DemoCountry.us).fiat, DemoFiat.usd);
   });
 
   test('onramp filter sends onlyOnramps with the selected id', () {
     const form = BuyForm(onramp: 'moonpay');
-    expect(form.toRequest().onlyOnramps, ['moonpay']);
+    expect(form.toRequest()!.onlyOnramps, ['moonpay']);
   });
 
   test('US state list has 50 states plus DC', () {
     expect(usStates.length, 51);
     expect(usStates.any((s) => s.code == 'DC'), isTrue);
+  });
+
+  test('each crypto maps to its network and predefined wallet', () {
+    for (final c in DemoCrypto.values) {
+      final data = const BuyForm().withCrypto(c).toRequest()!.transactionData;
+      expect(data.destination, c.name);
+      expect(data.wallet.network, c.network);
+      expect(data.wallet.address, c.defaultWallet);
+    }
+    expect(DemoCrypto.btc.network, 'bitcoin');
+    expect(DemoCrypto.eth.network, 'ethereum');
+    expect(DemoCrypto.sol.network, 'solana');
+  });
+
+  test('switching crypto replaces an edited wallet with its default', () {
+    final form = const BuyForm()
+        .copyWith(wallet: 'my-sol-wallet')
+        .withCrypto(DemoCrypto.eth);
+    expect(form.wallet, DemoCrypto.eth.defaultWallet);
+  });
+
+  test('amount accepts comma or dot decimals; trims wallet', () {
+    final data = const BuyForm()
+        .copyWith(amount: ' 12,5 ', wallet: '  addr  ')
+        .toRequest()!
+        .transactionData;
+    expect(data.amount, 12.5);
+    expect(data.wallet.address, 'addr');
+  });
+
+  test('invalid amount or empty wallet gives no request', () {
+    for (final amount in ['', '0', '-1', 'abc', '1.2.3']) {
+      expect(const BuyForm().copyWith(amount: amount).toRequest(), isNull,
+          reason: amount);
+    }
+    expect(const BuyForm().copyWith(wallet: '   ').toRequest(), isNull);
   });
 }

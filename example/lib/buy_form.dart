@@ -91,21 +91,50 @@ const usStates = <UsState>[
   UsState('WY', 'Wyoming'),
 ];
 
-/// Everything the demo's buy form edits. Mirrors the RN demo's `BuyForm`.
+/// Cryptos the demo can buy, with predefined demo wallets (same as RN).
+enum DemoCrypto {
+  btc('BTC', 'bitcoin', 'bc1qj5lez36llxlmflw9rh4yqakkap297fz8h6l2kp'),
+  eth('ETH', 'ethereum', '0x97EF62c275A9A4C2E6199Bd7a4feB6efd207fC86'),
+  sol('SOL', 'solana', 'Br2jjHYskB1JJikv3Qw2QcmWVQGfZvkJFng4ZEwiGSjv');
+
+  const DemoCrypto(this.symbol, this.network, this.defaultWallet);
+  final String symbol;
+  final String network;
+  final String defaultWallet;
+}
+
+final _amountPattern = RegExp(r'^\d+(\.\d+)?$');
+
+/// Parses typed amount text (`,` or `.` decimal). Null unless a number > 0.
+double? parseAmount(String text) {
+  final normalized = text.trim().replaceAll(',', '.');
+  if (!_amountPattern.hasMatch(normalized)) return null;
+  final value = double.parse(normalized);
+  return value > 0 ? value : null;
+}
+
+/// Everything the demo's buy form edits. Mirrors the RN demo's `BuyForm`;
+/// text fields hold what the user typed.
 class BuyForm {
   const BuyForm({
+    this.crypto = DemoCrypto.sol,
+    String? wallet,
+    this.amount = '100',
     this.fiat = DemoFiat.usd,
     this.onramp,
     this.countryOverride = false,
     this.country = DemoCountry.us,
     this.usState = 'CA',
-  });
+  }) : _wallet = wallet;
 
-  static const _crypto = 'sol';
-  static const _network = 'solana';
-  static const _amount = 100.0;
   static const _paymentMethod = 'applepay';
 
+  final DemoCrypto crypto;
+  final String? _wallet;
+
+  /// Wallet address as typed; defaults to the crypto's demo wallet.
+  String get wallet => _wallet ?? crypto.defaultWallet;
+  final String amount;
   final DemoFiat fiat;
 
   /// Onramp id for `onlyOnramps`, or `null` for any onramp.
@@ -119,12 +148,17 @@ class BuyForm {
   final String usState;
 
   BuyForm copyWith({
+    String? wallet,
+    String? amount,
     DemoFiat? fiat,
     String? Function()? onramp,
     bool? countryOverride,
     String? usState,
   }) =>
       BuyForm(
+        crypto: crypto,
+        wallet: wallet ?? _wallet,
+        amount: amount ?? this.amount,
         fiat: fiat ?? this.fiat,
         onramp: onramp != null ? onramp() : this.onramp,
         countryOverride: countryOverride ?? this.countryOverride,
@@ -132,8 +166,22 @@ class BuyForm {
         usState: usState ?? this.usState,
       );
 
+  /// Selects [newCrypto] and switches to its demo wallet.
+  BuyForm withCrypto(DemoCrypto newCrypto) => BuyForm(
+        crypto: newCrypto,
+        amount: amount,
+        fiat: fiat,
+        onramp: onramp,
+        countryOverride: countryOverride,
+        country: country,
+        usState: usState,
+      );
+
   /// Selects [newCountry] and switches to its default fiat.
   BuyForm withCountry(DemoCountry newCountry) => BuyForm(
+        crypto: crypto,
+        wallet: _wallet,
+        amount: amount,
         fiat: newCountry.defaultFiat,
         onramp: onramp,
         countryOverride: countryOverride,
@@ -141,22 +189,23 @@ class BuyForm {
         usState: usState,
       );
 
-  static const defaultWallet = 'Br2jjHYskB1JJikv3Qw2QcmWVQGfZvkJFng4ZEwiGSjv';
-
-  CheckoutIntentRequest toRequest({String walletAddress = defaultWallet}) {
-    final override = countryOverride;
+  /// The SDK request, or `null` while the amount or wallet is invalid.
+  CheckoutIntentRequest? toRequest() {
+    final value = parseAmount(amount);
+    final address = wallet.trim();
+    if (value == null || address.isEmpty) return null;
     return CheckoutIntentRequest(
       transactionData: OnramperTransactionData(
         source: fiat.name,
-        destination: _crypto,
-        amount: _amount,
+        destination: crypto.name,
+        amount: value,
         type: TransactionType.buy,
         paymentMethod: _paymentMethod,
-        country: override ? country.name : null,
-        subdivision: override && country == DemoCountry.us
+        country: countryOverride ? country.name : null,
+        subdivision: countryOverride && country == DemoCountry.us
             ? 'us-${usState.toLowerCase()}'
             : null,
-        wallet: WalletInfo(network: _network, address: walletAddress),
+        wallet: WalletInfo(network: crypto.network, address: address),
       ),
       onlyOnramps: onramp == null ? null : [onramp!],
     );

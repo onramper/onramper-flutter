@@ -81,7 +81,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   final LogBuffer _logs = LogBuffer();
   final PrefillController _prefill = PrefillController();
   OnramperLogLevel _logLevel = OnramperLogLevel.info;
-  BuyForm _form = const BuyForm();
+  BuyForm _form = const BuyForm(wallet: _walletAddress);
   SessionInitializer _session = SessionInitializer();
   String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
@@ -238,7 +238,8 @@ class _ExampleHomeState extends State<ExampleHome> {
 
   Future<void> _prepareCheckout() async {
     final client = _client;
-    if (client == null) return;
+    final request = _form.toRequest();
+    if (client == null || request == null) return;
     setState(() {
       _busy = true;
       // Hide the previous button: once a new preparation starts, the old one
@@ -260,7 +261,7 @@ class _ExampleHomeState extends State<ExampleHome> {
       });
       setState(() => _statusMessage = 'fetching checkout requirements…');
       final requirements = await client.getCheckoutRequirements(
-        _form.toRequest(walletAddress: _walletAddress),
+        request,
         prefill: _prefill.build(),
       );
       setState(() {
@@ -355,7 +356,10 @@ class _ExampleHomeState extends State<ExampleHome> {
               const SizedBox(height: 16),
               if (_requirements == null)
                 ElevatedButton(
-                  onPressed: _busy || client == null ? null : _prepareCheckout,
+                  onPressed:
+                      _busy || client == null || _form.toRequest() == null
+                          ? null
+                          : _prepareCheckout,
                   child: Text(_busy ? 'Preparing…' : 'Prepare checkout'),
                 )
               else ...[
@@ -407,8 +411,9 @@ class _ExampleHomeState extends State<ExampleHome> {
       return const _MissingEnvBanner();
     }
     return Text(
-      'Buy 100 ${_form.fiat.label} of SOL via Apple Pay (sandbox). Tap '
-      '"Prepare checkout" to mint a demo session and fetch requirements.',
+      'Buy ${_form.amount.trim()} ${_form.fiat.label} of '
+      '${_form.crypto.symbol} via Apple Pay (sandbox). Tap "Prepare checkout" '
+      'to mint a demo session and fetch requirements.',
       style: const TextStyle(fontSize: 14),
     );
   }
@@ -500,8 +505,9 @@ class _VersionsBanner extends StatelessWidget {
   }
 }
 
-/// Country override, fiat and onramp filter — same approach as the RN demo.
-class _BuyFormFields extends StatelessWidget {
+/// Crypto, amount, wallet, country override, fiat and onramp filter — same
+/// approach as the RN demo.
+class _BuyFormFields extends StatefulWidget {
   const _BuyFormFields({
     required this.form,
     required this.enabled,
@@ -513,10 +519,66 @@ class _BuyFormFields extends StatelessWidget {
   final ValueChanged<BuyForm> onChanged;
 
   @override
+  State<_BuyFormFields> createState() => _BuyFormFieldsState();
+}
+
+class _BuyFormFieldsState extends State<_BuyFormFields> {
+  late final _amount = TextEditingController(text: widget.form.amount);
+  late final _wallet = TextEditingController(text: widget.form.wallet);
+
+  @override
+  void didUpdateWidget(_BuyFormFields old) {
+    super.didUpdateWidget(old);
+    // Switching crypto replaces the wallet; keep the field in sync.
+    if (_wallet.text != widget.form.wallet) _wallet.text = widget.form.wallet;
+  }
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _wallet.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final form = widget.form;
+    final enabled = widget.enabled;
+    final onChanged = widget.onChanged;
+    final amountValid = parseAmount(form.amount) != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        SegmentedButton<DemoCrypto>(
+          segments: [
+            for (final c in DemoCrypto.values)
+              ButtonSegment(value: c, label: Text(c.symbol)),
+          ],
+          selected: {form.crypto},
+          onSelectionChanged:
+              enabled ? (s) => onChanged(form.withCrypto(s.first)) : null,
+        ),
+        TextField(
+          controller: _amount,
+          enabled: enabled,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Amount (${form.fiat.label})',
+            errorText: amountValid ? null : 'Enter a number greater than 0',
+          ),
+          onChanged: (v) => onChanged(form.copyWith(amount: v)),
+        ),
+        TextField(
+          controller: _wallet,
+          enabled: enabled,
+          decoration: InputDecoration(
+            labelText: '${form.crypto.symbol} wallet (${form.crypto.network})',
+            errorText:
+                form.wallet.trim().isEmpty ? 'Enter a wallet address' : null,
+          ),
+          style: const TextStyle(fontSize: 13),
+          onChanged: (v) => onChanged(form.copyWith(wallet: v)),
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Override country and state'),
