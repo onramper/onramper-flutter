@@ -85,10 +85,28 @@ actor SessionRefreshBridge {
 /// both `headlessCheckoutId` and the requirements list. We rebuild the
 /// missing fields from delegate callbacks fired during the call.
 @MainActor
-private final class CheckoutRequirementsCollector {
-    var headlessCheckoutId: String?
-    var requireLoginRequirements: [CheckoutRequirement]?
-    var becameReadyToCheckout: Bool = false
+final class CheckoutRequirementsCollector {
+    private(set) var headlessCheckoutId: String?
+    private(set) var requireLoginRequirements: [CheckoutRequirement]?
+    private(set) var becameReadyToCheckout: Bool = false
+
+    /// Native runs a new preparation only after the superseded one finished,
+    /// so anything recorded before this call belongs to an older call.
+    func checkoutStarted(_ checkoutId: String) {
+        headlessCheckoutId = checkoutId
+        requireLoginRequirements = nil
+        becameReadyToCheckout = false
+    }
+
+    func loginRequired(_ requirements: [CheckoutRequirement]) {
+        requireLoginRequirements = requirements
+    }
+
+    /// Ready-to-checkout means no login is required for this preparation.
+    func readyToCheckout() {
+        becameReadyToCheckout = true
+        requireLoginRequirements = []
+    }
 }
 
 /// Main Flutter plugin entry point. Owns the native `OnramperClient`, mirrors
@@ -211,11 +229,10 @@ extension OnramperSdkPlugin: OnramperHostApi {
 
         // Forward CheckoutEvents to Dart.
         let api = self.flutterApi
-        eventForwardingTask = Task { @MainActor [weak self] in
+        eventForwardingTask = Task { @MainActor in
             for await event in newClient.events {
                 let dto = BridgeMappers.fromNative(event)
                 api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
-                self?.observeEventForRequirementsCollector(event)
             }
         }
 
@@ -226,24 +243,6 @@ extension OnramperSdkPlugin: OnramperHostApi {
             .sink { id in
                 api?.onTransactionIdChanged(transactionId: id) { _ in }
             }
-    }
-
-    /// Side-channel for the per-call requirements collector. The delegate
-    /// path is the primary source of truth, but `loginRequired` and
-    /// `checkoutStarted` events arrive at the same time and double-record
-    /// here as a belt-and-braces fallback in case the delegate fires later.
-    fileprivate func observeEventForRequirementsCollector(_ event: CheckoutEvent) {
-        guard let collector = inFlightRequirements else { return }
-        switch event {
-        case .checkoutStarted(let id):
-            if collector.headlessCheckoutId == nil { collector.headlessCheckoutId = id }
-        case .loginRequired(let reqs):
-            if collector.requireLoginRequirements == nil { collector.requireLoginRequirements = reqs }
-        case .readyToCheckout:
-            collector.becameReadyToCheckout = true
-        default:
-            break
-        }
     }
 
     func initialize(
@@ -442,15 +441,15 @@ extension OnramperSdkPlugin: OnramperDelegate {
     }
 
     public func onramperClient(_ client: OnramperClient, didStartCheckout checkoutId: String) {
-        inFlightRequirements?.headlessCheckoutId = checkoutId
+        inFlightRequirements?.checkoutStarted(checkoutId)
     }
 
     public func onramperClient(_ client: OnramperClient, didRequireLogin requirements: [CheckoutRequirement]) {
-        inFlightRequirements?.requireLoginRequirements = requirements
+        inFlightRequirements?.loginRequired(requirements)
     }
 
     public func onramperClient(_ client: OnramperClient, didBecomeReadyToCheckout checkoutId: String) {
-        inFlightRequirements?.becameReadyToCheckout = true
+        inFlightRequirements?.readyToCheckout()
     }
 
     public func onramperClient(_ client: OnramperClient, didCompleteCheckout checkoutId: String) {
