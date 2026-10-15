@@ -193,8 +193,10 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
           prefill?.toDto(),
           buttonStyle?.toNativeDto(),
         ));
+    // Disposed while the call was in flight: native dispose already dropped
+    // the prepared button, so the result is unusable.
+    if (_disposed) throw const OnramperError.clientDisposed();
     final result = CheckoutRequirementsResult.fromDto(dto);
-    if (_disposed) return result;
     _tosRequirements = result.tos;
     notifyListeners();
     return result;

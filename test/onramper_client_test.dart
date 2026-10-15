@@ -315,7 +315,16 @@ void main() {
         fakeHost.resetGate!.complete();
         fakeHost.signOutGate!.complete();
         fakeHost.requirementsGate!.complete();
-        await expectLater(pending, completes, reason: call);
+        if (call == 'getCheckoutRequirements') {
+          // Native dispose already dropped the prepared button.
+          await expectLater(
+            pending,
+            throwsA(isA<OnramperError>().having(
+                (e) => e.kind, 'kind', OnramperErrorKind.clientDisposed)),
+          );
+        } else {
+          await expectLater(pending, completes, reason: call);
+        }
       }
     });
 
