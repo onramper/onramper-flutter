@@ -174,6 +174,21 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 
     // MARK: Internal helpers
 
+    /// Builds the native log handler that forwards records to Dart. Native
+    /// calls it synchronously on arbitrary threads, so it keeps Console output
+    /// and hops to main (FIFO) before touching the channel.
+    func makeLogHandler() -> OnramperLogHandler {
+        return { [weak self] (record: OnramperLogRecord) in
+            OnramperLog.systemHandler(record)
+            let dto = BridgeMappers.fromNative(record)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.flutterApi?.onLog(record: dto) { _ in }
+                }
+            }
+        }
+    }
+
     /// Cancels the event-forwarding task. Called on dispose / reconfigure.
     private func tearDownObservers() {
         eventForwardingTask?.cancel(); eventForwardingTask = nil
@@ -198,20 +213,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
     func configure(config: ConfigurationDto) throws {
         // Capture the bridge and a weak self for the closure the SDK retains.
         let bridge = self.refreshBridge
-        // Native calls the handler synchronously on arbitrary threads. Keep
-        // Console output, then hop to main (FIFO) before touching the channel.
-        var logHandler: OnramperLogHandler?
-        if config.hasLogHandler {
-            logHandler = { [weak self] (record: OnramperLogRecord) in
-                OnramperLog.systemHandler(record)
-                let dto = BridgeMappers.fromNative(record)
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        self?.flutterApi?.onLog(record: dto) { _ in }
-                    }
-                }
-            }
-        }
+        let logHandler = config.hasLogHandler ? makeLogHandler() : nil
         let nativeConfig = BridgeMappers.toNative(config, logHandler: logHandler) { [weak self] in
             try await bridge.awaitRefresh { @Sendable in
                 // The notification runs on the main actor so the

@@ -64,6 +64,32 @@ final class OnramperSdkPluginTests: XCTestCase {
         try await super.tearDown()
     }
 
+    // MARK: - log forwarding
+
+    func test_logHandler_forwardsRecordsToDartOnMain() async {
+        let handler = plugin.makeLogHandler()
+        let record = OnramperLogRecord(level: .info, category: "Checkout", event: "checkout.finalized", context: [:])
+        DispatchQueue.global().async { handler(record) }   // native calls from arbitrary threads
+        let delivered = expectation(description: "delivered")
+        func poll() {
+            if mockApi.logs.count == 1 { delivered.fulfill(); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { MainActor.assumeIsolated { poll() } }
+        }
+        poll()
+        await fulfillment(of: [delivered], timeout: 2)
+        XCTAssertEqual(mockApi.logs.first?.event, "checkout.finalized")
+    }
+
+    func test_configure_installsLogHandlerOnlyWhenDartHasOne() throws {
+        var withHandler = makeConfig()
+        withHandler.hasLogHandler = true
+        try plugin.configure(config: withHandler)
+        XCTAssertNotNil(plugin.testClient()?.configuration.logHandler)
+
+        try plugin.configure(config: makeConfig())
+        XCTAssertNil(plugin.testClient()?.configuration.logHandler)
+    }
+
     // MARK: - sdkVersion
 
     func test_sdkVersion_returnsNativeVersion() throws {
