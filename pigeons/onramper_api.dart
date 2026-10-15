@@ -526,6 +526,9 @@ abstract class OnramperHostApi {
   // Aborts a pending session refresh (e.g. user signed out). Causes the
   // in-flight SDK call to fail with sessionRefreshAborted.
   void failRefreshedSession(String reason);
+
+  /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+  String sdkVersion();
 }
 
 @FlutterApi()

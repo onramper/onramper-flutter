@@ -71,6 +71,14 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// The SDK uses Pigeon-generated channels that wire themselves up on first
   /// use, so there's nothing to register here — this entry point exists
   /// solely to satisfy the Flutter plugin contract.
+  /// Version of this Flutter plugin. `X.Y.Z` bundles native OnramperSDK
+  /// `X.Y.Z`.
+  static const String wrapperVersion = '1.3.1';
+
+  /// Version of the bundled native OnramperSDK (e.g. "1.3.1"). Works without a
+  /// client instance. Useful for diagnostics and support screens.
+  static Future<String> sdkVersion() => OnramperHostApi().sdkVersion();
+
   static void registerWith() {
     // No-op: Pigeon channels are configured per-client in `_OnramperClient._`.
   }

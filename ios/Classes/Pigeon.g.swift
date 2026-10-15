@@ -1330,6 +1330,8 @@ protocol OnramperHostApi {
   func dispose(completion: @escaping (Result<Void, Error>) -> Void)
   func provideRefreshedSession(credentials: SessionCredentialsDto) throws
   func failRefreshedSession(reason: String) throws
+  /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+  func sdkVersion() throws -> String
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1484,6 +1486,20 @@ class OnramperHostApiSetup {
       }
     } else {
       failRefreshedSessionChannel.setMessageHandler(nil)
+    }
+    /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+    let sdkVersionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.sdkVersion\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      sdkVersionChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.sdkVersion()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      sdkVersionChannel.setMessageHandler(nil)
     }
   }
 }

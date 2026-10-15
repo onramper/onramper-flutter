@@ -392,6 +392,10 @@ extension OnramperSdkPlugin: OnramperHostApi {
     func failRefreshedSession(reason: String) throws {
         Task { await refreshBridge.fail(reason) }
     }
+
+    func sdkVersion() throws -> String {
+        OnramperClient.sdkVersion
+    }
 }
 
 // MARK: - OnramperDelegate conformance

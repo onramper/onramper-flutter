@@ -64,6 +64,13 @@ final class OnramperSdkPluginTests: XCTestCase {
         try await super.tearDown()
     }
 
+    // MARK: - sdkVersion
+
+    func test_sdkVersion_returnsNativeVersion() throws {
+        XCTAssertEqual(try plugin.sdkVersion(), OnramperClient.sdkVersion)
+        XCTAssertEqual(try plugin.sdkVersion(), "1.3.1")
+    }
+
     // MARK: - configure
 
     func test_configure_createsNativeClient() throws {

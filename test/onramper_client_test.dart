@@ -517,4 +517,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
   Future<void> failRefreshedSession(String reason) async {
     lastFailReason = reason;
   }
+
+  @override
+  Future<String> sdkVersion() async => '0.0.0-fake';
 }
