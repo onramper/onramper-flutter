@@ -41,6 +41,9 @@ typedef SessionExpirationHandler = Future<SessionCredentials> Function();
 /// The client is created with an [OnramperConfiguration] which is forwarded to
 /// the native side once during construction (fire-and-forget). Call
 /// [initialize] with [SessionCredentials] before starting a checkout flow.
+///
+/// After [dispose], methods throw [OnramperError] with kind `clientDisposed`,
+/// and late native callbacks are ignored. Create a new client to start over.
 class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// Creates a client wired to the real native HostApi.
   OnramperClient({
@@ -173,6 +176,12 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// [CheckoutRequirementsResult.tos] under [tosRequirements] for downstream
   /// UI to render.
   ///
+  /// Calling it again (or [reset] / [signOut]) supersedes an earlier call
+  /// still in flight; the earlier future fails with
+  /// `OnramperErrorKind.intentInvalidated`, which you can ignore when waiting
+  /// for the latest quote. Buttons from earlier calls that weren't yet shown
+  /// are released and render nothing.
+  ///
   /// Throws [OnramperError] on SDK failure.
   Future<CheckoutRequirementsResult> getCheckoutRequirements(
     CheckoutIntentRequest request, {
@@ -239,6 +248,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// PlatformException whose `details` is an [OnramperErrorDto]) into a typed
   /// [OnramperError]. Other exceptions propagate unchanged.
   Future<T> _guard<T>(Future<T> Function() call) async {
+    if (_disposed) throw const OnramperError.clientDisposed();
     try {
       return await call();
     } on PlatformException catch (e) {
@@ -252,6 +262,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onStateChanged(OnramperStateDto state) {
+    if (_disposed) return;
     _state = OnramperState.fromDto(state);
     if (!_stateController.isClosed) _stateController.add(_state);
     notifyListeners();
@@ -259,6 +270,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onEvent(CheckoutEventDto event) {
+    if (_disposed) return;
     if (!_eventController.isClosed) {
       _eventController.add(CheckoutEvent.fromDto(event));
     }
@@ -266,12 +278,14 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onError(OnramperErrorDto error) {
+    if (_disposed) return;
     _lastError = OnramperError.fromDto(error);
     notifyListeners();
   }
 
   @override
   void onTransactionIdChanged(String? transactionId) {
+    if (_disposed) return;
     if (transactionId == _currentTransactionId) return;
     _currentTransactionId = transactionId;
     notifyListeners();
@@ -279,6 +293,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onLog(LogRecordDto record) {
+    if (_disposed) return;
     final handler = _config.logHandler;
     if (handler == null) return;
     try {
@@ -296,6 +311,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onSessionExpired() {
+    if (_disposed) return;
     // The Pigeon callback is synchronous; dispatch the async refresh.
     unawaited(_handleSessionExpired());
   }

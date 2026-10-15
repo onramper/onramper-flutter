@@ -216,6 +216,82 @@ void main() {
       await client.dispose();
     });
 
+    test('methods after dispose throw clientDisposed', () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await client.dispose();
+      await client.dispose(); // idempotent
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.clientDisposed)),
+      );
+      await expectLater(
+        client.initialize(sessionId: 's', sessionToken: 't'),
+        throwsA(isA<OnramperError>()),
+      );
+    });
+
+    test('late native callbacks after dispose are ignored', () async {
+      final logs = <OnramperLogRecord>[];
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+            apiKey: 'pk_x', clientId: '01H', logHandler: logs.add),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await client.dispose();
+      expect(
+        () {
+          client.debugDispatchStateChanged(
+              OnramperStateDto(kind: OnramperStateKindDto.ready));
+          client.debugDispatchEvent(
+              CheckoutEventDto(kind: CheckoutEventKindDto.readyToCheckout));
+          client.onTransactionIdChanged('x');
+          client.onLog(LogRecordDto(
+            timestampMs: 0,
+            level: LogLevelDto.info,
+            category: 'c',
+            event: 'e',
+            context: const {},
+            message: 'e',
+          ));
+        },
+        returnsNormally,
+      );
+      expect(client.state.kind, OnramperStateKind.idle);
+      expect(client.currentTransactionId, isNull);
+      expect(logs, isEmpty);
+    });
+
+    test('intentInvalidated from native surfaces as typed error', () async {
+      final fakeHost = FakeOnramperHostApi()
+        ..nextGetRequirementsError = PlatformException(
+          code: 'onramper_error',
+          message: 'superseded',
+          details: OnramperErrorDto(
+            kind: OnramperErrorKindDto.intentInvalidated,
+            message: 'superseded',
+            userMessage: 'Your checkout details have changed.',
+            supportCode: 'FLUTTER-INTENT-INVALIDATED',
+            recoverable: true,
+          ),
+        );
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>().having(
+            (e) => e.kind, 'kind', OnramperErrorKind.intentInvalidated)),
+      );
+      await client.dispose();
+    });
+
     test('getCheckoutRequirements forwards prefill', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(

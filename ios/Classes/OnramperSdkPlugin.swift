@@ -109,6 +109,10 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 
     let refreshBridge = SessionRefreshBridge()
 
+    // Supersedes in-flight getCheckoutRequirements calls on a newer call,
+    // reset, signOut or dispose.
+    let preparationGate = PreparationGate()
+
     // Stores the per-call collector while `getCheckoutRequirements` is
     // in-flight. Reset to nil between calls.
     fileprivate var inFlightRequirements: CheckoutRequirementsCollector?
@@ -286,8 +290,18 @@ extension OnramperSdkPlugin: OnramperHostApi {
         let collector = CheckoutRequirementsCollector()
         self.inFlightRequirements = collector
 
+        // Supersede earlier preparations synchronously, before any await, and
+        // release the previous unmounted button.
+        let generation = preparationGate.begin()
+        if let prev = lastButtonHandle {
+            lastButtonHandle = nil
+            Task { await CheckoutButtonRegistry.shared.drop(prev) }
+        }
+        let invalidated = BridgeMappers.pigeonError(BridgeMappers.intentInvalidatedDto())
+
         Task { @MainActor in
-            defer { self.inFlightRequirements = nil }
+            // Only clear the collector if a newer call hasn't replaced it.
+            defer { if self.inFlightRequirements === collector { self.inFlightRequirements = nil } }
             do {
                 // `getCheckoutRequirements` is UIKit-gated and returns a
                 // SwiftUI button + quote. The button's appearance comes from
@@ -298,13 +312,20 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     prefill: nativePrefill,
                     buttonStyle: nativeStyle
                 )
+                guard self.preparationGate.isCurrent(generation) else {
+                    completion(.failure(invalidated))
+                    return
+                }
 
                 // Store the button in the registry and hand the handle to Dart so
                 // OnramperNativeCheckoutButton can look it up via the platform view.
-                if let prev = self.lastButtonHandle {
-                    await CheckoutButtonRegistry.shared.drop(prev)
-                }
                 let handle = await CheckoutButtonRegistry.shared.store(result.button)
+                // A newer call may have started while we awaited the registry.
+                guard self.preparationGate.isCurrent(generation) else {
+                    await CheckoutButtonRegistry.shared.drop(handle)
+                    completion(.failure(invalidated))
+                    return
+                }
                 self.lastButtonHandle = handle
 
                 guard let headlessId = collector.headlessCheckoutId else {
@@ -316,24 +337,32 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 }
 
                 let nativeReqs = collector.requireLoginRequirements ?? []
-                let dto = CheckoutRequirementsResultDto(
+                completion(.success(CheckoutRequirementsResultDto(
                     headlessCheckoutId: headlessId,
                     requirements: nativeReqs.map(BridgeMappers.fromNative),
                     quote: BridgeMappers.fromNative(result.quote),
                     buttonHandle: handle
-                )
-                completion(.success(dto))
-            } catch let onramperError as OnramperError {
-                let errDto = BridgeMappers.fromNative(onramperError)
-                self.flutterApi?.onError(error: errDto) { _ in }
-                completion(.failure(BridgeMappers.pigeonError(errDto)))
+                )))
             } catch {
-                completion(.failure(error))
+                // Native single-flight cancels the older call with
+                // CancellationError; stale failures are reported as invalidated.
+                if !self.preparationGate.isCurrent(generation) || error is CancellationError {
+                    completion(.failure(invalidated))
+                    return
+                }
+                if let onramperError = error as? OnramperError {
+                    let errDto = BridgeMappers.fromNative(onramperError)
+                    self.flutterApi?.onError(error: errDto) { _ in }
+                    completion(.failure(BridgeMappers.pigeonError(errDto)))
+                } else {
+                    completion(.failure(error))
+                }
             }
         }
     }
 
     func reset(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         let handle = self.lastButtonHandle
         Task { @MainActor in
@@ -345,6 +374,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
     }
 
     func signOut(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         let handle = self.lastButtonHandle
         Task { @MainActor in
@@ -366,6 +396,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
     }
 
     func dispose(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         Task { @MainActor in
             await client?.reset()
