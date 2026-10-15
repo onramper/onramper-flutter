@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
@@ -172,6 +173,46 @@ void main() {
         throwsA(isA<PlatformException>()
             .having((e) => e.code, 'code', 'not_configured')),
       );
+      await client.dispose();
+    });
+
+    LogRecordDto sampleLog() => LogRecordDto(
+          timestampMs: 0,
+          level: LogLevelDto.debug,
+          category: 'c',
+          event: 'e',
+          context: const {},
+          message: 'e',
+        );
+
+    test('onLog forwards records to logHandler', () async {
+      final got = <OnramperLogRecord>[];
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+            apiKey: 'pk_x', clientId: '01H', logHandler: got.add),
+        hostApi: FakeOnramperHostApi(),
+      );
+      client.onLog(sampleLog());
+      expect(got.single.event, 'e');
+      await client.dispose();
+    });
+
+    test('a throwing logHandler is reported, not propagated', () async {
+      final reported = <FlutterErrorDetails>[];
+      final previous = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previous);
+
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+          apiKey: 'pk_x',
+          clientId: '01H',
+          logHandler: (_) => throw StateError('boom'),
+        ),
+        hostApi: FakeOnramperHostApi(),
+      );
+      expect(() => client.onLog(sampleLog()), returnsNormally);
+      expect(reported.single.exception, isA<StateError>());
       await client.dispose();
     });
 

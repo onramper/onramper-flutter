@@ -23,12 +23,38 @@ class ConfigurationDto {
     required this.environment,
     required this.theme,
     required this.logLevel,
+    required this.hasLogHandler,
+    required this.isEventLoggingEnabled,
+    required this.isEventConsoleLoggingEnabled,
   });
   final String apiKey;
   final String clientId;
   final EnvironmentDto environment;
   final ThemeDto theme;
   final LogLevelDto logLevel;
+
+  /// True when Dart set `OnramperConfiguration.logHandler`; native installs a
+  /// forwarding handler only then.
+  final bool hasLogHandler;
+  final bool isEventLoggingEnabled;
+  final bool isEventConsoleLoggingEnabled;
+}
+
+class LogRecordDto {
+  LogRecordDto({
+    required this.timestampMs,
+    required this.level,
+    required this.category,
+    required this.event,
+    required this.context,
+    required this.message,
+  });
+  final int timestampMs;
+  final LogLevelDto level;
+  final String category;
+  final String event;
+  final Map<String, String> context;
+  final String message;
 }
 
 class SessionCredentialsDto {
@@ -508,4 +534,6 @@ abstract class OnramperFlutterApi {
   // Mirrors native `@Published currentTransactionId`. Null when cleared (new
   // intent or reset).
   void onTransactionIdChanged(String? transactionId);
+
+  void onLog(LogRecordDto record);
 }

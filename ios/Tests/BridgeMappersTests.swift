@@ -10,10 +10,13 @@ final class BridgeMappersTests: XCTestCase {
             clientId: "01HABCDEF",
             environment: .development,
             theme: .light,
-            logLevel: .debug
+            logLevel: .debug,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
 
-        let native = BridgeMappers.toNative(dto, sessionExpirationHandler: { fatalError("not invoked in this test") })
+        let native = BridgeMappers.toNative(dto, logHandler: nil, sessionExpirationHandler: { fatalError("not invoked in this test") })
 
         XCTAssertEqual(native.apiKey, "pk_test_x")
         XCTAssertEqual(native.clientId, "01HABCDEF")
@@ -28,10 +31,13 @@ final class BridgeMappersTests: XCTestCase {
             clientId: "01H",
             environment: .production,
             theme: .system,
-            logLevel: .off
+            logLevel: .off,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
 
-        let native = BridgeMappers.toNative(dto, sessionExpirationHandler: { fatalError() })
+        let native = BridgeMappers.toNative(dto, logHandler: nil, sessionExpirationHandler: { fatalError() })
 
         XCTAssertEqual(native.environment, .production)
         XCTAssertEqual(native.theme, .system)
@@ -952,5 +958,29 @@ final class BridgeMappersTests: XCTestCase {
         let dto = BridgeMappers.intentInvalidatedDto()
         XCTAssertEqual(dto.kind, .intentInvalidated)
         XCTAssertEqual(dto.supportCode, "FLUTTER-INTENT-INVALIDATED")
+    }
+
+    // MARK: - Logging
+
+    func test_configuration_passesFlagsAndLogHandler() {
+        let dto = ConfigurationDto(apiKey: "pk", clientId: "c", environment: .production, theme: .system,
+                                   logLevel: .info, hasLogHandler: true,
+                                   isEventLoggingEnabled: true, isEventConsoleLoggingEnabled: true)
+        let native = BridgeMappers.toNative(dto, logHandler: { _ in }, sessionExpirationHandler: { fatalError() })
+        XCTAssertTrue(native.isEventLoggingEnabled)
+        XCTAssertTrue(native.isEventConsoleLoggingEnabled)
+        XCTAssertNotNil(native.logHandler)
+    }
+
+    func test_logRecord_fromNative_mapsAllFields() {
+        let record = OnramperLogRecord(timestamp: Date(timeIntervalSince1970: 1_760_500_000), level: .info,
+                                       category: "Checkout", event: "checkout.finalized", context: ["ramp": "moonpay"])
+        let dto = BridgeMappers.fromNative(record)
+        XCTAssertEqual(dto.timestampMs, 1_760_500_000_000)
+        XCTAssertEqual(dto.level, .info)
+        XCTAssertEqual(dto.category, "Checkout")
+        XCTAssertEqual(dto.event, "checkout.finalized")
+        XCTAssertEqual(dto.context, ["ramp": "moonpay"])
+        XCTAssertEqual(dto.message, "checkout.finalized ramp=moonpay")
     }
 }

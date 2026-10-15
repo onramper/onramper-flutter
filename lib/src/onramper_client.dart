@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'models/configuration.dart';
 import 'models/errors.dart';
 import 'models/events.dart';
+import 'models/log_record.dart';
 import 'models/prefill.dart';
 import 'models/requirements.dart';
 import 'models/state.dart';
@@ -266,6 +267,23 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     if (transactionId == _currentTransactionId) return;
     _currentTransactionId = transactionId;
     notifyListeners();
+  }
+
+  @override
+  void onLog(LogRecordDto record) {
+    final handler = _config.logHandler;
+    if (handler == null) return;
+    try {
+      handler(OnramperLogRecord.fromDto(record));
+    } catch (e, st) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'onramper_flutter',
+        context:
+            ErrorDescription('while calling OnramperConfiguration.logHandler'),
+      ));
+    }
   }
 
   @override

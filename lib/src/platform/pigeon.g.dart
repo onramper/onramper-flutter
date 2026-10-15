@@ -168,6 +168,9 @@ class ConfigurationDto {
     required this.environment,
     required this.theme,
     required this.logLevel,
+    required this.hasLogHandler,
+    required this.isEventLoggingEnabled,
+    required this.isEventConsoleLoggingEnabled,
   });
 
   String apiKey;
@@ -180,6 +183,14 @@ class ConfigurationDto {
 
   LogLevelDto logLevel;
 
+  /// True when Dart set `OnramperConfiguration.logHandler`; native installs a
+  /// forwarding handler only then.
+  bool hasLogHandler;
+
+  bool isEventLoggingEnabled;
+
+  bool isEventConsoleLoggingEnabled;
+
   Object encode() {
     return <Object?>[
       apiKey,
@@ -187,6 +198,9 @@ class ConfigurationDto {
       environment,
       theme,
       logLevel,
+      hasLogHandler,
+      isEventLoggingEnabled,
+      isEventConsoleLoggingEnabled,
     ];
   }
 
@@ -198,6 +212,55 @@ class ConfigurationDto {
       environment: result[2]! as EnvironmentDto,
       theme: result[3]! as ThemeDto,
       logLevel: result[4]! as LogLevelDto,
+      hasLogHandler: result[5]! as bool,
+      isEventLoggingEnabled: result[6]! as bool,
+      isEventConsoleLoggingEnabled: result[7]! as bool,
+    );
+  }
+}
+
+class LogRecordDto {
+  LogRecordDto({
+    required this.timestampMs,
+    required this.level,
+    required this.category,
+    required this.event,
+    required this.context,
+    required this.message,
+  });
+
+  int timestampMs;
+
+  LogLevelDto level;
+
+  String category;
+
+  String event;
+
+  Map<String, String> context;
+
+  String message;
+
+  Object encode() {
+    return <Object?>[
+      timestampMs,
+      level,
+      category,
+      event,
+      context,
+      message,
+    ];
+  }
+
+  static LogRecordDto decode(Object result) {
+    result as List<Object?>;
+    return LogRecordDto(
+      timestampMs: result[0]! as int,
+      level: result[1]! as LogLevelDto,
+      category: result[2]! as String,
+      event: result[3]! as String,
+      context: (result[4] as Map<Object?, Object?>?)!.cast<String, String>(),
+      message: result[5]! as String,
     );
   }
 }
@@ -1098,68 +1161,71 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is ConfigurationDto) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is SessionCredentialsDto) {
+    } else if (value is LogRecordDto) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is WalletInfoDto) {
+    } else if (value is SessionCredentialsDto) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperTransactionDataDto) {
+    } else if (value is WalletInfoDto) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutIntentRequestDto) {
+    } else if (value is OnramperTransactionDataDto) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is UserPrefillDto) {
+    } else if (value is CheckoutIntentRequestDto) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    } else if (value is QuoteDto) {
+    } else if (value is UserPrefillDto) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    } else if (value is TosItemDto) {
+    } else if (value is QuoteDto) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    } else if (value is TosRequirementDto) {
+    } else if (value is TosItemDto) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    } else if (value is AmountLimitRequirementDto) {
+    } else if (value is TosRequirementDto) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    } else if (value is UserInfoFieldDto) {
+    } else if (value is AmountLimitRequirementDto) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    } else if (value is UserInfoRequirementDto) {
+    } else if (value is UserInfoFieldDto) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    } else if (value is ReverificationRequirementDto) {
+    } else if (value is UserInfoRequirementDto) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementDto) {
+    } else if (value is ReverificationRequirementDto) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutRequirementsResultDto) {
+    } else if (value is CheckoutRequirementDto) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    } else if (value is RenderContextDto) {
+    } else if (value is CheckoutRequirementsResultDto) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    } else if (value is HeadlessCheckoutDataDto) {
+    } else if (value is RenderContextDto) {
       buffer.putUint8(158);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutFinalizeResponseDto) {
+    } else if (value is HeadlessCheckoutDataDto) {
       buffer.putUint8(159);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperStateDto) {
+    } else if (value is CheckoutFinalizeResponseDto) {
       buffer.putUint8(160);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutEventDto) {
+    } else if (value is OnramperStateDto) {
       buffer.putUint8(161);
       writeValue(buffer, value.encode());
-    } else if (value is OnramperErrorDto) {
+    } else if (value is CheckoutEventDto) {
       buffer.putUint8(162);
       writeValue(buffer, value.encode());
-    } else if (value is CheckoutButtonStyleDto) {
+    } else if (value is OnramperErrorDto) {
       buffer.putUint8(163);
+      writeValue(buffer, value.encode());
+    } else if (value is CheckoutButtonStyleDto) {
+      buffer.putUint8(164);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1211,46 +1277,48 @@ class _PigeonCodec extends StandardMessageCodec {
       case 142:
         return ConfigurationDto.decode(readValue(buffer)!);
       case 143:
-        return SessionCredentialsDto.decode(readValue(buffer)!);
+        return LogRecordDto.decode(readValue(buffer)!);
       case 144:
-        return WalletInfoDto.decode(readValue(buffer)!);
+        return SessionCredentialsDto.decode(readValue(buffer)!);
       case 145:
-        return OnramperTransactionDataDto.decode(readValue(buffer)!);
+        return WalletInfoDto.decode(readValue(buffer)!);
       case 146:
-        return CheckoutIntentRequestDto.decode(readValue(buffer)!);
+        return OnramperTransactionDataDto.decode(readValue(buffer)!);
       case 147:
-        return UserPrefillDto.decode(readValue(buffer)!);
+        return CheckoutIntentRequestDto.decode(readValue(buffer)!);
       case 148:
-        return QuoteDto.decode(readValue(buffer)!);
+        return UserPrefillDto.decode(readValue(buffer)!);
       case 149:
-        return TosItemDto.decode(readValue(buffer)!);
+        return QuoteDto.decode(readValue(buffer)!);
       case 150:
-        return TosRequirementDto.decode(readValue(buffer)!);
+        return TosItemDto.decode(readValue(buffer)!);
       case 151:
-        return AmountLimitRequirementDto.decode(readValue(buffer)!);
+        return TosRequirementDto.decode(readValue(buffer)!);
       case 152:
-        return UserInfoFieldDto.decode(readValue(buffer)!);
+        return AmountLimitRequirementDto.decode(readValue(buffer)!);
       case 153:
-        return UserInfoRequirementDto.decode(readValue(buffer)!);
+        return UserInfoFieldDto.decode(readValue(buffer)!);
       case 154:
-        return ReverificationRequirementDto.decode(readValue(buffer)!);
+        return UserInfoRequirementDto.decode(readValue(buffer)!);
       case 155:
-        return CheckoutRequirementDto.decode(readValue(buffer)!);
+        return ReverificationRequirementDto.decode(readValue(buffer)!);
       case 156:
-        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
+        return CheckoutRequirementDto.decode(readValue(buffer)!);
       case 157:
-        return RenderContextDto.decode(readValue(buffer)!);
+        return CheckoutRequirementsResultDto.decode(readValue(buffer)!);
       case 158:
-        return HeadlessCheckoutDataDto.decode(readValue(buffer)!);
+        return RenderContextDto.decode(readValue(buffer)!);
       case 159:
-        return CheckoutFinalizeResponseDto.decode(readValue(buffer)!);
+        return HeadlessCheckoutDataDto.decode(readValue(buffer)!);
       case 160:
-        return OnramperStateDto.decode(readValue(buffer)!);
+        return CheckoutFinalizeResponseDto.decode(readValue(buffer)!);
       case 161:
-        return CheckoutEventDto.decode(readValue(buffer)!);
+        return OnramperStateDto.decode(readValue(buffer)!);
       case 162:
-        return OnramperErrorDto.decode(readValue(buffer)!);
+        return CheckoutEventDto.decode(readValue(buffer)!);
       case 163:
+        return OnramperErrorDto.decode(readValue(buffer)!);
+      case 164:
         return CheckoutButtonStyleDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1518,6 +1586,8 @@ abstract class OnramperFlutterApi {
 
   void onTransactionIdChanged(String? transactionId);
 
+  void onLog(LogRecordDto record);
+
   static void setUp(
     OnramperFlutterApi? api, {
     BinaryMessenger? binaryMessenger,
@@ -1652,6 +1722,35 @@ abstract class OnramperFlutterApi {
           final String? arg_transactionId = (args[0] as String?);
           try {
             api.onTransactionIdChanged(arg_transactionId);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onLog$messageChannelSuffix',
+          pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onLog was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final LogRecordDto? arg_record = (args[0] as LogRecordDto?);
+          assert(arg_record != null,
+              'Argument for dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onLog was null, expected non-null LogRecordDto.');
+          try {
+            api.onLog(arg_record!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

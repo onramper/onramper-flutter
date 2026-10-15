@@ -8,6 +8,7 @@ library onramper_flutter;
 export 'src/models/configuration.dart';
 export 'src/models/errors.dart';
 export 'src/models/events.dart';
+export 'src/models/log_record.dart';
 export 'src/models/prefill.dart';
 export 'src/models/quote.dart';
 export 'src/models/requirements.dart';

@@ -176,7 +176,21 @@ extension OnramperSdkPlugin: OnramperHostApi {
     func configure(config: ConfigurationDto) throws {
         // Capture the bridge and a weak self for the closure the SDK retains.
         let bridge = self.refreshBridge
-        let nativeConfig = BridgeMappers.toNative(config) { [weak self] in
+        // Native calls the handler synchronously on arbitrary threads. Keep
+        // Console output, then hop to main (FIFO) before touching the channel.
+        var logHandler: OnramperLogHandler?
+        if config.hasLogHandler {
+            logHandler = { [weak self] (record: OnramperLogRecord) in
+                OnramperLog.systemHandler(record)
+                let dto = BridgeMappers.fromNative(record)
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        self?.flutterApi?.onLog(record: dto) { _ in }
+                    }
+                }
+            }
+        }
+        let nativeConfig = BridgeMappers.toNative(config, logHandler: logHandler) { [weak self] in
             try await bridge.awaitRefresh { @Sendable in
                 // The notification runs on the main actor so the
                 // `OnramperFlutterApi` can be touched without crossing isolation.

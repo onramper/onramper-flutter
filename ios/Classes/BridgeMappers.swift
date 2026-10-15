@@ -5,6 +5,7 @@ import SwiftUI
 enum BridgeMappers {
     static func toNative(
         _ dto: ConfigurationDto,
+        logHandler: OnramperLogHandler?,
         sessionExpirationHandler: @escaping @Sendable () async throws -> SessionCredentials
     ) -> OnramperConfiguration {
         OnramperConfiguration(
@@ -13,6 +14,9 @@ enum BridgeMappers {
             environment: toNative(dto.environment),
             theme: toNative(dto.theme),
             logLevel: toNative(dto.logLevel),
+            logHandler: logHandler,
+            isEventLoggingEnabled: dto.isEventLoggingEnabled,
+            isEventConsoleLoggingEnabled: dto.isEventConsoleLoggingEnabled,
             sessionExpirationHandler: sessionExpirationHandler
         )
     }
@@ -49,6 +53,29 @@ enum BridgeMappers {
         case .debug:   return .debug
         case .trace:   return .debug
         }
+    }
+
+    // MARK: - Logging (Swift -> Dart)
+
+    static func fromNative(_ native: LogLevel) -> LogLevelDto {
+        switch native {
+        case .off:   return .off
+        case .error: return .error
+        case .info:  return .info
+        case .debug: return .debug
+        @unknown default: return .debug
+        }
+    }
+
+    static func fromNative(_ native: OnramperLogRecord) -> LogRecordDto {
+        LogRecordDto(
+            timestampMs: Int64((native.timestamp.timeIntervalSince1970 * 1000).rounded()),
+            level: fromNative(native.level),
+            category: native.category,
+            event: native.event,
+            context: native.context,
+            message: native.message
+        )
     }
 
     // MARK: - Quote (Swift -> Dart)

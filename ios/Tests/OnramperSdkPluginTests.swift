@@ -30,6 +30,13 @@ final class MockOnramperFlutterApi: OnramperFlutterApiProtocol {
         completion(.success(()))
     }
 
+    var logs: [LogRecordDto] = []
+
+    func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+        logs.append(recordArg)
+        completion(.success(()))
+    }
+
     var transactionIds: [String?] = []
 
     func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void) {
@@ -202,7 +209,10 @@ final class OnramperSdkPluginTests: XCTestCase {
             clientId: "01HPLUGINTEST",
             environment: .development,
             theme: .system,
-            logLevel: .off
+            logLevel: .off,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
     }
 

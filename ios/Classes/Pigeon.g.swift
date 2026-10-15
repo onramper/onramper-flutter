@@ -210,6 +210,11 @@ struct ConfigurationDto {
   var environment: EnvironmentDto
   var theme: ThemeDto
   var logLevel: LogLevelDto
+  /// True when Dart set `OnramperConfiguration.logHandler`; native installs a
+  /// forwarding handler only then.
+  var hasLogHandler: Bool
+  var isEventLoggingEnabled: Bool
+  var isEventConsoleLoggingEnabled: Bool
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -219,13 +224,19 @@ struct ConfigurationDto {
     let environment = pigeonVar_list[2] as! EnvironmentDto
     let theme = pigeonVar_list[3] as! ThemeDto
     let logLevel = pigeonVar_list[4] as! LogLevelDto
+    let hasLogHandler = pigeonVar_list[5] as! Bool
+    let isEventLoggingEnabled = pigeonVar_list[6] as! Bool
+    let isEventConsoleLoggingEnabled = pigeonVar_list[7] as! Bool
 
     return ConfigurationDto(
       apiKey: apiKey,
       clientId: clientId,
       environment: environment,
       theme: theme,
-      logLevel: logLevel
+      logLevel: logLevel,
+      hasLogHandler: hasLogHandler,
+      isEventLoggingEnabled: isEventLoggingEnabled,
+      isEventConsoleLoggingEnabled: isEventConsoleLoggingEnabled
     )
   }
   func toList() -> [Any?] {
@@ -235,6 +246,49 @@ struct ConfigurationDto {
       environment,
       theme,
       logLevel,
+      hasLogHandler,
+      isEventLoggingEnabled,
+      isEventConsoleLoggingEnabled,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct LogRecordDto {
+  var timestampMs: Int64
+  var level: LogLevelDto
+  var category: String
+  var event: String
+  var context: [String: String]
+  var message: String
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> LogRecordDto? {
+    let timestampMs = pigeonVar_list[0] as! Int64
+    let level = pigeonVar_list[1] as! LogLevelDto
+    let category = pigeonVar_list[2] as! String
+    let event = pigeonVar_list[3] as! String
+    let context = pigeonVar_list[4] as! [String: String]
+    let message = pigeonVar_list[5] as! String
+
+    return LogRecordDto(
+      timestampMs: timestampMs,
+      level: level,
+      category: category,
+      event: event,
+      context: context,
+      message: message
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      timestampMs,
+      level,
+      category,
+      event,
+      context,
+      message,
     ]
   }
 }
@@ -1072,46 +1126,48 @@ private class PigeonPigeonCodecReader: FlutterStandardReader {
     case 142:
       return ConfigurationDto.fromList(self.readValue() as! [Any?])
     case 143:
-      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
+      return LogRecordDto.fromList(self.readValue() as! [Any?])
     case 144:
-      return WalletInfoDto.fromList(self.readValue() as! [Any?])
+      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
     case 145:
-      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
+      return WalletInfoDto.fromList(self.readValue() as! [Any?])
     case 146:
-      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
+      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
     case 147:
-      return UserPrefillDto.fromList(self.readValue() as! [Any?])
+      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
     case 148:
-      return QuoteDto.fromList(self.readValue() as! [Any?])
+      return UserPrefillDto.fromList(self.readValue() as! [Any?])
     case 149:
-      return TosItemDto.fromList(self.readValue() as! [Any?])
+      return QuoteDto.fromList(self.readValue() as! [Any?])
     case 150:
-      return TosRequirementDto.fromList(self.readValue() as! [Any?])
+      return TosItemDto.fromList(self.readValue() as! [Any?])
     case 151:
-      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
+      return TosRequirementDto.fromList(self.readValue() as! [Any?])
     case 152:
-      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
+      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
     case 153:
-      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
     case 154:
-      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
     case 155:
-      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
+      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
     case 156:
-      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
     case 157:
-      return RenderContextDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
     case 158:
-      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
+      return RenderContextDto.fromList(self.readValue() as! [Any?])
     case 159:
-      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
+      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
     case 160:
-      return OnramperStateDto.fromList(self.readValue() as! [Any?])
+      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
     case 161:
-      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+      return OnramperStateDto.fromList(self.readValue() as! [Any?])
     case 162:
-      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
     case 163:
+      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+    case 164:
       return CheckoutButtonStyleDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1163,68 +1219,71 @@ private class PigeonPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? ConfigurationDto {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? SessionCredentialsDto {
+    } else if let value = value as? LogRecordDto {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? WalletInfoDto {
+    } else if let value = value as? SessionCredentialsDto {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperTransactionDataDto {
+    } else if let value = value as? WalletInfoDto {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutIntentRequestDto {
+    } else if let value = value as? OnramperTransactionDataDto {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? UserPrefillDto {
+    } else if let value = value as? CheckoutIntentRequestDto {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? QuoteDto {
+    } else if let value = value as? UserPrefillDto {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? TosItemDto {
+    } else if let value = value as? QuoteDto {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? TosRequirementDto {
+    } else if let value = value as? TosItemDto {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? AmountLimitRequirementDto {
+    } else if let value = value as? TosRequirementDto {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoFieldDto {
+    } else if let value = value as? AmountLimitRequirementDto {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoRequirementDto {
+    } else if let value = value as? UserInfoFieldDto {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? ReverificationRequirementDto {
+    } else if let value = value as? UserInfoRequirementDto {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementDto {
+    } else if let value = value as? ReverificationRequirementDto {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementsResultDto {
+    } else if let value = value as? CheckoutRequirementDto {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? RenderContextDto {
+    } else if let value = value as? CheckoutRequirementsResultDto {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? HeadlessCheckoutDataDto {
+    } else if let value = value as? RenderContextDto {
       super.writeByte(158)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutFinalizeResponseDto {
+    } else if let value = value as? HeadlessCheckoutDataDto {
       super.writeByte(159)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperStateDto {
+    } else if let value = value as? CheckoutFinalizeResponseDto {
       super.writeByte(160)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutEventDto {
+    } else if let value = value as? OnramperStateDto {
       super.writeByte(161)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperErrorDto {
+    } else if let value = value as? CheckoutEventDto {
       super.writeByte(162)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutButtonStyleDto {
+    } else if let value = value as? OnramperErrorDto {
       super.writeByte(163)
+      super.writeValue(value.toList())
+    } else if let value = value as? CheckoutButtonStyleDto {
+      super.writeByte(164)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1428,6 +1487,7 @@ protocol OnramperFlutterApiProtocol {
   func onError(error errorArg: OnramperErrorDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onSessionExpired(completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void)
+  func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
 }
 class OnramperFlutterApi: OnramperFlutterApiProtocol {
   private let binaryMessenger: FlutterBinaryMessenger
@@ -1515,6 +1575,24 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
     let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([transactionIdArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(Void()))
+      }
+    }
+  }
+  func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onLog\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([recordArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
         completion(.failure(createConnectionError(withChannelName: channelName)))
         return
