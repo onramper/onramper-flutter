@@ -46,7 +46,6 @@ class _OnramperCheckoutButtonState extends State<OnramperCheckoutButton> {
       children: [
         OnramperNativeCheckoutButton(
           buttonHandle: widget.requirements.buttonHandle,
-          height: 56,
         ),
         if (tosItems.isNotEmpty) ...[
           const SizedBox(height: 8),

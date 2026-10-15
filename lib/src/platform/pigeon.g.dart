@@ -1802,3 +1802,76 @@ abstract class OnramperFlutterApi {
     }
   }
 }
+
+/// Native → Dart sizing callbacks for one checkout-button platform view.
+/// Set up per view with `messageChannelSuffix` = the platform view id.
+abstract class CheckoutButtonFlutterApi {
+  static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
+
+  /// Content height in points (button + ToS + payment disclosures).
+  void onHeightChanged(double height);
+
+  /// The handle was unknown, expired (5 min) or invalidated; nothing renders.
+  void onUnavailable();
+
+  static void setUp(
+    CheckoutButtonFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+    {
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onHeightChanged$messageChannelSuffix',
+          pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+              'Argument for dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onHeightChanged was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final double? arg_height = (args[0] as double?);
+          assert(arg_height != null,
+              'Argument for dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onHeightChanged was null, expected non-null double.');
+          try {
+            api.onHeightChanged(arg_height!);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onUnavailable$messageChannelSuffix',
+          pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            api.onUnavailable();
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+  }
+}

@@ -546,3 +546,14 @@ abstract class OnramperFlutterApi {
 
   void onLog(LogRecordDto record);
 }
+
+/// Native → Dart sizing callbacks for one checkout-button platform view.
+/// Set up per view with `messageChannelSuffix` = the platform view id.
+@FlutterApi()
+abstract class CheckoutButtonFlutterApi {
+  /// Content height in points (button + ToS + payment disclosures).
+  void onHeightChanged(double height);
+
+  /// The handle was unknown, expired (5 min) or invalidated; nothing renders.
+  void onUnavailable();
+}
