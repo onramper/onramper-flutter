@@ -288,6 +288,7 @@ enum OnramperStateKindDto {
   readyToCheckout,
   finalizing,
   rendering,
+  paymentPending,
   completed,
   failed,
 }
@@ -325,6 +326,11 @@ enum CheckoutEventKindDto {
   paymentProcessing,
   paymentCancelled,
   providerError,
+  // iOS SDK 1.3.0
+  paymentPending,
+  challengeStarted,
+  challengeCompleted,
+  customerOnboardingRequired,
 }
 
 class CheckoutEventDto {
@@ -358,7 +364,8 @@ class CheckoutEventDto {
 
 // ---- Errors ----
 
-// One enum value per native OnramperError case (1:1).
+// One value per native OnramperError case, plus wrapper-originated kinds at
+// the end.
 enum OnramperErrorKindDto {
   notInitialized,
   initializationFailed,
@@ -386,12 +393,21 @@ enum OnramperErrorKindDto {
   deviceBlocked,
   securityStorageFailed,
   securityTrustFailed,
+  // iOS SDK 1.3.0
+  paymentFailed,
+  providerFailed,
+  applePayNotConfigured,
+  // Wrapper-originated (not native SDK cases)
+  intentInvalidated,
+  clientDisposed,
 }
 
 class OnramperErrorDto {
   OnramperErrorDto({
     required this.kind,
     required this.message,
+    required this.userMessage,
+    required this.supportCode,
     required this.recoverable,
     this.code,
     this.minAmount,
@@ -407,6 +423,12 @@ class OnramperErrorDto {
   });
   final OnramperErrorKindDto kind;
   final String message;
+
+  /// End-user copy, safe to display.
+  final String userMessage;
+
+  /// Short stable code, safe to display next to [userMessage]; matches SDK logs.
+  final String supportCode;
   final bool recoverable;
   // Variant payloads (nullable; only populated for the relevant kind):
   final int? code; // networkError.code, securityStorageFailed.status

@@ -249,7 +249,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // on the call result.
                 let dto = BridgeMappers.fromNative(onramperError)
                 self.flutterApi?.onError(error: dto) { _ in }
-                completion(.failure(PigeonError(code: "onramper_error", message: dto.message, details: nil)))
+                completion(.failure(BridgeMappers.pigeonError(dto)))
             } catch {
                 completion(.failure(error))
             }
@@ -312,7 +312,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
             } catch let onramperError as OnramperError {
                 let errDto = BridgeMappers.fromNative(onramperError)
                 self.flutterApi?.onError(error: errDto) { _ in }
-                completion(.failure(PigeonError(code: "onramper_error", message: errDto.message, details: nil)))
+                completion(.failure(BridgeMappers.pigeonError(errDto)))
             } catch {
                 completion(.failure(error))
             }

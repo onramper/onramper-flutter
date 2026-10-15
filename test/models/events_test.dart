@@ -90,6 +90,8 @@ void main() {
         error: OnramperErrorDto(
           kind: OnramperErrorKindDto.networkError,
           message: 'm',
+          userMessage: 'Something went wrong. Please try again.',
+          supportCode: 'test',
           recoverable: true,
         ),
       ));
@@ -177,6 +179,20 @@ void main() {
         expect(e.checkoutId, isNull);
         expect(e.error, isNull);
       }
+    });
+  });
+
+  test('maps every 1.3.0 event kind', () {
+    const pairs = {
+      CheckoutEventKindDto.paymentPending: CheckoutEventKind.paymentPending,
+      CheckoutEventKindDto.challengeStarted: CheckoutEventKind.challengeStarted,
+      CheckoutEventKindDto.challengeCompleted:
+          CheckoutEventKind.challengeCompleted,
+      CheckoutEventKindDto.customerOnboardingRequired:
+          CheckoutEventKind.customerOnboardingRequired,
+    };
+    pairs.forEach((dto, kind) {
+      expect(CheckoutEvent.fromDto(CheckoutEventDto(kind: dto)).kind, kind);
     });
   });
 }

@@ -900,4 +900,57 @@ final class BridgeMappersTests: XCTestCase {
     func test_userPrefillDto_nil_mapsToNil() {
         XCTAssertNil(BridgeMappers.toNative(nil as UserPrefillDto?))
     }
+
+    // MARK: - 1.3.0 cases
+
+    func test_state_paymentPending_maps() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.paymentPending).kind, .paymentPending)
+    }
+
+    func test_events_1_3_0_map() {
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.paymentPending).kind, .paymentPending)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.challengeStarted).kind, .challengeStarted)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.challengeCompleted).kind, .challengeCompleted)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.customerOnboardingRequired).kind, .customerOnboardingRequired)
+    }
+
+    func test_errors_1_3_0_map_withCopy() {
+        let failed = BridgeMappers.fromNative(OnramperError.paymentFailed("declined"))
+        XCTAssertEqual(failed.kind, .paymentFailed)
+        XCTAssertEqual(failed.debugInfo, "declined")
+        XCTAssertTrue(failed.recoverable)
+        XCTAssertEqual(failed.userMessage, OnramperError.paymentFailed("declined").userMessage)
+        XCTAssertEqual(failed.supportCode, OnramperError.paymentFailed("declined").supportCode)
+
+        let provider = BridgeMappers.fromNative(OnramperError.providerFailed("status"))
+        XCTAssertEqual(provider.kind, .providerFailed)
+        XCTAssertFalse(provider.recoverable)
+
+        let applePay = BridgeMappers.fromNative(OnramperError.applePayNotConfigured)
+        XCTAssertEqual(applePay.kind, .applePayNotConfigured)
+        XCTAssertFalse(applePay.recoverable)
+    }
+
+    func test_everyError_hasNonEmptyUserMessageAndSupportCode() {
+        let samples: [OnramperError] = [.notInitialized, .timeout, .networkError(code: 500, message: "x"),
+                                        .quoteUnavailable(debugInfo: nil), .paymentFailed("x")]
+        for e in samples {
+            let dto = BridgeMappers.fromNative(e)
+            XCTAssertFalse(dto.userMessage.isEmpty, "\(e)")
+            XCTAssertFalse(dto.supportCode.isEmpty, "\(e)")
+        }
+    }
+
+    func test_pigeonError_carriesDtoInDetails() {
+        let dto = BridgeMappers.fromNative(OnramperError.timeout)
+        let err = BridgeMappers.pigeonError(dto)
+        XCTAssertEqual(err.code, "onramper_error")
+        XCTAssertEqual((err.details as? OnramperErrorDto)?.kind, .timeout)
+    }
+
+    func test_intentInvalidatedDto_hasWrapperCode() {
+        let dto = BridgeMappers.intentInvalidatedDto()
+        XCTAssertEqual(dto.kind, .intentInvalidated)
+        XCTAssertEqual(dto.supportCode, "FLUTTER-INTENT-INVALIDATED")
+    }
 }

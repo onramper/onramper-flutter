@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import 'models/configuration.dart';
 import 'models/errors.dart';
@@ -138,13 +139,16 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   /// Hands the bootstrap [SessionCredentials] to the native SDK so it can
   /// perform attestation and stand up a DPoP-bound session.
+  ///
+  /// Throws [OnramperError] on SDK failure.
   Future<void> initialize({
     required String sessionId,
     required String sessionToken,
   }) {
-    return _host.initialize(
-      SessionCredentialsDto(sessionId: sessionId, sessionToken: sessionToken),
-    );
+    return _guard(() => _host.initialize(
+          SessionCredentialsDto(
+              sessionId: sessionId, sessionToken: sessionToken),
+        ));
   }
 
   /// Requests a checkout intent from the BFF.
@@ -159,16 +163,18 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// Returns the mapped [CheckoutRequirementsResult] and caches its
   /// [CheckoutRequirementsResult.tos] under [tosRequirements] for downstream
   /// UI to render.
+  ///
+  /// Throws [OnramperError] on SDK failure.
   Future<CheckoutRequirementsResult> getCheckoutRequirements(
     CheckoutIntentRequest request, {
     OnramperUserPrefill? prefill,
     CheckoutButtonStyle? buttonStyle,
   }) async {
-    final dto = await _host.getCheckoutRequirements(
-      request.toDto(),
-      prefill?.toDto(),
-      buttonStyle?.toNativeDto(),
-    );
+    final dto = await _guard(() => _host.getCheckoutRequirements(
+          request.toDto(),
+          prefill?.toDto(),
+          buttonStyle?.toNativeDto(),
+        ));
     final result = CheckoutRequirementsResult.fromDto(dto);
     _tosRequirements = result.tos;
     notifyListeners();
@@ -180,7 +186,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     _tosRequirements = null;
     _lastError = null;
     _currentTransactionId = null;
-    await _host.reset();
+    await _guard(_host.reset);
     notifyListeners();
   }
 
@@ -192,7 +198,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> signOut() async {
     _tosRequirements = null;
     _lastError = null;
-    await _host.signOut();
+    await _guard(_host.signOut);
     notifyListeners();
   }
 
@@ -202,7 +208,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// old handle so its native resources are released promptly rather than
   /// waiting for the next [reset] or [dispose].
   Future<void> cancelPreparedIntent(String buttonHandle) {
-    return _host.cancelPreparedIntent(buttonHandle);
+    return _guard(() => _host.cancelPreparedIntent(buttonHandle));
   }
 
   /// Tears down the client, releases native resources, and closes both
@@ -218,6 +224,19 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     await _stateController.close();
     await _eventController.close();
     super.dispose();
+  }
+
+  /// Runs a host call, converting a native `OnramperError` (delivered as a
+  /// PlatformException whose `details` is an [OnramperErrorDto]) into a typed
+  /// [OnramperError]. Other exceptions propagate unchanged.
+  Future<T> _guard<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on PlatformException catch (e) {
+      final details = e.details;
+      if (details is OnramperErrorDto) throw OnramperError.fromDto(details);
+      rethrow;
+    }
   }
 
   // ---- OnramperFlutterApi conformance (native -> Dart) ---------------------

@@ -2,7 +2,8 @@ import '../platform/pigeon.g.dart';
 
 /// Categorical taxonomy of errors emitted by the native SDK.
 ///
-/// Mirrors `OnramperErrorKindDto` 1:1.
+/// Mirrors `OnramperErrorKindDto` 1:1. The last two kinds originate in the
+/// Flutter plugin, not the native SDK.
 enum OnramperErrorKind {
   notInitialized,
   initializationFailed,
@@ -30,6 +31,23 @@ enum OnramperErrorKind {
   deviceBlocked,
   securityStorageFailed,
   securityTrustFailed,
+
+  /// The provider confirmed the payment failed (e.g. card declined).
+  paymentFailed,
+
+  /// The payment surface failed without confirming the outcome. The payment
+  /// may have gone through; follow `userMessage` before retrying.
+  providerFailed,
+
+  /// No Apple Pay card in Wallet on this device.
+  applePayNotConfigured,
+
+  /// A newer `getCheckoutRequirements`, `reset` or `signOut` superseded this
+  /// preparation. Ignore it when waiting for the latest quote.
+  intentInvalidated,
+
+  /// An `OnramperClient` method was called after `dispose()`.
+  clientDisposed,
 }
 
 /// Public, throwable error type exposed by the SDK.
@@ -42,6 +60,8 @@ class OnramperError implements Exception {
     required this.kind,
     required this.message,
     required this.recoverable,
+    this.userMessage = OnramperError.genericUserMessage,
+    this.supportCode = 'FLUTTER-UNSPECIFIED',
     this.code,
     this.minAmount,
     this.maxAmount,
@@ -59,6 +79,8 @@ class OnramperError implements Exception {
         kind: _kindFromDto(dto.kind),
         message: dto.message,
         recoverable: dto.recoverable,
+        userMessage: dto.userMessage,
+        supportCode: dto.supportCode,
         code: dto.code,
         minAmount: dto.minAmount,
         maxAmount: dto.maxAmount,
@@ -72,9 +94,32 @@ class OnramperError implements Exception {
         host: dto.host,
       );
 
+  /// Thrown by `OnramperClient` methods called after `dispose()`.
+  const OnramperError.clientDisposed()
+      : this(
+          kind: OnramperErrorKind.clientDisposed,
+          message: 'This OnramperClient has been disposed. Create a new '
+              'client before making SDK calls.',
+          recoverable: false,
+          userMessage: 'This checkout session has ended. Please reopen '
+              'checkout.',
+          supportCode: 'FLUTTER-CLIENT-DISPOSED',
+        );
+
+  /// Generic end-user copy used when no specific copy is available.
+  static const String genericUserMessage =
+      'Something went wrong. Please try again.';
+
   final OnramperErrorKind kind;
   final String message;
   final bool recoverable;
+
+  /// Plain end-user copy, safe to show users.
+  final String userMessage;
+
+  /// Short stable code, safe to show next to [userMessage] (e.g. "Error code:
+  /// …"). Matches what the native SDK logs.
+  final String supportCode;
   final int? code;
   final double? minAmount;
   final double? maxAmount;
@@ -91,7 +136,7 @@ class OnramperError implements Exception {
   final String? host;
 
   @override
-  String toString() => 'OnramperError(${kind.name}): $message';
+  String toString() => 'OnramperError(${kind.name}, $supportCode): $message';
 
   static OnramperErrorKind _kindFromDto(OnramperErrorKindDto dto) {
     return switch (dto) {
@@ -137,6 +182,13 @@ class OnramperError implements Exception {
         OnramperErrorKind.securityStorageFailed,
       OnramperErrorKindDto.securityTrustFailed =>
         OnramperErrorKind.securityTrustFailed,
+      OnramperErrorKindDto.paymentFailed => OnramperErrorKind.paymentFailed,
+      OnramperErrorKindDto.providerFailed => OnramperErrorKind.providerFailed,
+      OnramperErrorKindDto.applePayNotConfigured =>
+        OnramperErrorKind.applePayNotConfigured,
+      OnramperErrorKindDto.intentInvalidated =>
+        OnramperErrorKind.intentInvalidated,
+      OnramperErrorKindDto.clientDisposed => OnramperErrorKind.clientDisposed,
     };
   }
 }

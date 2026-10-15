@@ -5,10 +5,10 @@ import 'state.dart';
 
 /// Discriminator for events streamed to consumers of [OnramperClient.events].
 ///
-/// The first 9 kinds are the "canonical" SDK events. The last 6
-/// (`checkoutCancelled` … `providerError`) are provider-lifecycle events
-/// forwarded from the third-party checkout webview — not every provider emits
-/// every kind.
+/// The first 9 kinds are the "canonical" SDK events. The rest
+/// (`checkoutCancelled` onwards) are provider-lifecycle events forwarded from
+/// the payment surface — not every provider emits every kind. They are
+/// progress events, not payment completion.
 enum CheckoutEventKind {
   stateChanged,
   checkoutStarted,
@@ -25,6 +25,18 @@ enum CheckoutEventKind {
   paymentProcessing,
   paymentCancelled,
   providerError,
+
+  /// Payment accepted but not yet settled.
+  paymentPending,
+
+  /// 3-D Secure verification started.
+  challengeStarted,
+
+  /// 3-D Secure verification finished.
+  challengeCompleted,
+
+  /// MoonPay guest checkout unavailable; the SDK opens MoonPay onboarding.
+  customerOnboardingRequired,
 }
 
 /// Full finalize response emitted with a [CheckoutEventKind.checkoutFinalized]
@@ -165,6 +177,13 @@ class CheckoutEvent {
         CheckoutEventKindDto.paymentCancelled =>
           CheckoutEventKind.paymentCancelled,
         CheckoutEventKindDto.providerError => CheckoutEventKind.providerError,
+        CheckoutEventKindDto.paymentPending => CheckoutEventKind.paymentPending,
+        CheckoutEventKindDto.challengeStarted =>
+          CheckoutEventKind.challengeStarted,
+        CheckoutEventKindDto.challengeCompleted =>
+          CheckoutEventKind.challengeCompleted,
+        CheckoutEventKindDto.customerOnboardingRequired =>
+          CheckoutEventKind.customerOnboardingRequired,
       };
 
   static CheckoutRequirementKind _reqTypeFromDto(

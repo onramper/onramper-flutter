@@ -100,6 +100,7 @@ enum OnramperStateKindDto {
   readyToCheckout,
   finalizing,
   rendering,
+  paymentPending,
   completed,
   failed,
 }
@@ -120,6 +121,10 @@ enum CheckoutEventKindDto {
   paymentProcessing,
   paymentCancelled,
   providerError,
+  paymentPending,
+  challengeStarted,
+  challengeCompleted,
+  customerOnboardingRequired,
 }
 
 enum OnramperErrorKindDto {
@@ -149,6 +154,11 @@ enum OnramperErrorKindDto {
   deviceBlocked,
   securityStorageFailed,
   securityTrustFailed,
+  paymentFailed,
+  providerFailed,
+  applePayNotConfigured,
+  intentInvalidated,
+  clientDisposed,
 }
 
 class ConfigurationDto {
@@ -912,6 +922,8 @@ class OnramperErrorDto {
   OnramperErrorDto({
     required this.kind,
     required this.message,
+    required this.userMessage,
+    required this.supportCode,
     required this.recoverable,
     this.code,
     this.minAmount,
@@ -929,6 +941,12 @@ class OnramperErrorDto {
   OnramperErrorKindDto kind;
 
   String message;
+
+  /// End-user copy, safe to display.
+  String userMessage;
+
+  /// Short stable code, safe to display next to [userMessage]; matches SDK logs.
+  String supportCode;
 
   bool recoverable;
 
@@ -958,6 +976,8 @@ class OnramperErrorDto {
     return <Object?>[
       kind,
       message,
+      userMessage,
+      supportCode,
       recoverable,
       code,
       minAmount,
@@ -978,18 +998,20 @@ class OnramperErrorDto {
     return OnramperErrorDto(
       kind: result[0]! as OnramperErrorKindDto,
       message: result[1]! as String,
-      recoverable: result[2]! as bool,
-      code: result[3] as int?,
-      minAmount: result[4] as double?,
-      maxAmount: result[5] as double?,
-      retryAfterSeconds: result[6] as double?,
-      field: result[7] as String?,
-      debugInfo: result[8] as String?,
-      fromState: result[9] as String?,
-      toState: result[10] as String?,
-      expectedState: result[11] as String?,
-      actualState: result[12] as String?,
-      host: result[13] as String?,
+      userMessage: result[2]! as String,
+      supportCode: result[3]! as String,
+      recoverable: result[4]! as bool,
+      code: result[5] as int?,
+      minAmount: result[6] as double?,
+      maxAmount: result[7] as double?,
+      retryAfterSeconds: result[8] as double?,
+      field: result[9] as String?,
+      debugInfo: result[10] as String?,
+      fromState: result[11] as String?,
+      toState: result[12] as String?,
+      expectedState: result[13] as String?,
+      actualState: result[14] as String?,
+      host: result[15] as String?,
     );
   }
 }

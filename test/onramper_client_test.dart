@@ -130,6 +130,51 @@ void main() {
       await client.dispose();
     });
 
+    test('host PlatformException carrying OnramperErrorDto rethrows typed',
+        () async {
+      final fakeHost = FakeOnramperHostApi()
+        ..nextGetRequirementsError = PlatformException(
+          code: 'onramper_error',
+          message: 'quote unavailable',
+          details: OnramperErrorDto(
+            kind: OnramperErrorKindDto.quoteUnavailable,
+            message: 'quote unavailable',
+            userMessage: 'No quote is available right now.',
+            supportCode: 'quoteUnavailable',
+            recoverable: true,
+          ),
+        );
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.quoteUnavailable)
+            .having((e) => e.supportCode, 'supportCode', 'quoteUnavailable')),
+      );
+      await client.dispose();
+    });
+
+    test('non-Onramper PlatformException passes through unchanged', () async {
+      final fakeHost = FakeOnramperHostApi()
+        ..nextGetRequirementsError =
+            PlatformException(code: 'not_configured', message: 'x');
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<PlatformException>()
+            .having((e) => e.code, 'code', 'not_configured')),
+      );
+      await client.dispose();
+    });
+
     test('getCheckoutRequirements forwards prefill', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
@@ -272,6 +317,8 @@ void main() {
       client.debugDispatchError(OnramperErrorDto(
         kind: OnramperErrorKindDto.timeout,
         message: 'gateway timeout',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: true,
       ));
       await Future<void>.delayed(Duration.zero);
@@ -291,6 +338,8 @@ void main() {
       client.debugDispatchError(OnramperErrorDto(
         kind: OnramperErrorKindDto.securityTrustFailed,
         message: 'trust failed',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: false,
         host: 'api.example.com',
       ));
@@ -359,6 +408,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
   SessionCredentialsDto? lastProvidedCredentials;
   String? lastFailReason;
   String? lastCancelledHandle;
+  Object? nextGetRequirementsError;
 
   @override
   // ignore: non_constant_identifier_names
@@ -385,6 +435,8 @@ class FakeOnramperHostApi implements OnramperHostApi {
     UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   ) async {
+    final error = nextGetRequirementsError;
+    if (error != null) throw error;
     lastPrefillDto = prefill;
     lastButtonStyleDto = buttonStyle;
     return nextRequirementsResult ??

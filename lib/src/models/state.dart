@@ -13,6 +13,10 @@ enum OnramperStateKind {
   readyToCheckout,
   finalizing,
   rendering,
+
+  /// Payment accepted; settlement pending. Neither success nor failure —
+  /// track with `OnramperClient.currentTransactionId`.
+  paymentPending,
   completed,
   failed,
 }
@@ -101,6 +105,7 @@ class OnramperState {
           OnramperStateKind.readyToCheckout,
         OnramperStateKindDto.finalizing => OnramperStateKind.finalizing,
         OnramperStateKindDto.rendering => OnramperStateKind.rendering,
+        OnramperStateKindDto.paymentPending => OnramperStateKind.paymentPending,
         OnramperStateKindDto.completed => OnramperStateKind.completed,
         OnramperStateKindDto.failed => OnramperStateKind.failed,
       };

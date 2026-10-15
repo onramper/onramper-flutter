@@ -8,6 +8,8 @@ void main() {
       final dto = OnramperErrorDto(
         kind: OnramperErrorKindDto.amountOutOfRange,
         message: 'amount too low',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: true,
         code: 42,
         minAmount: 10.0,
@@ -44,6 +46,8 @@ void main() {
       final dto = OnramperErrorDto(
         kind: OnramperErrorKindDto.securityTrustFailed,
         message: 'trust',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: false,
         host: 'api.onramper.com',
       );
@@ -56,6 +60,8 @@ void main() {
       final dto = OnramperErrorDto(
         kind: OnramperErrorKindDto.networkError,
         message: 'oops',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: false,
       );
 
@@ -79,6 +85,8 @@ void main() {
         final dto = OnramperErrorDto(
           kind: dtoKind,
           message: 'm',
+          userMessage: 'Something went wrong. Please try again.',
+          supportCode: 'test',
           recoverable: false,
         );
         final err = OnramperError.fromDto(dto);
@@ -110,5 +118,38 @@ void main() {
       expect(s, contains('amountOutOfRange'));
       expect(s, contains('amount too low'));
     });
+  });
+
+  test('maps userMessage and supportCode', () {
+    final err = OnramperError.fromDto(OnramperErrorDto(
+      kind: OnramperErrorKindDto.paymentFailed,
+      message: 'card declined',
+      userMessage: 'Your payment was declined.',
+      supportCode: 'paymentFailed',
+      recoverable: true,
+    ));
+    expect(err.kind, OnramperErrorKind.paymentFailed);
+    expect(err.userMessage, 'Your payment was declined.');
+    expect(err.supportCode, 'paymentFailed');
+  });
+
+  test('every DTO kind maps to the same-named Dart kind', () {
+    for (final dto in OnramperErrorKindDto.values) {
+      final err = OnramperError.fromDto(OnramperErrorDto(
+        kind: dto,
+        message: 'm',
+        userMessage: 'u',
+        supportCode: 's',
+        recoverable: false,
+      ));
+      expect(err.kind.name, dto.name);
+    }
+  });
+
+  test('clientDisposed carries wrapper support code and copy', () {
+    const err = OnramperError.clientDisposed();
+    expect(err.kind, OnramperErrorKind.clientDisposed);
+    expect(err.supportCode, 'FLUTTER-CLIENT-DISPOSED');
+    expect(err.userMessage, isNotEmpty);
   });
 }

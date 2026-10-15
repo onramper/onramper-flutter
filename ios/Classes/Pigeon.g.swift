@@ -142,8 +142,9 @@ enum OnramperStateKindDto: Int {
   case readyToCheckout = 6
   case finalizing = 7
   case rendering = 8
-  case completed = 9
-  case failed = 10
+  case paymentPending = 9
+  case completed = 10
+  case failed = 11
 }
 
 enum CheckoutEventKindDto: Int {
@@ -162,6 +163,10 @@ enum CheckoutEventKindDto: Int {
   case paymentProcessing = 12
   case paymentCancelled = 13
   case providerError = 14
+  case paymentPending = 15
+  case challengeStarted = 16
+  case challengeCompleted = 17
+  case customerOnboardingRequired = 18
 }
 
 enum OnramperErrorKindDto: Int {
@@ -191,6 +196,11 @@ enum OnramperErrorKindDto: Int {
   case deviceBlocked = 23
   case securityStorageFailed = 24
   case securityTrustFailed = 25
+  case paymentFailed = 26
+  case providerFailed = 27
+  case applePayNotConfigured = 28
+  case intentInvalidated = 29
+  case clientDisposed = 30
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
@@ -869,6 +879,10 @@ struct CheckoutEventDto {
 struct OnramperErrorDto {
   var kind: OnramperErrorKindDto
   var message: String
+  /// End-user copy, safe to display.
+  var userMessage: String
+  /// Short stable code, safe to display next to [userMessage]; matches SDK logs.
+  var supportCode: String
   var recoverable: Bool
   var code: Int64? = nil
   var minAmount: Double? = nil
@@ -887,22 +901,26 @@ struct OnramperErrorDto {
   static func fromList(_ pigeonVar_list: [Any?]) -> OnramperErrorDto? {
     let kind = pigeonVar_list[0] as! OnramperErrorKindDto
     let message = pigeonVar_list[1] as! String
-    let recoverable = pigeonVar_list[2] as! Bool
-    let code: Int64? = nilOrValue(pigeonVar_list[3])
-    let minAmount: Double? = nilOrValue(pigeonVar_list[4])
-    let maxAmount: Double? = nilOrValue(pigeonVar_list[5])
-    let retryAfterSeconds: Double? = nilOrValue(pigeonVar_list[6])
-    let field: String? = nilOrValue(pigeonVar_list[7])
-    let debugInfo: String? = nilOrValue(pigeonVar_list[8])
-    let fromState: String? = nilOrValue(pigeonVar_list[9])
-    let toState: String? = nilOrValue(pigeonVar_list[10])
-    let expectedState: String? = nilOrValue(pigeonVar_list[11])
-    let actualState: String? = nilOrValue(pigeonVar_list[12])
-    let host: String? = nilOrValue(pigeonVar_list[13])
+    let userMessage = pigeonVar_list[2] as! String
+    let supportCode = pigeonVar_list[3] as! String
+    let recoverable = pigeonVar_list[4] as! Bool
+    let code: Int64? = nilOrValue(pigeonVar_list[5])
+    let minAmount: Double? = nilOrValue(pigeonVar_list[6])
+    let maxAmount: Double? = nilOrValue(pigeonVar_list[7])
+    let retryAfterSeconds: Double? = nilOrValue(pigeonVar_list[8])
+    let field: String? = nilOrValue(pigeonVar_list[9])
+    let debugInfo: String? = nilOrValue(pigeonVar_list[10])
+    let fromState: String? = nilOrValue(pigeonVar_list[11])
+    let toState: String? = nilOrValue(pigeonVar_list[12])
+    let expectedState: String? = nilOrValue(pigeonVar_list[13])
+    let actualState: String? = nilOrValue(pigeonVar_list[14])
+    let host: String? = nilOrValue(pigeonVar_list[15])
 
     return OnramperErrorDto(
       kind: kind,
       message: message,
+      userMessage: userMessage,
+      supportCode: supportCode,
       recoverable: recoverable,
       code: code,
       minAmount: minAmount,
@@ -921,6 +939,8 @@ struct OnramperErrorDto {
     return [
       kind,
       message,
+      userMessage,
+      supportCode,
       recoverable,
       code,
       minAmount,
