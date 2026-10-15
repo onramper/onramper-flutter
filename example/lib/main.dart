@@ -83,6 +83,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   OnramperLogLevel _logLevel = OnramperLogLevel.info;
   BuyForm _form = const BuyForm(wallet: _walletAddress);
   SessionInitializer _session = SessionInitializer();
+  int _prepareGeneration = 0;
   String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
   String? _statusMessage;
@@ -147,7 +148,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   Future<void> _rebuildClient(String reason, VoidCallback apply) async {
     await _eventSub?.cancel();
     final old = _client;
-    setState(() {
+    _update(() {
       _client = null;
       _requirements = null;
       apply();
@@ -182,13 +183,13 @@ class _ExampleHomeState extends State<ExampleHome> {
     });
     try {
       await action(client);
-      setState(() => _statusMessage = '$label OK');
+      _update(() => _statusMessage = '$label OK');
     } on OnramperError catch (e) {
-      setState(() => _errorMessage = _describe(e));
+      _update(() => _errorMessage = _describe(e));
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      _update(() => _errorMessage = e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _update(() => _busy = false);
     }
   }
 
@@ -215,7 +216,7 @@ class _ExampleHomeState extends State<ExampleHome> {
 
   void _onEvent(CheckoutEvent event) {
     final client = _client;
-    setState(() {
+    _update(() {
       switch (event.kind) {
         case CheckoutEventKind.paymentPending:
           _statusMessage = 'payment processing — transaction '
@@ -236,10 +237,17 @@ class _ExampleHomeState extends State<ExampleHome> {
   String _describe(OnramperError e) =>
       '${e.userMessage}\nError code: ${e.supportCode}';
 
+  /// setState for async callbacks: the screen may be gone by the time an
+  /// SDK call returns.
+  void _update(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
   Future<void> _prepareCheckout() async {
     final client = _client;
     final request = _form.toRequest();
     if (client == null || request == null) return;
+    final generation = ++_prepareGeneration;
     setState(() {
       _busy = true;
       // Hide the previous button: once a new preparation starts, the old one
@@ -253,35 +261,36 @@ class _ExampleHomeState extends State<ExampleHome> {
       await _session.ensureInitialized(() async {
         final credentials =
             await SessionTokenService.fetch(authToken: _demoAuthToken);
-        setState(() => _statusMessage = 'initializing…');
+        _update(() => _statusMessage = 'initializing…');
         await client.initialize(
           sessionId: credentials.sessionId,
           sessionToken: credentials.sessionToken,
         );
       });
-      setState(() => _statusMessage = 'fetching checkout requirements…');
+      _update(() => _statusMessage = 'fetching checkout requirements…');
       final requirements = await client.getCheckoutRequirements(
         request,
         prefill: _prefill.build(),
       );
-      setState(() {
+      _update(() {
         _requirements = requirements;
         _statusMessage = 'ready — tap Buy';
       });
     } on OnramperError catch (e) {
       // Superseded by a newer "New quote" tap; the newer call reports.
       if (e.kind == OnramperErrorKind.intentInvalidated) return;
-      setState(() {
+      _update(() {
         _errorMessage = _describe(e);
         _statusMessage = null;
       });
     } catch (e) {
-      setState(() {
+      _update(() {
         _errorMessage = e.toString();
         _statusMessage = null;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      // A superseded prepare must not clear the busy state of a newer one.
+      if (generation == _prepareGeneration) _update(() => _busy = false);
     }
   }
 

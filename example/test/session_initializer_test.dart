@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter_example/session_initializer.dart';
 
@@ -22,5 +24,19 @@ void main() {
     );
     await s.ensureInitialized(() async => calls++);
     expect(calls, 2);
+  });
+
+  test('overlapping prepares share one initialize', () async {
+    var calls = 0;
+    final gate = Completer<void>();
+    final s = SessionInitializer();
+    final a = s.ensureInitialized(() async {
+      calls++;
+      await gate.future;
+    });
+    final b = s.ensureInitialized(() async => calls++);
+    gate.complete();
+    await Future.wait([a, b]);
+    expect(calls, 1);
   });
 }
