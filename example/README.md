@@ -25,6 +25,11 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
 - Observing `client.events` in real time, with pending payments shown separately
   from completion and failures shown as `userMessage` + support code
 - Rendering the self-sizing `OnramperCheckoutButton`
+- **Environment** selector (Development / Production, default Development):
+  each uses its own `.env` keys (`ONRAMPER_DEV_*` / `ONRAMPER_PROD_*`, see
+  `.env.example`) and demo session endpoint (`demo-stg.onramper.dev` /
+  `demo-prod.onramper.com`); switching rebuilds the client. A banner lists any
+  keys missing for the selected environment.
 - **Crypto** selector (BTC / ETH / SOL) with predefined demo wallets, plus
   editable **amount** and **wallet** fields (switching crypto restores its
   demo wallet)

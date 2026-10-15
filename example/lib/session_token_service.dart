@@ -5,38 +5,40 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:onramper_flutter/onramper_flutter.dart';
 
-/// Mints demo `sessionId`/`sessionToken` pairs by hitting the Onramper staging
-/// demo BFF. The bearer token is injected at build time via `--dart-define`,
-/// never hard-coded.
+/// Mints demo `sessionId`/`sessionToken` pairs from the selected environment's
+/// Onramper demo endpoint. The bearer token is injected at build time via
+/// `--dart-define`, never hard-coded.
 ///
 /// In production your backend would call
 /// `POST {upstream}/partners/v2/{apiKey}/client-sessions` signed with your
 /// Ed25519 partner key — see `doc/BACKEND_SESSION_ENDPOINT.md` in the plugin
 /// repo for a reference implementation.
 class SessionTokenService {
-  static const _endpoint = 'https://demo-stg.onramper.dev/demo/create-session';
-
-  static Future<SessionCredentials> fetch({required String authToken}) async {
+  static Future<SessionCredentials> fetch({
+    required String authToken,
+    required String endpoint,
+  }) async {
     if (authToken.isEmpty) {
       throw const FormatException(
-        'ONRAMPER_DEMO_AUTH_TOKEN is not set — pass it via --dart-define.',
+        'The demo auth token for this environment is not set — add it to '
+        'example/.env (see .env.example).',
       );
     }
 
     final masked = authToken.length <= 8
         ? '****'
         : '${authToken.substring(0, 4)}…${authToken.substring(authToken.length - 4)}';
-    debugPrint('SessionTokenService: POST $_endpoint (token=$masked)');
+    debugPrint('SessionTokenService: POST $endpoint (token=$masked)');
 
     final response = await http.post(
-      Uri.parse(_endpoint),
+      Uri.parse(endpoint),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $authToken',
       },
       body: jsonEncode({
-        'scope': ['quotes:read', 'checkout:write'],
+        'scope': ['quotes:read', 'checkout:read', 'checkout:write'],
       }),
     );
 

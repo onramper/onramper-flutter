@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
 import 'buy_form.dart';
+import 'demo_environment.dart';
 import 'ios_diagnostics.dart';
 import 'log_buffer.dart';
 import 'log_viewer_sheet.dart';
@@ -98,18 +99,11 @@ class _ExampleHomeState extends State<ExampleHome> {
   bool _busy = false;
   IosAppIdentifiers? _appIdentifiers;
 
-  static const _apiKey = String.fromEnvironment(
-    'ONRAMPER_API_KEY',
-    defaultValue: '',
-  );
-  static const _clientId = String.fromEnvironment(
-    'ONRAMPER_CLIENT_ID',
-    defaultValue: '',
-  );
-  static const _demoAuthToken = String.fromEnvironment(
-    'ONRAMPER_DEMO_AUTH_TOKEN',
-    defaultValue: '',
-  );
+  DemoEnvironment _environment = DemoEnvironment.development;
+
+  /// Selected environment with its `.env` secrets.
+  ResolvedEnvironment get _env => _environment.resolve(demoDefines);
+
   static const _walletAddress = String.fromEnvironment(
     'ONRAMPER_WALLET_ADDRESS',
     defaultValue: 'Br2jjHYskB1JJikv3Qw2QcmWVQGfZvkJFng4ZEwiGSjv',
@@ -135,9 +129,9 @@ class _ExampleHomeState extends State<ExampleHome> {
   OnramperClient _buildClient() {
     final client = OnramperClient(
       configuration: OnramperConfiguration(
-        apiKey: _apiKey,
-        clientId: _clientId,
-        environment: OnramperEnvironment.development,
+        apiKey: _env.apiKey,
+        clientId: _env.clientId,
+        environment: _env.sdkEnvironment,
         theme: widget.darkMode.value ? OnramperTheme.dark : OnramperTheme.light,
         logLevel: _logLevel,
         logHandler: _logs.add,
@@ -151,7 +145,10 @@ class _ExampleHomeState extends State<ExampleHome> {
 
   Future<SessionCredentials> _fetchSessionCredentials() =>
       widget.sessionCredentialsProvider?.call() ??
-      SessionTokenService.fetch(authToken: _demoAuthToken);
+      SessionTokenService.fetch(
+        authToken: _env.demoToken,
+        endpoint: _env.sessionEndpoint,
+      );
 
   /// Log level and theme are fixed at configure time, so changing either
   /// rebuilds the client and drops the current quote.
@@ -182,6 +179,12 @@ class _ExampleHomeState extends State<ExampleHome> {
   Future<void> _changeLogLevel(OnramperLogLevel level) async {
     if (level == _logLevel) return;
     await _rebuildClient('log level → ${level.name}', () => _logLevel = level);
+  }
+
+  Future<void> _changeEnvironment(DemoEnvironment environment) async {
+    if (environment == _environment) return;
+    await _rebuildClient(
+        'environment → ${environment.label}', () => _environment = environment);
   }
 
   Future<void> _changeDarkMode(bool dark) async {
@@ -341,6 +344,20 @@ class _ExampleHomeState extends State<ExampleHome> {
               const SizedBox(height: 8),
               Row(
                 children: [
+                  const Expanded(child: Text('Environment')),
+                  SegmentedButton<DemoEnvironment>(
+                    segments: [
+                      for (final e in DemoEnvironment.values)
+                        ButtonSegment(value: e, label: Text(e.label)),
+                    ],
+                    selected: {_environment},
+                    onSelectionChanged:
+                        _busy ? null : (s) => _changeEnvironment(s.first),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
                   const Expanded(
                     child: Text(
                       'SDK log level (rebuilds client; needs a new quote)',
@@ -441,12 +458,12 @@ class _ExampleHomeState extends State<ExampleHome> {
   }
 
   Widget _buildHeader() {
-    if (_apiKey.isEmpty || _clientId.isEmpty || _demoAuthToken.isEmpty) {
-      return const _MissingEnvBanner();
-    }
+    final env = _env;
+    if (!env.isComplete) return _MissingEnvBanner(env: env);
     return Text(
       'Buy ${_form.amount.trim()} ${_form.fiat.label} of '
-      '${_form.crypto.symbol} via Apple Pay (sandbox). Tap "Prepare checkout" '
+      '${_form.crypto.symbol} via Apple Pay (${_environment.label}). Tap '
+      '"Prepare checkout" '
       'to mint a demo session and fetch requirements.',
       style: const TextStyle(fontSize: 14),
     );
@@ -484,7 +501,9 @@ class _IdentifiersBanner extends StatelessWidget {
 }
 
 class _MissingEnvBanner extends StatelessWidget {
-  const _MissingEnvBanner();
+  const _MissingEnvBanner({required this.env});
+
+  final ResolvedEnvironment env;
 
   @override
   Widget build(BuildContext context) {
@@ -494,11 +513,12 @@ class _MissingEnvBanner extends StatelessWidget {
         color: Theme.of(context).colorScheme.tertiaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Text(
-        'Pass ONRAMPER_API_KEY, ONRAMPER_CLIENT_ID, and ONRAMPER_DEMO_AUTH_TOKEN '
-        'via --dart-define before running. The demo auth token authorises the '
-        'session-minting endpoint at demo-stg.onramper.dev.',
-        style: TextStyle(fontSize: 12),
+      child: Text(
+        '${env.environment.label} is missing ${env.missing.join(', ')}. Add '
+        'them to example/.env (see .env.example) and run with '
+        '--dart-define-from-file=.env. The demo auth token authorises '
+        '${Uri.parse(env.sessionEndpoint).host}.',
+        style: const TextStyle(fontSize: 12),
       ),
     );
   }
