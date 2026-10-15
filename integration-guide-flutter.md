@@ -183,7 +183,7 @@ Prefill is best-effort and never blocks sign-in. Blank fields are ignored. A pre
 
 ### Re-quoting
 
-Calling `getCheckoutRequirements` again (or `reset()` / `signOut()`) supersedes an earlier call that's still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest quote. Buttons from earlier calls that weren't shown yet are released and render nothing. Prepared buttons expire after 5 minutes.
+Calling `getCheckoutRequirements` again (or `reset()` / `signOut()`) supersedes an earlier call that's still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest quote. Buttons from earlier calls that weren't shown yet are released and render nothing. Prepared buttons expire after 5 minutes. A button that's already on screen can't be recalled, so hide it while you re-quote and show the new `requirements` when the call returns.
 
 ## 6. Render the button
 

@@ -174,6 +174,9 @@ class _ExampleHomeState extends State<ExampleHome> {
     if (client == null) return;
     setState(() {
       _busy = true;
+      // Hide the previous button: once a new preparation starts, the old one
+      // no longer addresses the current checkout.
+      _requirements = null;
       _errorMessage = null;
       _statusMessage = 'minting session…';
     });
