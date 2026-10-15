@@ -1,18 +1,28 @@
-// Minimal example demonstrating the four-step onramper_sdk integration:
+// Example demonstrating the onramper_flutter integration:
 //
 //   1. Create an OnramperClient with your API key, client ID, and a
 //      sessionExpirationHandler that mints credentials from your backend.
 //   2. Call client.initialize() with a fresh (sessionId, sessionToken) pair.
-//   3. Call client.getCheckoutRequirements() to fetch the quote + requirements.
+//   3. Call client.getCheckoutRequirements() to fetch the quote + requirements
+//      (optionally with prefill from the "Prefill (optional)" form).
 //   4. Embed OnramperCheckoutButton — it handles login, finalize, and payment.
+//
+// Also shows: plugin/SDK versions and the current transaction id, a
+// "New quote" button (re-quotes; superseded calls are ignored), and an SDK
+// log viewer (app-bar icon) fed by OnramperConfiguration.logHandler.
 //
 // Credentials are injected at build time via --dart-define-from-file=.env.
 // See the README for setup instructions.
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
 import 'ios_diagnostics.dart';
+import 'log_buffer.dart';
+import 'log_viewer_sheet.dart';
+import 'prefill_form.dart';
 import 'session_token_service.dart';
 
 void main() => runApp(const ExampleApp());
@@ -37,7 +47,12 @@ class ExampleHome extends StatefulWidget {
 }
 
 class _ExampleHomeState extends State<ExampleHome> {
-  late final OnramperClient _client;
+  OnramperClient? _client;
+  StreamSubscription<CheckoutEvent>? _eventSub;
+  final LogBuffer _logs = LogBuffer();
+  final PrefillController _prefill = PrefillController();
+  OnramperLogLevel _logLevel = OnramperLogLevel.info;
+  String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
   String? _statusMessage;
   String? _errorMessage;
@@ -64,18 +79,50 @@ class _ExampleHomeState extends State<ExampleHome> {
   @override
   void initState() {
     super.initState();
-    _client = OnramperClient(
-      configuration: const OnramperConfiguration(
+    _client = _buildClient();
+    _loadAppIdentifiers();
+    _loadSdkVersion();
+  }
+
+  Future<void> _loadSdkVersion() async {
+    try {
+      final v = await OnramperClient.sdkVersion();
+      if (mounted) setState(() => _sdkVersion = v);
+    } catch (e) {
+      debugPrint('sdkVersion failed: $e');
+    }
+  }
+
+  OnramperClient _buildClient() {
+    final client = OnramperClient(
+      configuration: OnramperConfiguration(
         apiKey: _apiKey,
         clientId: _clientId,
         environment: OnramperEnvironment.development,
-        logLevel: OnramperLogLevel.debug,
+        logLevel: _logLevel,
+        logHandler: _logs.add,
       ),
       sessionExpirationHandler: () =>
           SessionTokenService.fetch(authToken: _demoAuthToken),
     );
-    _client.events.listen(_onEvent);
-    _loadAppIdentifiers();
+    _eventSub = client.events.listen(_onEvent);
+    return client;
+  }
+
+  /// Log level is fixed at configure time, so changing it rebuilds the client
+  /// and drops the current quote.
+  Future<void> _changeLogLevel(OnramperLogLevel level) async {
+    if (level == _logLevel) return;
+    await _eventSub?.cancel();
+    final old = _client;
+    setState(() {
+      _client = null;
+      _requirements = null;
+      _logLevel = level;
+      _statusMessage = 'log level → ${level.name}; prepare a new quote';
+    });
+    await old?.dispose();
+    if (mounted) setState(() => _client = _buildClient());
   }
 
   Future<void> _loadAppIdentifiers() async {
@@ -92,15 +139,39 @@ class _ExampleHomeState extends State<ExampleHome> {
 
   @override
   void dispose() {
-    _client.dispose();
+    _eventSub?.cancel();
+    _client?.dispose();
+    _logs.dispose();
+    _prefill.dispose();
     super.dispose();
   }
 
   void _onEvent(CheckoutEvent event) {
-    setState(() => _statusMessage = 'event: ${event.kind.name}');
+    final client = _client;
+    setState(() {
+      switch (event.kind) {
+        case CheckoutEventKind.paymentPending:
+          _statusMessage = 'payment processing — transaction '
+              '${client?.currentTransactionId ?? '—'}';
+        case CheckoutEventKind.completed:
+          _statusMessage = 'completed — transaction '
+              '${client?.currentTransactionId ?? '—'}';
+        case CheckoutEventKind.failed:
+          final e = event.error;
+          _statusMessage = 'event: failed';
+          if (e != null) _errorMessage = _describe(e);
+        default:
+          _statusMessage = 'event: ${event.kind.name}';
+      }
+    });
   }
 
+  String _describe(OnramperError e) =>
+      '${e.userMessage}\nError code: ${e.supportCode}';
+
   Future<void> _prepareCheckout() async {
+    final client = _client;
+    if (client == null) return;
     setState(() {
       _busy = true;
       _errorMessage = null;
@@ -110,12 +181,12 @@ class _ExampleHomeState extends State<ExampleHome> {
       final credentials =
           await SessionTokenService.fetch(authToken: _demoAuthToken);
       setState(() => _statusMessage = 'initializing…');
-      await _client.initialize(
+      await client.initialize(
         sessionId: credentials.sessionId,
         sessionToken: credentials.sessionToken,
       );
       setState(() => _statusMessage = 'fetching checkout requirements…');
-      final requirements = await _client.getCheckoutRequirements(
+      final requirements = await client.getCheckoutRequirements(
         const CheckoutIntentRequest(
           transactionData: OnramperTransactionData(
             source: 'usd',
@@ -128,14 +199,17 @@ class _ExampleHomeState extends State<ExampleHome> {
             wallet: WalletInfo(network: 'solana', address: _walletAddress),
           ),
         ),
+        prefill: _prefill.build(),
       );
       setState(() {
         _requirements = requirements;
         _statusMessage = 'ready — tap Buy';
       });
     } on OnramperError catch (e) {
+      // Superseded by a newer "New quote" tap; the newer call reports.
+      if (e.kind == OnramperErrorKind.intentInvalidated) return;
       setState(() {
-        _errorMessage = '${e.kind.name}: ${e.message}';
+        _errorMessage = _describe(e);
         _statusMessage = null;
       });
     } catch (e) {
@@ -150,29 +224,73 @@ class _ExampleHomeState extends State<ExampleHome> {
 
   @override
   Widget build(BuildContext context) {
+    final client = _client;
     return Scaffold(
-      appBar: AppBar(title: const Text('Onramper SDK example')),
+      appBar: AppBar(
+        title: const Text('Onramper SDK example'),
+        actions: [
+          IconButton(
+            tooltip: 'SDK logs',
+            icon: const Icon(Icons.article_outlined),
+            onPressed: () => showLogViewer(context, _logs),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_appIdentifiers != null)
                 _IdentifiersBanner(identifiers: _appIdentifiers!),
-              if (_appIdentifiers != null) const SizedBox(height: 12),
+              if (_appIdentifiers != null) const SizedBox(height: 4),
+              _VersionsBanner(sdkVersion: _sdkVersion, client: client),
+              const SizedBox(height: 12),
               _buildHeader(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'SDK log level (rebuilds client; needs a new quote)',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  DropdownButton<OnramperLogLevel>(
+                    value: _logLevel,
+                    onChanged: _busy
+                        ? null
+                        : (v) {
+                            if (v != null) _changeLogLevel(v);
+                          },
+                    items: const [
+                      OnramperLogLevel.off,
+                      OnramperLogLevel.error,
+                      OnramperLogLevel.info,
+                      OnramperLogLevel.debug,
+                    ]
+                        .map((l) =>
+                            DropdownMenuItem(value: l, child: Text(l.name)))
+                        .toList(),
+                  ),
+                ],
+              ),
+              PrefillForm(controller: _prefill),
+              const SizedBox(height: 16),
               if (_requirements == null)
                 ElevatedButton(
-                  onPressed: _busy ? null : _prepareCheckout,
+                  onPressed: _busy || client == null ? null : _prepareCheckout,
                   child: Text(_busy ? 'Preparing…' : 'Prepare checkout'),
                 )
-              else
-                OnramperCheckoutButton(
-                  requirements: _requirements!,
+              else ...[
+                OnramperCheckoutButton(requirements: _requirements!),
+                TextButton(
+                  onPressed: _busy ? null : _prepareCheckout,
+                  child: const Text('New quote'),
                 ),
-              const SizedBox(height: 24),
+              ],
+              const SizedBox(height: 16),
               if (_statusMessage != null) Text('Status: $_statusMessage'),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 8),
@@ -243,6 +361,41 @@ class _MissingEnvBanner extends StatelessWidget {
         'via --dart-define before running. The demo auth token authorises the '
         'session-minting endpoint at demo-stg.onramper.dev.',
         style: TextStyle(fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _VersionsBanner extends StatelessWidget {
+  const _VersionsBanner({required this.sdkVersion, required this.client});
+
+  final String? sdkVersion;
+  final OnramperClient? client;
+
+  @override
+  Widget build(BuildContext context) {
+    const mono = TextStyle(fontSize: 12, fontFamily: 'Courier');
+    final c = client;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade50,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Plugin: ${OnramperClient.wrapperVersion}', style: mono),
+          Text('SDK:    ${sdkVersion ?? '…'}', style: mono),
+          if (c != null)
+            ListenableBuilder(
+              listenable: c,
+              builder: (_, __) => SelectableText(
+                'Txn:    ${c.currentTransactionId ?? '—'}',
+                style: mono,
+              ),
+            ),
+        ],
       ),
     );
   }
