@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:onramper_flutter/src/models/provider_json.dart';
 import 'package:onramper_flutter/src/models/quote.dart';
 import 'package:onramper_flutter/src/platform/pigeon.g.dart';
 
@@ -60,5 +61,44 @@ void main() {
 
       expect(() => q.recommendations!.add('b'), throwsUnsupportedError);
     });
+  });
+
+  test('maps providerContext and paymentDisclosures', () {
+    final q = QuoteResponse.fromDto(QuoteDto(
+      quoteId: 'q',
+      ramp: 'moonpay',
+      rate: 1,
+      networkFee: 0,
+      transactionFee: 0,
+      payout: 1,
+      paymentMethod: 'applepay',
+      providerContext: {
+        'executable': true,
+        'paymentDisclosures': [
+          {
+            'code': 'c',
+            'version': '1',
+            'contentMarkdown': 'm',
+            'contentHtml': 'h',
+          },
+        ],
+      },
+    ));
+    expect((q.providerContext!['executable'] as ProviderJSONBool).value, true);
+    expect(q.paymentDisclosures.single.code, 'c');
+  });
+
+  test('paymentDisclosures is empty without providerContext', () {
+    final q = QuoteResponse.fromDto(QuoteDto(
+      quoteId: 'q',
+      ramp: 'r',
+      rate: 1,
+      networkFee: 0,
+      transactionFee: 0,
+      payout: 1,
+      paymentMethod: 'p',
+    ));
+    expect(q.providerContext, isNull);
+    expect(q.paymentDisclosures, isEmpty);
   });
 }

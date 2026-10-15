@@ -983,4 +983,21 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(dto.context, ["ramp": "moonpay"])
         XCTAssertEqual(dto.message, "checkout.finalized ramp=moonpay")
     }
+
+    // MARK: - providerContext
+
+    func test_quote_providerContext_mapsToPlainJSON() {
+        let native = QuoteResponse(
+            quoteId: "q", ramp: "moonpay", rate: 1, payout: 1, paymentMethod: "applepay",
+            networkFee: 0, transactionFee: 0,
+            providerContext: ["executable": .bool(true), "limits": .object(["max": .number(500)]),
+                              "list": .array([.string("a"), .null])]
+        )
+        let ctx = BridgeMappers.fromNative(native).providerContext!
+        XCTAssertEqual(ctx["executable"] as? Bool, true)
+        XCTAssertEqual((ctx["limits"] as? [String: Any])?["max"] as? Double, 500)
+        let list = ctx["list"] as? [Any]
+        XCTAssertEqual(list?.first as? String, "a")
+        XCTAssertTrue(list?.last is NSNull)
+    }
 }

@@ -89,8 +89,23 @@ enum BridgeMappers {
             transactionFee: native.transactionFee,
             payout: native.payout,
             paymentMethod: native.paymentMethod,
-            recommendations: native.recommendations
+            recommendations: native.recommendations,
+            providerContext: native.providerContext?.mapValues { jsonObject($0) }
         )
+    }
+
+    /// Converts a provider JSON value into standard-codec values. `.null`
+    /// becomes NSNull so it survives inside collections.
+    static func jsonObject(_ value: ProviderJSONValue) -> Any {
+        switch value {
+        case .string(let s): return s
+        case .number(let d): return d
+        case .bool(let b):   return b
+        case .null:          return NSNull()
+        case .array(let a):  return a.map { jsonObject($0) }
+        case .object(let o): return o.mapValues { jsonObject($0) }
+        @unknown default:    return NSNull()
+        }
     }
 
     // MARK: - CheckoutIntentRequest inputs (Dart -> Swift)

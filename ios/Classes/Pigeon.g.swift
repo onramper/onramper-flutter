@@ -463,6 +463,10 @@ struct QuoteDto {
   var payout: Double
   var paymentMethod: String
   var recommendations: [String]? = nil
+  /// Provider-specific JSON. Values are String, double, bool, null, List or
+  /// Map (recursively). Pigeon can't model recursive types, so the standard
+  /// codec carries the raw structure.
+  var providerContext: [String: Any?]? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -475,6 +479,7 @@ struct QuoteDto {
     let payout = pigeonVar_list[5] as! Double
     let paymentMethod = pigeonVar_list[6] as! String
     let recommendations: [String]? = nilOrValue(pigeonVar_list[7])
+    let providerContext: [String: Any?]? = nilOrValue(pigeonVar_list[8])
 
     return QuoteDto(
       quoteId: quoteId,
@@ -484,7 +489,8 @@ struct QuoteDto {
       transactionFee: transactionFee,
       payout: payout,
       paymentMethod: paymentMethod,
-      recommendations: recommendations
+      recommendations: recommendations,
+      providerContext: providerContext
     )
   }
   func toList() -> [Any?] {
@@ -497,6 +503,7 @@ struct QuoteDto {
       payout,
       paymentMethod,
       recommendations,
+      providerContext,
     ]
   }
 }

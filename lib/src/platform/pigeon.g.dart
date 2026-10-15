@@ -453,6 +453,7 @@ class QuoteDto {
     required this.payout,
     required this.paymentMethod,
     this.recommendations,
+    this.providerContext,
   });
 
   String quoteId;
@@ -471,6 +472,11 @@ class QuoteDto {
 
   List<String>? recommendations;
 
+  /// Provider-specific JSON. Values are String, double, bool, null, List or
+  /// Map (recursively). Pigeon can't model recursive types, so the standard
+  /// codec carries the raw structure.
+  Map<String, Object?>? providerContext;
+
   Object encode() {
     return <Object?>[
       quoteId,
@@ -481,6 +487,7 @@ class QuoteDto {
       payout,
       paymentMethod,
       recommendations,
+      providerContext,
     ];
   }
 
@@ -495,6 +502,8 @@ class QuoteDto {
       payout: result[5]! as double,
       paymentMethod: result[6]! as String,
       recommendations: (result[7] as List<Object?>?)?.cast<String>(),
+      providerContext:
+          (result[8] as Map<Object?, Object?>?)?.cast<String, Object?>(),
     );
   }
 }

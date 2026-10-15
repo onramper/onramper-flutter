@@ -125,6 +125,7 @@ class QuoteDto {
     required this.payout,
     required this.paymentMethod,
     this.recommendations,
+    this.providerContext,
   });
   final String quoteId;
   final String ramp;
@@ -134,6 +135,11 @@ class QuoteDto {
   final double payout;
   final String paymentMethod;
   final List<String>? recommendations;
+
+  /// Provider-specific JSON. Values are String, double, bool, null, List or
+  /// Map (recursively). Pigeon can't model recursive types, so the standard
+  /// codec carries the raw structure.
+  final Map<String, Object?>? providerContext;
 }
 
 // ---- Checkout requirements ----
