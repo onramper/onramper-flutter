@@ -21,10 +21,24 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
 
 ## What it covers
 
-- Wiring `sessionExpirationHandler` to a local mock session service
-- Observing `client.events` and `client.stateStream` in real time
-- Rendering `OnramperCheckoutButton` with custom `CheckoutButtonStyle`
-- Handling `OnramperError` kinds in the UI
+- Wiring `sessionExpirationHandler` to a demo session service
+- Observing `client.events` in real time, with pending payments shown separately
+  from completion and failures shown as `userMessage` + support code
+- Rendering the self-sizing `OnramperCheckoutButton`
+- **Prefill (optional):** email, first/last name and phone passed to
+  `getCheckoutRequirements(prefill:)`. Email must match the OnramperID sign-in
+  address, or the whole prefill is dropped.
+- **New quote:** re-runs `getCheckoutRequirements`; superseded calls
+  (`intentInvalidated`) are ignored
+- **Versions banner:** plugin version, bundled SDK version and the current
+  transaction id
+- **SDK log viewer** (app-bar icon), fed by `OnramperConfiguration.logHandler`:
+  pick a log level (rebuilds the client), browse records, Clear, Copy all
+  (JSON lines). Exported logs may contain personal data.
+
+`pubspec.yaml` points `onramper_flutter` at this checkout through
+`dependency_overrides` (`path: ../`) so the app always runs the local plugin
+code. The override is removed when a release is published.
 
 For the full integration walkthrough, see the
 [integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md).

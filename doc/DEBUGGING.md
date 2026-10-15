@@ -147,12 +147,56 @@ This error is rare in steady state. If it occurs frequently, check that your `se
 
 ---
 
-## Reading the event log in the demo app
+## Capturing SDK logs
 
-The `example/` app ships an event log widget that surfaces every `CheckoutEvent` and `OnramperState` transition in real time. To use it for debugging your own integration:
+Pass a `logHandler` to receive structured, sanitized log records in Dart (Console output is kept):
+
+```dart
+final records = <OnramperLogRecord>[];
+
+OnramperConfiguration(
+  apiKey: 'pk_test_...',
+  clientId: '...',
+  environment: OnramperEnvironment.development,
+  logLevel: OnramperLogLevel.debug,
+  logHandler: records.add,
+)
+```
+
+Each record carries `timestamp`, `level`, `category`, `event`, `context` and `message`. URLs are reduced to hosts, HTTP paths to route templates, and values resembling emails, phone numbers, card numbers or tokens are redacted. **Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data** and choose retention and sharing accordingly.
+
+Two flags, both `false` by default:
+
+- `isEventLoggingEnabled` mirrors provider-lifecycle events to Onramper's backend telemetry.
+- `isEventConsoleLoggingEnabled` logs provider-lifecycle events at `info` even when `logLevel` is lower, including `off`.
+
+For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is running. The native SDK logs with the subsystem `com.onramper.sdk`.
+
+---
+
+## Support codes
+
+Every `OnramperError` has a `supportCode`: a short, stable code that's safe to show users next to `userMessage` (e.g. "Error code: …") and matches what the SDK logs. Ask users to quote it, together with `client.currentTransactionId` when there is one, when they contact support. Codes starting with `FLUTTER-` come from the Flutter plugin itself (`FLUTTER-INTENT-INVALIDATED`, `FLUTTER-CLIENT-DISPOSED`).
+
+---
+
+## Versions
+
+```dart
+final plugin = OnramperClient.wrapperVersion;   // e.g. '1.3.1'
+final sdk = await OnramperClient.sdkVersion();  // bundled native SDK, e.g. '1.3.1'
+```
+
+Include both in bug reports. After upgrading the package, run `pod install` and rebuild: a Dart-only update doesn't replace the bundled iOS SDK.
+
+---
+
+## Using the example app for debugging
+
+The `example/` app shows plugin and SDK versions and the current transaction id, and includes an SDK log viewer:
 
 1. Clone the repository and open `example/`.
-2. Run with verbose logging enabled:
+2. Run it:
 
 ```bash
 cd example
@@ -161,11 +205,8 @@ cd ios && pod install && cd ..
 flutter run --dart-define-from-file=.env --debug
 ```
 
-3. In `main.dart`, set `logLevel: OnramperLogLevel.debug` on the `OnramperConfiguration`. This emits HTTP method, URL path, and status for every backend and security call to the device console.
-
-4. Observe the event stream. Every state transition, event, and error emitted by the native SDK is printed to the on-screen log, alongside the raw `OnramperError` fields (`kind`, `code`, `message`, `debugInfo`) when an error is present.
-
-For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is running. The native SDK logs with the subsystem `com.onramper.sdk`.
+3. Pick a log level in the app (changing it rebuilds the client, so request a new quote afterwards).
+4. Tap the log icon in the app bar to browse records, expand their context, **Clear** them, or **Copy all** as JSON lines.
 
 ---
 
@@ -181,5 +222,9 @@ For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is 
 | `decodingError: encryption key not found` | Plugin/backend version skew | Upgrade to `onramper_flutter` v1.1.1+; confirm backend environment matches `OnramperEnvironment`. |
 | `networkError` (code 403) on `getCheckoutRequirements` | Session token missing `checkout:write` scope | Add `checkout:write` to the scope list in your backend session-mint call. |
 | `unrecoverable` mid-flow | Recovery chain exhausted | Call `reset()`, fetch fresh credentials, call `initialize()`. |
+| `intentInvalidated` thrown from `getCheckoutRequirements` | A newer call, `reset()` or `signOut()` superseded it | Expected when re-quoting; ignore it and use the latest result. |
+| `clientDisposed` | Method called after `dispose()` | Create a new `OnramperClient`. |
+| Previously signed-in users see the OnramperID login again after upgrading | Credentials are now stored per environment (SDK 1.3.0) | Expected once per user; no action needed. |
+| Checkout button shows nothing | Prepared button expired (5 min) or was superseded | Request a new quote. |
 | Build fails — Swift module not found | Xcode < 26 | Update to Xcode 26+. |
 | Payment sheet obscured by Flutter debug overlay | Running in debug mode | Use `flutter run --release` or `--profile` for checkout testing. |

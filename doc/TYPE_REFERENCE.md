@@ -19,6 +19,9 @@ Passed to `OnramperClient(configuration:)`.
 | `environment` | `OnramperEnvironment` | Yes | — | `production` or `development` (staging). |
 | `theme` | `OnramperTheme` | No | `system` | Visual theme applied to native checkout UI. |
 | `logLevel` | `OnramperLogLevel` | No | `off` | Verbosity of SDK logging to the device console. |
+| `logHandler` | `OnramperLogHandler?` | No | `null` | Receives structured `OnramperLogRecord`s at or above `logLevel`, in addition to Console output. Exceptions it throws are reported via `FlutterError.reportError` and don't interrupt checkout. |
+| `isEventLoggingEnabled` | `bool` | No | `false` | Mirrors provider-lifecycle events to Onramper's backend telemetry. |
+| `isEventConsoleLoggingEnabled` | `bool` | No | `false` | Emits provider-lifecycle events at `info` even when `logLevel` is lower, including `off`. |
 
 ### `OnramperEnvironment`
 
@@ -45,6 +48,21 @@ Passed to `OnramperClient(configuration:)`.
 | `info` | HTTP method, URL path, and status for every backend and security call. |
 | `debug` | Low-level bridge and state machine detail. |
 | `trace` | Maximum verbosity. _(Collapsed to `debug` on the Swift side.)_ |
+
+### `OnramperLogRecord`
+
+Delivered to `OnramperConfiguration.logHandler`. Structured and sanitized: URLs are reduced to hosts, HTTP paths to route templates, and values resembling emails, phone numbers, card numbers or tokens are redacted. Provider messages get best-effort redaction only, so treat exported logs as possibly containing personal data.
+
+| Field | Type | Description |
+|---|---|---|
+| `timestamp` | `DateTime` | UTC time the record was emitted. |
+| `level` | `OnramperLogLevel` | `off`, `error`, `info` or `debug` (the native levels). |
+| `category` | `String` | Stable category, e.g. `Checkout`, `ProviderEvents`. |
+| `event` | `String` | Stable event name, e.g. `checkout.finalized`. |
+| `context` | `Map<String, String>` | Structured key/value context. |
+| `message` | `String` | `"<event> k1=v1 k2=v2"`, keys sorted. |
+
+`OnramperLogHandler` is `void Function(OnramperLogRecord record)`.
 
 ### `SessionCredentials`
 
@@ -90,17 +108,38 @@ OnramperClient({
 | `events` | `Stream<CheckoutEvent>` | Broadcast stream of domain events. |
 | `lastError` | `OnramperError?` | Most recent error, or `null`. |
 | `tosRequirements` | `List<TosRequirement>?` | Cached ToS requirements from the latest `getCheckoutRequirements` call. |
+| `currentTransactionId` | `String?` | Onramper's durable transaction id. Set at finalize, cleared by a new checkout or `reset()`. Store it and quote it to support. Notifies listeners on change. |
+
+**Static members:**
+
+| Member | Type | Description |
+|---|---|---|
+| `wrapperVersion` | `String` (const) | Version of this Flutter plugin, e.g. `'1.3.1'`. |
+| `sdkVersion()` | `Future<String>` | Version of the bundled native OnramperSDK, e.g. `'1.3.1'`. No client instance needed. |
 
 **Methods:**
 
 | Method | Returns | Description |
 |---|---|---|
 | `initialize({required String sessionId, required String sessionToken})` | `Future<void>` | Runs App Attest and exchanges the bootstrap token for a DPoP-bound session. Call once per app launch. |
-| `getCheckoutRequirements(CheckoutIntentRequest request, {CheckoutButtonStyle? buttonStyle})` | `Future<CheckoutRequirementsResult>` | Creates a checkout intent, resolves requirements and quote, prepares the native button. |
+| `getCheckoutRequirements(CheckoutIntentRequest request, {OnramperUserPrefill? prefill, CheckoutButtonStyle? buttonStyle})` | `Future<CheckoutRequirementsResult>` | Creates a checkout intent, resolves requirements and quote, prepares the native button. A newer call (or `reset()` / `signOut()`) makes an in-flight call throw `intentInvalidated`. |
 | `reset()` | `Future<void>` | Clears cached checkout state. Returns to `ready`. |
 | `signOut()` | `Future<void>` | Wipes stored OnramperID OIDC tokens. Does not invalidate the partner session. |
 | `cancelPreparedIntent(String buttonHandle)` | `Future<void>` | Drops a specific native button by handle. Call when navigating away from a prepared intent. |
-| `dispose()` | `Future<void>` | Tears down the client, closes streams, detaches Pigeon callbacks. Idempotent. |
+| `dispose()` | `Future<void>` | Tears down the client, closes streams, detaches Pigeon callbacks. Idempotent. Afterwards, methods throw `clientDisposed` and late callbacks are ignored. |
+
+Failed calls throw `OnramperError`.
+
+### `OnramperUserPrefill`
+
+Optional `prefill:` for `getCheckoutRequirements`. Pre-populates OnramperID sign-in and additional-info screens. Best-effort; blank fields are ignored; enabled per integration.
+
+| Field | Type | Description |
+|---|---|---|
+| `email` | `String?` | Pass only when you're confident it's the sign-in address. A mismatch drops the whole prefill. |
+| `firstName` | `String?` | |
+| `lastName` | `String?` | |
+| `phoneNumber` | `String?` | E.164, e.g. `+3712345678`. The user still verifies it. |
 
 ---
 
@@ -130,6 +169,7 @@ Snapshot of the SDK state. At most one payload field is non-null per instance, m
 | `readyToCheckout` | All requirements satisfied; Buy goes straight to finalize. |
 | `finalizing` | backend finalize call is in flight. |
 | `rendering` | Payment surface is on screen. |
+| `paymentPending` | Payment accepted, settlement pending. Neither success nor failure; track with `currentTransactionId`. |
 | `completed` | Terminal success. |
 | `failed` | Terminal failure. |
 
@@ -196,8 +236,12 @@ Domain event observed from the native SDK. Inspect `kind` to decide which payloa
 | `paymentProcessing` | Provider accepted payment and is settling. | — |
 | `paymentCancelled` | Provider reports user cancelled (e.g. dismissed Apple Pay sheet). | — |
 | `providerError` | Provider reported non-recoverable failure. | `providerReason` |
+| `paymentPending` | Payment accepted but not yet settled. | — |
+| `challengeStarted` | 3-D Secure verification started. | — |
+| `challengeCompleted` | 3-D Secure verification finished. | — |
+| `customerOnboardingRequired` | MoonPay guest checkout unavailable; the SDK opens MoonPay onboarding. | — |
 
-The `checkoutCancelled` through `providerError` events are forwarded from third-party checkout webviews; not every provider emits every kind.
+The events from `checkoutCancelled` onwards are forwarded from the payment surface; not every provider emits every kind. They report progress, not payment completion.
 
 ### `CheckoutFinalizeResponse`
 
@@ -206,6 +250,7 @@ Carried by the `checkoutFinalized` event.
 | Field | Type | Description |
 |---|---|---|
 | `headlessCheckoutId` | `String` | Finalized checkout ID. |
+| `onramperTransactionId` | `String` | Onramper's durable transaction id; same as `OnramperClient.currentTransactionId`. |
 | `headlessCheckoutData` | `HeadlessCheckoutData` | Payment surface info. |
 
 ### `HeadlessCheckoutData`
@@ -388,6 +433,23 @@ Returned inside `CheckoutRequirementsResult.quote`. All core fields are non-null
 | `payout` | `double` | Amount of the destination asset the user receives. |
 | `paymentMethod` | `String` | Payment method the quote was priced for. |
 | `recommendations` | `List<String>?` | Optional provider recommendation metadata. |
+| `providerContext` | `Map<String, ProviderJSONValue>?` | Provider-specific data (executable flags, limits, disclosures). Most integrations can ignore it. May contain tokens; don't log it. |
+| `paymentDisclosures` | `List<PaymentDisclosure>` (getter) | Disclosures listed under `providerContext['paymentDisclosures']`. The native button already shows them. |
+
+### `ProviderJSONValue`
+
+Sealed JSON value: `ProviderJSONString(String value)`, `ProviderJSONNumber(double value)`, `ProviderJSONBool(bool value)`, `ProviderJSONNull()`, `ProviderJSONArray(List<ProviderJSONValue> value)`, `ProviderJSONObject(Map<String, ProviderJSONValue> value)`. `stringValue` returns the string payload or `null`.
+
+### `PaymentDisclosure`
+
+| Field | Type |
+|---|---|
+| `code` | `String` |
+| `version` | `String` |
+| `contentMarkdown` | `String` |
+| `contentHtml` | `String` |
+
+`PaymentDisclosure.tryParse(ProviderJSONValue)` returns `null` unless all four fields are strings.
 
 ---
 
@@ -400,7 +462,9 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | Field | Type | Description |
 |---|---|---|
 | `kind` | `OnramperErrorKind` | Discriminator — always set. |
-| `message` | `String` | Human-readable description (English, non-localized). |
+| `message` | `String` | Developer-facing description (English, non-localized). |
+| `userMessage` | `String` | Plain end-user copy, safe to show users. |
+| `supportCode` | `String` | Short stable code, safe to show next to `userMessage`; matches SDK logs. Plugin-originated errors use `FLUTTER-…` codes. |
 | `recoverable` | `bool` | SDK's assessment of whether a retry is worthwhile. |
 | `code` | `int?` | Numeric backend error code when one was present. Do not switch on this; use `kind`. |
 | `minAmount` | `double?` | Populated for `amountOutOfRange`. |
@@ -444,6 +508,11 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `deviceBlocked` | false | Show a "unable to continue on this device" message. |
 | `securityStorageFailed` | false | Rare; log `debugInfo` and surface a generic error. |
 | `securityTrustFailed` | false | Rare; log `error.host` and surface a generic error. |
+| `paymentFailed` | true | Provider confirmed failure (e.g. card declined). Show `userMessage`; offer another payment method. |
+| `providerFailed` | false | Outcome unknown — the payment may have gone through. Check status before offering another payment. |
+| `applePayNotConfigured` | false | No Apple Pay card in Wallet. Ask the user to add one or pick another method. |
+| `intentInvalidated` | true | _Plugin-originated._ Superseded by a newer `getCheckoutRequirements`, `reset()` or `signOut()`. Ignore. |
+| `clientDisposed` | false | _Plugin-originated._ Method called after `dispose()`. Create a new client. |
 
 ---
 
@@ -490,13 +559,13 @@ Low-level wrapper. Embeds the native SwiftUI button directly via `UiKitView`. Us
 const OnramperNativeCheckoutButton({
   Key? key,
   required String buttonHandle,
-  double height = 56.0,
+  @Deprecated('The button sizes itself.') double? height,
 })
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `buttonHandle` | `String` | Handle from `CheckoutRequirementsResult.buttonHandle`. |
-| `height` | `double` | Height in logical pixels. Default `56`. |
+| `height` | `double?` | **Deprecated.** The button sizes itself to its native content; if set, acts as a minimum height. |
 
-Renders an empty `SizedBox` on non-iOS platforms.
+Starts at 56 logical pixels until the native view reports its content height. Renders nothing (height 0) for an expired or superseded handle. Renders an empty `SizedBox` on non-iOS platforms.

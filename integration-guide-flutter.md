@@ -34,7 +34,7 @@ Add the plugin to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  onramper_flutter: ^1.1.2
+  onramper_flutter: ^1.3.1
 ```
 
 Or pin a specific tag (useful for preview releases before they reach pub.dev):
@@ -44,7 +44,7 @@ dependencies:
   onramper_flutter:
     git:
       url: https://github.com/onramper/onramper-flutter.git
-      ref: v1.1.2
+      ref: v1.3.1
 ```
 
 Then fetch packages and pods:
@@ -85,6 +85,24 @@ final client = OnramperClient(
 ```
 
 The handler is invoked from the native side via a Pigeon callback. If it throws, the native SDK surfaces the failure as `OnramperError(kind: userTokenRefreshFailed)` — the refresh is considered terminally failed and the SDK re-enters the login flow.
+
+### Capturing SDK logs (optional)
+
+Logging is off by default. To capture structured, sanitized SDK logs (for example for an in-app diagnostics screen), set `logLevel` and pass a `logHandler`. Console output is kept either way.
+
+```dart
+OnramperConfiguration(
+  apiKey: 'pk_live_...',
+  clientId: 'YOUR_ONRAMPER_ID_CLIENT_ID',
+  logLevel: OnramperLogLevel.info,
+  logHandler: (record) => diagnostics.add(
+    '${record.timestamp.toIso8601String()} ${record.level.name} '
+    '${record.category} ${record.message}',
+  ),
+)
+```
+
+Each `OnramperLogRecord` carries `timestamp`, `level`, `category`, `event`, `context` and `message`. The handler runs on the UI isolate, so keep it fast; if it throws, the error is reported through `FlutterError.reportError` and checkout continues. Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data. `isEventLoggingEnabled` and `isEventConsoleLoggingEnabled` (both `false` by default) enable provider-event telemetry and provider-event console logging respectively.
 
 ## 4. Initialize
 
@@ -146,6 +164,27 @@ The returned `CheckoutRequirementsResult` carries:
 
 The convenience getter `requirements.tos` returns just the ToS entries for direct rendering.
 
+### Prefill (optional)
+
+If you already know some user details, pass them as `prefill:` so the OnramperID sign-in and additional-info screens arrive pre-populated:
+
+```dart
+final requirements = await client.getCheckoutRequirements(
+  request,
+  prefill: const OnramperUserPrefill(
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    phoneNumber: '+3712345678', // E.164
+  ),
+);
+```
+
+Prefill is best-effort and never blocks sign-in. Blank fields are ignored. A prefilled phone number is a candidate the user still verifies. **Pass `email` only when you're confident it's the address the user will sign in with:** if it doesn't match, the whole prefill is dropped, which is worse than omitting `email`. Prefill is enabled per integration; talk to your Onramper representative before relying on it.
+
+### Re-quoting
+
+Calling `getCheckoutRequirements` again (or `reset()` / `signOut()`) supersedes an earlier call that's still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest quote. Buttons from earlier calls that weren't shown yet are released and render nothing. Prepared buttons expire after 5 minutes.
+
 ## 6. Render the button
 
 Embed `OnramperCheckoutButton` anywhere a regular Flutter widget would go. It renders the native SwiftUI checkout button (via a Flutter platform view) with any unsatisfied ToS lines above it.
@@ -169,6 +208,8 @@ Tapping the button drives the native checkout flow internally:
 3. Finalizes the intent with Onramper's backend.
 4. Presents the payment surface (Apple Pay, card webview, deep-link) chosen from the finalize response.
 5. Silently re-authenticates if any token expires mid-flow.
+
+The button sizes itself to its native content — the Buy button plus any Terms of Service text and provider payment disclosures (for example MoonPay's, shown next to the Apple Pay button and not hideable). Don't wrap it in a fixed-height container.
 
 The button owns the whole loop — no `presentCheckout()` call is needed. Both `client` (a `ChangeNotifier`) and `client.events` (a `Stream<CheckoutEvent>`) emit updates throughout, so the rest of your UI can react in parallel.
 
@@ -210,11 +251,45 @@ Provider-lifecycle events forwarded from the third-party checkout webview (not e
 - `paymentCancelled` — provider reports the user cancelled (distinct from `checkoutCancelled`).
 - `providerError` — provider reported a non-recoverable failure; `event.providerReason` carries a short human-readable string.
 
+### Outcomes and the transaction id
+
+| Event | Meaning |
+|---|---|
+| `completed` | Payment completed. `event.checkoutId` is populated. |
+| `paymentPending` | Payment accepted but not yet settled. Neither success nor failure: show a "processing" state and track the transaction through your backend and webhooks. Don't start another payment because one is pending. |
+| `failed` | `event.error` carries the typed `OnramperError`. Show `error.userMessage` and `error.supportCode`. |
+
+```dart
+client.events.listen((event) {
+  switch (event.kind) {
+    case CheckoutEventKind.completed:
+      showSuccess(client.currentTransactionId);
+    case CheckoutEventKind.paymentPending:
+      showProcessing(client.currentTransactionId);
+    case CheckoutEventKind.failed:
+      final e = event.error!;
+      showError('${e.userMessage}\nError code: ${e.supportCode}');
+    default:
+      break;
+  }
+});
+```
+
+`client.currentTransactionId` is Onramper's durable id for the transaction. It's set when the checkout is finalized (before the payment surface appears), notifies listeners, and is cleared by a new checkout or `reset()`. **Store it and quote it to Onramper support.** It's distinct from the checkout id on `checkoutStarted` / `completed`, which identifies one attempt; a journey can have several checkout ids but at most one transaction id. The same value is on `event.finalizeResponse.onramperTransactionId`.
+
+Additional provider events in this release: `challengeStarted` / `challengeCompleted` (3-D Secure) and `customerOnboardingRequired` (MoonPay guest checkout unavailable; the SDK opens MoonPay onboarding). These report progress, not payment completion.
+
 `checkoutFinalized` events additionally carry `event.finalizeResponse` — the full `CheckoutFinalizeResponse` including `headlessCheckoutData` (payment URL, render type, payment type) — if you need more than the `renderContext` summary.
 
 ## 8. Error handling
 
 All errors thrown across the Flutter boundary are `OnramperError` instances. `kind` is the discriminator; the remaining fields carry context where it's known. The full enum from `lib/src/models/errors.dart`:
+
+Failed calls throw `OnramperError`, and `failed` events carry one. Every error has `userMessage` — plain copy that's safe to show users — and `supportCode`, a short stable code that's safe to show next to it and matches what the SDK logs:
+
+```dart
+showError('${error.userMessage}\nError code: ${error.supportCode}');
+```
 
 | `OnramperErrorKind` | Description | `recoverable` default | Suggested action |
 |---|---|---|---|
@@ -244,6 +319,11 @@ All errors thrown across the Flutter boundary are `OnramperError` instances. `ki
 | `deviceBlocked` | Onramper's backend terminally rejected the device. | false | Show a "unable to continue on this device" message. |
 | `securityStorageFailed` | Keychain read/write on the native side failed. | false | Rare; log `debugInfo` and surface a generic error. |
 | `securityTrustFailed` | Certificate pinning check failed for a host. `host` names the affected server. | false | Rare; log `host` and surface as a generic error. |
+| `paymentFailed` | The provider confirmed the payment failed (e.g. card declined). | true | Show `userMessage`; let the user try another payment method. |
+| `providerFailed` | The payment surface failed without confirming the outcome. The payment may have gone through. | false | Show `userMessage`; check the transaction status before offering another payment. |
+| `applePayNotConfigured` | No Apple Pay card in Wallet on this device. | false | Ask the user to add a card in Wallet, or offer another payment method. |
+| `intentInvalidated` | A newer `getCheckoutRequirements`, `reset()` or `signOut()` superseded this call (plugin-originated). | true | Ignore it; use the latest call's result. |
+| `clientDisposed` | A method was called after `dispose()` (plugin-originated). | false | Create a new `OnramperClient`. |
 
 Catch `OnramperError` directly when you need to branch on `kind`:
 
@@ -327,10 +407,10 @@ The native button's label text ("Buy") is fixed by the SDK and not currently ove
 
 ## 10. Lifecycle: reset, signOut, cancelPreparedIntent, dispose
 
-- **`client.reset()`** clears cached checkout state on both sides of the bridge. Call it before starting a fresh `getCheckoutRequirements` with inputs that aren't a continuation of the previous flow (e.g., user navigated back and changed the amount). After reset the client returns to `OnramperStateKind.ready` and is immediately reusable.
+- **`client.reset()`** clears cached checkout state on both sides of the bridge, including `currentTransactionId` (read it first). Call it before starting a fresh `getCheckoutRequirements` with inputs that aren't a continuation of the previous flow (e.g., user navigated back and changed the amount). After reset the client returns to `OnramperStateKind.ready` and is immediately reusable.
 - **`client.signOut()`** wipes cached OnramperID (OIDC) tokens. Distinct from `reset()`: the partner session (DPoP key + session token) is preserved, but the next checkout that requires identity re-prompts the login sheet. Call this from an "Sign out" button in your app.
 - **`client.cancelPreparedIntent(buttonHandle)`** drops a specific stored native checkout button by handle without tearing down the client. Useful when your UI navigates away from a prepared intent without ever showing the button — call this on the previous `requirements.buttonHandle` so the native resources are released promptly.
-- **`client.dispose()`** shuts the plugin down, detaches Pigeon callbacks, and closes the broadcast streams. Call it from the consumer widget's `State.dispose()`. The method is idempotent.
+- **`client.dispose()`** shuts the plugin down, detaches Pigeon callbacks, and closes the broadcast streams. Call it from the consumer widget's `State.dispose()`. The method is idempotent. After `dispose()`, methods throw `OnramperError` with kind `clientDisposed` and late native callbacks are ignored.
 - **Do not** instantiate a new `OnramperClient` for each checkout intent. One client per app session is the intended lifecycle; `reset()` exists precisely so you don't have to recreate it.
 
 ```dart

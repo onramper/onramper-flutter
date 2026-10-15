@@ -32,7 +32,7 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 
 ```yaml
 dependencies:
-  onramper_flutter: ^1.1.1
+  onramper_flutter: ^1.3.1
 ```
 
 Or pin a specific tag (useful for preview releases before they reach pub.dev):
@@ -42,7 +42,7 @@ dependencies:
   onramper_flutter:
     git:
       url: https://github.com/onramper/onramper-flutter.git
-      ref: v1.1.1
+      ref: v1.3.1
 ```
 
 Then:
@@ -101,6 +101,9 @@ final requirements = await client.getCheckoutRequirements(
       wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
     ),
   ),
+  // Optional: values you already know, to pre-populate OnramperID sign-in.
+  // Pass `email` only if you're sure it's the address the user signs in with.
+  prefill: const OnramperUserPrefill(firstName: 'Ada', lastName: 'Lovelace'),
   // Optional: style the native button. Omit to use the SDK default.
   buttonStyle: const CheckoutButtonStyle(
     backgroundColor: Color(0xFF0050FF),
@@ -108,8 +111,12 @@ final requirements = await client.getCheckoutRequirements(
   ),
 );
 
-// 4) Render the button. Tap → login → finalize → payment webview — all native.
+// 4) Render the button. Tap → login → finalize → payment — all native. The
+//    button sizes itself to its content (ToS text, payment disclosures).
 OnramperCheckoutButton(requirements: requirements)
+
+// 5) After finalize, store the transaction id and quote it to support.
+final transactionId = client.currentTransactionId;
 ```
 
 See [`example/`](https://github.com/onramper/onramper-flutter/tree/master/example) for a runnable app that wires all four steps end-to-end.
@@ -118,13 +125,32 @@ See [`example/`](https://github.com/onramper/onramper-flutter/tree/master/exampl
 
 Observe events via `client.events`, state via `client.state` / `client.stateStream`, and errors via `client.lastError`. All are `ChangeNotifier`-backed too — `AnimatedBuilder(animation: client, ...)` works.
 
-Terminal events:
+Terminal outcomes:
 - `CheckoutEventKind.completed` — happy path; `event.checkoutId` populated.
+- `CheckoutEventKind.paymentPending` — the payment was accepted but hasn't settled. Show a "processing" state and track `client.currentTransactionId` through your backend and webhooks. Don't start another payment because one is pending.
 - `CheckoutEventKind.failed` — `event.error` carries a typed `OnramperError`.
 
-Provider-lifecycle events (`checkoutCancelled`, `providerReady`, `paymentAuthorized`, `paymentProcessing`, `paymentCancelled`, `providerError`) surface everything the underlying provider emits — not every provider emits every one.
+```dart
+client.events.listen((event) {
+  switch (event.kind) {
+    case CheckoutEventKind.completed:
+      showSuccess(client.currentTransactionId);
+    case CheckoutEventKind.paymentPending:
+      showProcessing(client.currentTransactionId);
+    case CheckoutEventKind.failed:
+      final e = event.error!;
+      showError('${e.userMessage}\nError code: ${e.supportCode}');
+    default:
+      break;
+  }
+});
+```
 
-Errors are typed by `OnramperErrorKind` (25 kinds) with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). See the [full error table in the integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md#8-error-handling).
+Provider-lifecycle events (`checkoutCancelled`, `providerReady`, `paymentAuthorized`, `paymentProcessing`, `paymentCancelled`, `providerError`, `challengeStarted`, `challengeCompleted`, `customerOnboardingRequired`) surface everything the underlying provider emits — not every provider emits every one. They report progress, not payment completion.
+
+Errors are typed by `OnramperErrorKind` with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). Every error carries `userMessage` (safe to show users) and `supportCode` (safe to show next to it; quote it to support). Failed calls throw `OnramperError`. If you call `getCheckoutRequirements` again while an earlier call is in flight, the earlier call throws `intentInvalidated`; ignore it. See the [full error table in the integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md#8-error-handling).
+
+For diagnostics, pass `logHandler` to `OnramperConfiguration` to receive structured SDK log records, and use `OnramperClient.wrapperVersion` / `await OnramperClient.sdkVersion()` on support screens.
 
 ## Documentation
 
