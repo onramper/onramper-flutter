@@ -24,6 +24,7 @@ import 'ios_diagnostics.dart';
 import 'log_buffer.dart';
 import 'log_viewer_sheet.dart';
 import 'prefill_form.dart';
+import 'session_initializer.dart';
 import 'session_token_service.dart';
 
 void main() => runApp(const ExampleApp());
@@ -81,6 +82,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   final PrefillController _prefill = PrefillController();
   OnramperLogLevel _logLevel = OnramperLogLevel.info;
   BuyForm _form = const BuyForm();
+  SessionInitializer _session = SessionInitializer();
   String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
   String? _statusMessage;
@@ -136,6 +138,7 @@ class _ExampleHomeState extends State<ExampleHome> {
           SessionTokenService.fetch(authToken: _demoAuthToken),
     );
     _eventSub = client.events.listen(_onEvent);
+    _session = SessionInitializer();
     return client;
   }
 
@@ -242,16 +245,19 @@ class _ExampleHomeState extends State<ExampleHome> {
       // no longer addresses the current checkout.
       _requirements = null;
       _errorMessage = null;
-      _statusMessage = 'minting session…';
+      _statusMessage = 'preparing…';
     });
     try {
-      final credentials =
-          await SessionTokenService.fetch(authToken: _demoAuthToken);
-      setState(() => _statusMessage = 'initializing…');
-      await client.initialize(
-        sessionId: credentials.sessionId,
-        sessionToken: credentials.sessionToken,
-      );
+      // Initialize once per client; reset/signOut keep the native session.
+      await _session.ensureInitialized(() async {
+        final credentials =
+            await SessionTokenService.fetch(authToken: _demoAuthToken);
+        setState(() => _statusMessage = 'initializing…');
+        await client.initialize(
+          sessionId: credentials.sessionId,
+          sessionToken: credentials.sessionToken,
+        );
+      });
       setState(() => _statusMessage = 'fetching checkout requirements…');
       final requirements = await client.getCheckoutRequirements(
         _form.toRequest(walletAddress: _walletAddress),
