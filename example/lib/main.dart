@@ -66,10 +66,17 @@ class _ExampleAppState extends State<ExampleApp> {
 }
 
 class ExampleHome extends StatefulWidget {
-  const ExampleHome({super.key, required this.darkMode});
+  const ExampleHome({
+    super.key,
+    required this.darkMode,
+    this.sessionCredentialsProvider,
+  });
 
   /// App-wide dark mode; drives both the Flutter theme and `OnramperTheme`.
   final ValueNotifier<bool> darkMode;
+
+  /// Optional backend integration for obtaining fresh session credentials.
+  final SessionExpirationHandler? sessionCredentialsProvider;
 
   @override
   State<ExampleHome> createState() => _ExampleHomeState();
@@ -135,13 +142,16 @@ class _ExampleHomeState extends State<ExampleHome> {
         logLevel: _logLevel,
         logHandler: _logs.add,
       ),
-      sessionExpirationHandler: () =>
-          SessionTokenService.fetch(authToken: _demoAuthToken),
+      sessionExpirationHandler: _fetchSessionCredentials,
     );
     _eventSub = client.events.listen(_onEvent);
     _session = SessionInitializer();
     return client;
   }
+
+  Future<SessionCredentials> _fetchSessionCredentials() =>
+      widget.sessionCredentialsProvider?.call() ??
+      SessionTokenService.fetch(authToken: _demoAuthToken);
 
   /// Log level and theme are fixed at configure time, so changing either
   /// rebuilds the client and drops the current quote.
@@ -268,8 +278,7 @@ class _ExampleHomeState extends State<ExampleHome> {
     try {
       // Initialize once per client; reset/signOut keep the native session.
       await _session.ensureInitialized(() async {
-        final credentials =
-            await SessionTokenService.fetch(authToken: _demoAuthToken);
+        final credentials = await _fetchSessionCredentials();
         _update(() => _statusMessage = 'initializing…');
         await client.initialize(
           sessionId: credentials.sessionId,
@@ -368,7 +377,14 @@ class _ExampleHomeState extends State<ExampleHome> {
               _BuyFormFields(
                 form: _form,
                 enabled: !_busy,
-                onChanged: (f) => setState(() => _form = f),
+                onChanged: (f) => setState(() {
+                  _form = f;
+                  // The prepared button still targets the previous purchase.
+                  // Require a new quote before allowing checkout again.
+                  _requirements = null;
+                  _statusMessage = null;
+                  _errorMessage = null;
+                }),
               ),
               PrefillForm(controller: _prefill),
               const SizedBox(height: 16),
