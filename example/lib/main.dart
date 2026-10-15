@@ -19,6 +19,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
+import 'buy_form.dart';
 import 'ios_diagnostics.dart';
 import 'log_buffer.dart';
 import 'log_viewer_sheet.dart';
@@ -27,20 +28,47 @@ import 'session_token_service.dart';
 
 void main() => runApp(const ExampleApp());
 
-class ExampleApp extends StatelessWidget {
+class ExampleApp extends StatefulWidget {
   const ExampleApp({super.key});
 
   @override
+  State<ExampleApp> createState() => _ExampleAppState();
+}
+
+class _ExampleAppState extends State<ExampleApp> {
+  // Starts from the device appearance; the in-app switch owns it afterwards
+  // and is passed to the SDK as an explicit light/dark theme.
+  late final ValueNotifier<bool> _dark = ValueNotifier(
+    WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark,
+  );
+
+  @override
+  void dispose() {
+    _dark.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'Onramper SDK example',
-      home: ExampleHome(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _dark,
+      builder: (context, dark, _) => MaterialApp(
+        title: 'Onramper SDK example',
+        theme: ThemeData(brightness: Brightness.light),
+        darkTheme: ThemeData(brightness: Brightness.dark),
+        themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+        home: ExampleHome(darkMode: _dark),
+      ),
     );
   }
 }
 
 class ExampleHome extends StatefulWidget {
-  const ExampleHome({super.key});
+  const ExampleHome({super.key, required this.darkMode});
+
+  /// App-wide dark mode; drives both the Flutter theme and `OnramperTheme`.
+  final ValueNotifier<bool> darkMode;
 
   @override
   State<ExampleHome> createState() => _ExampleHomeState();
@@ -52,6 +80,7 @@ class _ExampleHomeState extends State<ExampleHome> {
   final LogBuffer _logs = LogBuffer();
   final PrefillController _prefill = PrefillController();
   OnramperLogLevel _logLevel = OnramperLogLevel.info;
+  BuyForm _form = const BuyForm();
   String? _sdkVersion;
   CheckoutRequirementsResult? _requirements;
   String? _statusMessage;
@@ -99,6 +128,7 @@ class _ExampleHomeState extends State<ExampleHome> {
         apiKey: _apiKey,
         clientId: _clientId,
         environment: OnramperEnvironment.development,
+        theme: widget.darkMode.value ? OnramperTheme.dark : OnramperTheme.light,
         logLevel: _logLevel,
         logHandler: _logs.add,
       ),
@@ -109,20 +139,54 @@ class _ExampleHomeState extends State<ExampleHome> {
     return client;
   }
 
-  /// Log level is fixed at configure time, so changing it rebuilds the client
-  /// and drops the current quote.
-  Future<void> _changeLogLevel(OnramperLogLevel level) async {
-    if (level == _logLevel) return;
+  /// Log level and theme are fixed at configure time, so changing either
+  /// rebuilds the client and drops the current quote.
+  Future<void> _rebuildClient(String reason, VoidCallback apply) async {
     await _eventSub?.cancel();
     final old = _client;
     setState(() {
       _client = null;
       _requirements = null;
-      _logLevel = level;
-      _statusMessage = 'log level → ${level.name}; prepare a new quote';
+      apply();
+      _statusMessage = '$reason; prepare a new quote';
     });
+    // Dispose the old client before creating the new one: the plugin's
+    // callback registration is global.
     await old?.dispose();
     if (mounted) setState(() => _client = _buildClient());
+  }
+
+  Future<void> _changeLogLevel(OnramperLogLevel level) async {
+    if (level == _logLevel) return;
+    await _rebuildClient('log level → ${level.name}', () => _logLevel = level);
+  }
+
+  Future<void> _changeDarkMode(bool dark) async {
+    if (dark == widget.darkMode.value) return;
+    await _rebuildClient('theme → ${dark ? 'dark' : 'light'}',
+        () => widget.darkMode.value = dark);
+  }
+
+  /// Runs Reset / Log out and reports the outcome like other calls.
+  Future<void> _runAction(
+      String label, Future<void> Function(OnramperClient) action) async {
+    final client = _client;
+    if (client == null) return;
+    setState(() {
+      _busy = true;
+      _requirements = null;
+      _errorMessage = null;
+    });
+    try {
+      await action(client);
+      setState(() => _statusMessage = '$label OK');
+    } on OnramperError catch (e) {
+      setState(() => _errorMessage = _describe(e));
+    } catch (e) {
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _loadAppIdentifiers() async {
@@ -190,18 +254,7 @@ class _ExampleHomeState extends State<ExampleHome> {
       );
       setState(() => _statusMessage = 'fetching checkout requirements…');
       final requirements = await client.getCheckoutRequirements(
-        const CheckoutIntentRequest(
-          transactionData: OnramperTransactionData(
-            source: 'usd',
-            destination: 'sol',
-            amount: 100,
-            type: TransactionType.buy,
-            country: 'us',
-            subdivision: 'us-ca',
-            paymentMethod: 'applepay',
-            wallet: WalletInfo(network: 'solana', address: _walletAddress),
-          ),
-        ),
+        _form.toRequest(walletAddress: _walletAddress),
         prefill: _prefill.build(),
       );
       setState(() {
@@ -279,6 +332,19 @@ class _ExampleHomeState extends State<ExampleHome> {
                   ),
                 ],
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Dark mode'),
+                subtitle: const Text('Rebuilds the client with this theme',
+                    style: TextStyle(fontSize: 12)),
+                value: widget.darkMode.value,
+                onChanged: _busy ? null : _changeDarkMode,
+              ),
+              _BuyFormFields(
+                form: _form,
+                enabled: !_busy,
+                onChanged: (f) => setState(() => _form = f),
+              ),
               PrefillForm(controller: _prefill),
               const SizedBox(height: 16),
               if (_requirements == null)
@@ -293,11 +359,35 @@ class _ExampleHomeState extends State<ExampleHome> {
                   child: const Text('New quote'),
                 ),
               ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy || client == null
+                          ? null
+                          : () => _runAction('reset', (c) => c.reset()),
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy || client == null
+                          ? null
+                          : () => _runAction('log out', (c) => c.signOut()),
+                      child: const Text('Log out'),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               if (_statusMessage != null) Text('Status: $_statusMessage'),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 8),
-                Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                Text(_errorMessage!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
             ],
           ),
@@ -310,10 +400,10 @@ class _ExampleHomeState extends State<ExampleHome> {
     if (_apiKey.isEmpty || _clientId.isEmpty || _demoAuthToken.isEmpty) {
       return const _MissingEnvBanner();
     }
-    return const Text(
-      'Buy 100 USD of SOL via Apple Pay (sandbox). Tap "Prepare checkout" to '
-      'mint a demo session and fetch requirements.',
-      style: TextStyle(fontSize: 14),
+    return Text(
+      'Buy 100 ${_form.fiat.label} of SOL via Apple Pay (sandbox). Tap '
+      '"Prepare checkout" to mint a demo session and fetch requirements.',
+      style: const TextStyle(fontSize: 14),
     );
   }
 }
@@ -328,7 +418,7 @@ class _IdentifiersBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -356,7 +446,7 @@ class _MissingEnvBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.shade100,
+        color: Theme.of(context).colorScheme.tertiaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
       child: const Text(
@@ -382,7 +472,7 @@ class _VersionsBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -400,6 +490,113 @@ class _VersionsBanner extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Country override, fiat and onramp filter — same approach as the RN demo.
+class _BuyFormFields extends StatelessWidget {
+  const _BuyFormFields({
+    required this.form,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final BuyForm form;
+  final bool enabled;
+  final ValueChanged<BuyForm> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Override country and state'),
+          subtitle: const Text('Off: the backend infers the user\'s country',
+              style: TextStyle(fontSize: 12)),
+          value: form.countryOverride,
+          onChanged: enabled
+              ? (v) => onChanged(form.copyWith(countryOverride: v))
+              : null,
+        ),
+        if (form.countryOverride) ...[
+          SegmentedButton<DemoCountry>(
+            segments: [
+              for (final c in DemoCountry.values)
+                ButtonSegment(value: c, label: Text(c.label)),
+            ],
+            selected: {form.country},
+            onSelectionChanged:
+                enabled ? (s) => onChanged(form.withCountry(s.first)) : null,
+          ),
+          if (form.country == DemoCountry.us)
+            _LabeledDropdown<String>(
+              label: 'US state',
+              value: form.usState,
+              items: [
+                for (final st in usStates)
+                  DropdownMenuItem(value: st.code, child: Text(st.name)),
+              ],
+              onChanged: enabled
+                  ? (v) {
+                      if (v != null) onChanged(form.copyWith(usState: v));
+                    }
+                  : null,
+            ),
+        ],
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Expanded(child: Text('Pay with')),
+            SegmentedButton<DemoFiat>(
+              segments: [
+                for (final f in DemoFiat.values)
+                  ButtonSegment(value: f, label: Text(f.label)),
+              ],
+              selected: {form.fiat},
+              onSelectionChanged: enabled
+                  ? (s) => onChanged(form.copyWith(fiat: s.first))
+                  : null,
+            ),
+          ],
+        ),
+        _LabeledDropdown<String?>(
+          label: 'Onramp',
+          value: form.onramp,
+          items: [
+            for (final (id, label) in onrampOptions)
+              DropdownMenuItem(value: id, child: Text(label)),
+          ],
+          onChanged:
+              enabled ? (v) => onChanged(form.copyWith(onramp: () => v)) : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _LabeledDropdown<T> extends StatelessWidget {
+  const _LabeledDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        DropdownButton<T>(value: value, items: items, onChanged: onChanged),
+      ],
     );
   }
 }

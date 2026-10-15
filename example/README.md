@@ -25,6 +25,14 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
 - Observing `client.events` in real time, with pending payments shown separately
   from completion and failures shown as `userMessage` + support code
 - Rendering the self-sizing `OnramperCheckoutButton`
+- **Dark mode** switch (starts from the device appearance): sets the app theme
+  and passes an explicit `OnramperTheme.light`/`.dark` to the SDK (rebuilds
+  the client)
+- **Override country and state** (off by default — no `country`/`subdivision`
+  is sent and the backend infers them); US/ES/NL/GR with a US state picker
+- **Pay with** USD or EUR (choosing a country selects its default currency)
+- **Onramp** filter: Any, MoonPay, Paybis or Coinbase Pay (`onlyOnramps`)
+- **Reset** (`client.reset()`) and **Log out** (`client.signOut()`)
 - **Prefill (optional):** email, first/last name and phone passed to
   `getCheckoutRequirements(prefill:)`. Email must match the OnramperID sign-in
   address, or the whole prefill is dropped.
