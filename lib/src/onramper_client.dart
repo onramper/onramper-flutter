@@ -68,12 +68,6 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
         sessionExpirationHandler: sessionExpirationHandler,
       );
 
-  /// Required by `dartPluginClass: OnramperClient` in `pubspec.yaml`.
-  ///
-  /// Flutter's generated `dart_plugin_registrant` calls this on app start.
-  /// The SDK uses Pigeon-generated channels that wire themselves up on first
-  /// use, so there's nothing to register here — this entry point exists
-  /// solely to satisfy the Flutter plugin contract.
   /// Version of this Flutter plugin. `X.Y.Z` bundles native OnramperSDK
   /// `X.Y.Z`.
   static const String wrapperVersion = '1.3.1';
@@ -82,6 +76,12 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// client instance. Useful for diagnostics and support screens.
   static Future<String> sdkVersion() => OnramperHostApi().sdkVersion();
 
+  /// Required by `dartPluginClass: OnramperClient` in `pubspec.yaml`.
+  ///
+  /// Flutter's generated `dart_plugin_registrant` calls this on app start.
+  /// The SDK uses Pigeon-generated channels that wire themselves up on first
+  /// use, so there's nothing to register here — this entry point exists
+  /// solely to satisfy the Flutter plugin contract.
   static void registerWith() {
     // No-op: Pigeon channels are configured per-client in `_OnramperClient._`.
   }
@@ -194,6 +194,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
           buttonStyle?.toNativeDto(),
         ));
     final result = CheckoutRequirementsResult.fromDto(dto);
+    if (_disposed) return result;
     _tosRequirements = result.tos;
     notifyListeners();
     return result;
@@ -205,7 +206,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     _lastError = null;
     _currentTransactionId = null;
     await _guard(_host.reset);
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Signs out of OnramperID. Distinct from [reset]: the partner session
@@ -216,8 +217,9 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> signOut() async {
     _tosRequirements = null;
     _lastError = null;
+    _currentTransactionId = null;
     await _guard(_host.signOut);
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Drops the native checkout button identified by [buttonHandle] without

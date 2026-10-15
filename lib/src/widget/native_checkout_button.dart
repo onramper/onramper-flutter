@@ -54,6 +54,8 @@ class _OnramperNativeCheckoutButtonState
       _height.dispose();
       _height = _newController();
     }
+    // ignore: deprecated_member_use_from_same_package
+    _height.minHeight = widget.height ?? 0;
   }
 
   void _onPlatformViewCreated(int id) {

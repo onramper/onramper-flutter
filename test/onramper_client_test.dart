@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -292,6 +294,43 @@ void main() {
       await client.dispose();
     });
 
+    test('dispose during reset/signOut does not notify a disposed client',
+        () async {
+      for (final call in ['reset', 'signOut', 'getCheckoutRequirements']) {
+        final fakeHost = FakeOnramperHostApi()
+          ..resetGate = Completer<void>()
+          ..signOutGate = Completer<void>()
+          ..requirementsGate = Completer<void>();
+        final client = OnramperClient.forTesting(
+          configuration:
+              const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+          hostApi: fakeHost,
+        );
+        final Future<Object?> pending = switch (call) {
+          'reset' => client.reset(),
+          'signOut' => client.signOut(),
+          _ => client.getCheckoutRequirements(_sampleRequest()),
+        };
+        await client.dispose();
+        fakeHost.resetGate!.complete();
+        fakeHost.signOutGate!.complete();
+        fakeHost.requirementsGate!.complete();
+        await expectLater(pending, completes, reason: call);
+      }
+    });
+
+    test('signOut clears currentTransactionId', () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      client.onTransactionIdChanged('01JTXN');
+      await client.signOut();
+      expect(client.currentTransactionId, isNull);
+      await client.dispose();
+    });
+
     test('getCheckoutRequirements forwards prefill', () async {
       final fakeHost = FakeOnramperHostApi();
       final client = OnramperClient.forTesting(
@@ -526,6 +565,9 @@ class FakeOnramperHostApi implements OnramperHostApi {
   String? lastFailReason;
   String? lastCancelledHandle;
   Object? nextGetRequirementsError;
+  Completer<void>? resetGate;
+  Completer<void>? requirementsGate;
+  Completer<void>? signOutGate;
 
   @override
   // ignore: non_constant_identifier_names
@@ -552,6 +594,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
     UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   ) async {
+    await requirementsGate?.future;
     final error = nextGetRequirementsError;
     if (error != null) throw error;
     lastPrefillDto = prefill;
@@ -566,11 +609,14 @@ class FakeOnramperHostApi implements OnramperHostApi {
   }
 
   @override
-  Future<void> reset() async {}
+  Future<void> reset() async {
+    await resetGate?.future;
+  }
 
   @override
   Future<void> signOut() async {
     signOutCallCount++;
+    await signOutGate?.future;
   }
 
   @override

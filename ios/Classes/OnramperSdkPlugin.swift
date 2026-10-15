@@ -175,6 +175,11 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 
     func testRefreshBridge() -> SessionRefreshBridge { refreshBridge }
 
+    var testLastButtonHandle: String? {
+        get { lastButtonHandle }
+        set { lastButtonHandle = newValue }
+    }
+
     // MARK: Internal helpers
 
     /// Builds the native log handler that forwards records to Dart. Native
@@ -376,7 +381,8 @@ extension OnramperSdkPlugin: OnramperHostApi {
         Task { @MainActor in
             await client?.reset()
             if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
-            self.lastButtonHandle = nil
+            // Keep a handle a newer preparation stored during the await.
+            if self.lastButtonHandle == handle { self.lastButtonHandle = nil }
             completion(.success(()))
         }
     }
@@ -390,7 +396,8 @@ extension OnramperSdkPlugin: OnramperHostApi {
             // Drop the current button too — the intent it addressed was tied
             // to the now-cleared OIDC identity.
             if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
-            self.lastButtonHandle = nil
+            // Keep a handle a newer preparation stored during the await.
+            if self.lastButtonHandle == handle { self.lastButtonHandle = nil }
             completion(.success(()))
         }
     }

@@ -64,6 +64,27 @@ final class OnramperSdkPluginTests: XCTestCase {
         try await super.tearDown()
     }
 
+    // MARK: - reset / signOut handle bookkeeping
+
+    /// A handle stored by a getCheckoutRequirements that finished while reset
+    /// or signOut was awaiting must survive, so the next preparation drops it.
+    func test_resetAndSignOut_keepHandleStoredDuringTheirAwait() async throws {
+        for call in ["reset", "signOut"] {
+            plugin.testLastButtonHandle = "H1"
+            let finished = expectation(description: call)
+            // Synchronous part captures H1 and schedules the native await.
+            if call == "reset" {
+                plugin.reset { _ in finished.fulfill() }
+            } else {
+                plugin.signOut { _ in finished.fulfill() }
+            }
+            // A newer preparation stores H2 before that await resumes.
+            plugin.testLastButtonHandle = "H2"
+            await fulfillment(of: [finished], timeout: 2)
+            XCTAssertEqual(plugin.testLastButtonHandle, "H2", call)
+        }
+    }
+
     // MARK: - log forwarding
 
     func test_logHandler_forwardsRecordsToDartOnMain() async {

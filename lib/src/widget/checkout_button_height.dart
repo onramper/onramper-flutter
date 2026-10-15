@@ -8,19 +8,29 @@ import '../platform/pigeon.g.dart';
 /// [CheckoutButtonFlutterApi].
 class CheckoutButtonHeightController extends ChangeNotifier
     implements CheckoutButtonFlutterApi {
-  CheckoutButtonHeightController({this.minHeight = 0});
+  CheckoutButtonHeightController({double minHeight = 0})
+      : _minHeight = minHeight;
 
   /// Used until the native view reports its first height.
   static const double fallbackHeight = 56;
 
-  final double minHeight;
+  double _minHeight;
+
+  /// Floor for [height] (from the deprecated widget `height` parameter).
+  double get minHeight => _minHeight;
+  set minHeight(double value) {
+    if (value == _minHeight) return;
+    _minHeight = value;
+    notifyListeners();
+  }
+
   double? _reported;
   bool _unavailable = false;
 
   bool get isUnavailable => _unavailable;
 
   double get height =>
-      _unavailable ? 0 : math.max(_reported ?? fallbackHeight, minHeight);
+      _unavailable ? 0 : math.max(_reported ?? fallbackHeight, _minHeight);
 
   @override
   void onHeightChanged(double height) {

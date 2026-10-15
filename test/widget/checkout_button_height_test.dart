@@ -33,4 +33,14 @@ void main() {
     expect(c.isUnavailable, isTrue);
     expect(c.height, 0);
   });
+
+  test('minHeight can change after creation', () {
+    final c = CheckoutButtonHeightController(minHeight: 56)
+      ..onHeightChanged(50);
+    var n = 0;
+    c.addListener(() => n++);
+    c.minHeight = 80;
+    expect(c.height, 80);
+    expect(n, 1);
+  });
 }
