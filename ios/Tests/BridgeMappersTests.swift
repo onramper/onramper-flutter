@@ -1000,4 +1000,12 @@ final class BridgeMappersTests: XCTestCase {
         XCTAssertEqual(list?.first as? String, "a")
         XCTAssertTrue(list?.last is NSNull)
     }
+
+    // MARK: - Button theme
+
+    func test_buttonColorScheme_forcesConfiguredThemeOnly() {
+        XCTAssertEqual(BridgeMappers.buttonColorScheme(for: .light), .light)
+        XCTAssertEqual(BridgeMappers.buttonColorScheme(for: .dark), .dark)
+        XCTAssertNil(BridgeMappers.buttonColorScheme(for: .system))
+    }
 }

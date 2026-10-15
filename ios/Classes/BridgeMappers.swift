@@ -28,6 +28,17 @@ enum BridgeMappers {
         }
     }
 
+    /// Color scheme forced on the embedded checkout button so its text
+    /// matches the configured theme even when the device appearance differs
+    /// (e.g. a light app on a dark-mode phone). `nil` follows the device.
+    static func buttonColorScheme(for dto: ThemeDto) -> ColorScheme? {
+        switch dto {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+
     static func toNative(_ dto: ThemeDto) -> OnramperConfiguration.Theme {
         switch dto {
         case .system: return .system

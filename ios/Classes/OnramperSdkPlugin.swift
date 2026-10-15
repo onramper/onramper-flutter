@@ -143,6 +143,9 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // reconfigure.
     private var transactionIdCancellable: AnyCancellable?
 
+    // Theme from the last configure(); applied to embedded buttons.
+    private var configuredTheme: ThemeDto = .system
+
     // Handle of the most recent button stored in CheckoutButtonRegistry.
     // Cleared on reset / dispose so stale handles don't linger.
     private var lastButtonHandle: String?
@@ -225,6 +228,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
         }
 
         tearDownObservers()
+        configuredTheme = config.theme
         let newClient = OnramperClient(configuration: nativeConfig)
         newClient.delegate = self
         client = newClient
@@ -320,7 +324,10 @@ extension OnramperSdkPlugin: OnramperHostApi {
 
                 // Store the button in the registry and hand the handle to Dart so
                 // OnramperNativeCheckoutButton can look it up via the platform view.
-                let handle = await CheckoutButtonRegistry.shared.store(result.button)
+                let scheme = BridgeMappers.buttonColorScheme(for: self.configuredTheme)
+                let button = scheme.map { AnyView(result.button.environment(\.colorScheme, $0)) }
+                    ?? AnyView(result.button)
+                let handle = await CheckoutButtonRegistry.shared.storeView(button)
                 // A newer call may have started while we awaited the registry.
                 guard self.preparationGate.isCurrent(generation) else {
                     await CheckoutButtonRegistry.shared.drop(handle)

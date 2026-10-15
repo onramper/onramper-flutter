@@ -91,6 +91,12 @@ released separately; their changes are included here.
   in-flight call throws `OnramperError` with kind `intentInvalidated`; ignore
   it when waiting for the latest quote. Expired (5 min) or invalidated
   handles render nothing.
+- **Checkout button follows the configured theme.** With
+  `OnramperTheme.light` or `.dark`, the embedded button (including its ToS
+  text) renders in that theme even when the device appearance differs, so a
+  light app on a dark-mode phone no longer shows white text on white.
+  `OnramperTheme.system` still follows the device. Set the theme to match
+  your app.
 - **Safe after `dispose()`.** Methods throw `OnramperErrorKind.clientDisposed`;
   late native callbacks are ignored.
 - Podspec license corrected to Apache-2.0.
