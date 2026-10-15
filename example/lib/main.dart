@@ -146,18 +146,27 @@ class _ExampleHomeState extends State<ExampleHome> {
   /// Log level and theme are fixed at configure time, so changing either
   /// rebuilds the client and drops the current quote.
   Future<void> _rebuildClient(String reason, VoidCallback apply) async {
-    await _eventSub?.cancel();
-    final old = _client;
-    _update(() {
-      _client = null;
-      _requirements = null;
-      apply();
-      _statusMessage = '$reason; prepare a new quote';
-    });
-    // Dispose the old client before creating the new one: the plugin's
-    // callback registration is global.
-    await old?.dispose();
-    if (mounted) setState(() => _client = _buildClient());
+    // Block other actions (including another rebuild) until the old client
+    // is disposed and the new one exists; overlapping rebuilds would create
+    // two native clients sharing the plugin's global channels.
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _eventSub?.cancel();
+      final old = _client;
+      _update(() {
+        _client = null;
+        _requirements = null;
+        apply();
+        _statusMessage = '$reason; prepare a new quote';
+      });
+      // Dispose the old client before creating the new one: the plugin's
+      // callback registration is global.
+      await old?.dispose();
+      if (mounted) setState(() => _client = _buildClient());
+    } finally {
+      _update(() => _busy = false);
+    }
   }
 
   Future<void> _changeLogLevel(OnramperLogLevel level) async {
