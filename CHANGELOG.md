@@ -21,11 +21,20 @@ released separately; their changes are included here.
   entries on first launch.
 - **Run `pod install` and rebuild.** A Dart-only update cannot replace the
   bundled iOS SDK.
-- **Failed calls now throw `OnramperError`.** `initialize`,
-  `getCheckoutRequirements`, `reset`, `signOut` and `cancelPreparedIntent`
-  used to throw a `PlatformException` with code `onramper_error`; they now
-  throw a typed `OnramperError`. Plugin setup errors (e.g. `not_configured`)
-  are still `PlatformException`s.
+- **Catch operational failures as `OnramperError`.** Migrate catches of
+  `PlatformException` to `OnramperError` for SDK/bridge failures from
+  `initialize`, `getCheckoutRequirements`, `reset`, `signOut`,
+  `cancelPreparedIntent`, `sdkVersion` and `dispose`. SDK DTO errors keep
+  their kinds. Native `not_configured`, `not_initialized` and
+  `missing_response` map to `notConfigured`, `notInitialized` and
+  `missingResponse`; other `PlatformException`s and `MissingPluginException`s
+  map to `platformFailure`. `notConfigured`, `missingResponse` and
+  `platformFailure` are new Dart-only enum cases: update exhaustive switches.
+  Programming errors propagate unchanged. Public method signatures are unchanged.
+- **Update manually constructed finalize responses.**
+  `CheckoutFinalizeResponse(...)` now requires `onramperTransactionId`;
+  supply it in application code and fixtures as well as the existing
+  `headlessCheckoutId` and `headlessCheckoutData` arguments.
 
 ### Included from iOS SDK 1.2.0 – 1.3.1
 
@@ -78,9 +87,24 @@ released separately; their changes are included here.
 - `OnramperLogRecord`, `OnramperLogHandler`, `ProviderJSONValue`,
   `PaymentDisclosure`
 - `OnramperError.userMessage`, `OnramperError.supportCode`
+- Nullable `OnramperError.cause` (`Object?`), `stackTrace` (`StackTrace?`) and
+  `platformCode` (`String?`) diagnostics. The original exception (including
+  native details) is retained via `cause`, and the original stack is preserved.
+  `platformCode` is synthesized as `missing_plugin` for `MissingPluginException`;
+  otherwise it retains the original platform exception code when available.
+  These diagnostics are not safe end-user copy.
 
 ### Wrapper fixes
 
+- **Awaitable setup.** Construction starts configuration exactly once.
+  `initialize` and setup-dependent calls await the stored setup internally.
+  Setup failures are retained and thrown by dependent methods without an
+  unhandled configure future. Initialize once per client for normal startup.
+- **Cleanup after failures.** `dispose()` waits for pending setup and attempts
+  native cleanup even if setup failed. Repeated calls share one future and its
+  success or failure, with no duplicate cleanup. Both stream closes are initiated
+  without waiting for paused subscribers; `super.dispose()` always runs even if
+  native cleanup fails. Platform failures are normalized to `OnramperError`.
 - **Self-sizing checkout button.** The native button reports its content
   height (Buy button, ToS text, payment disclosures) and the platform view
   resizes to match. `OnramperNativeCheckoutButton.height` is deprecated and
@@ -97,7 +121,7 @@ released separately; their changes are included here.
   light app on a dark-mode phone no longer shows white text on white.
   `OnramperTheme.system` still follows the device. Set the theme to match
   your app.
-- **Safe after `dispose()`.** Methods throw `OnramperErrorKind.clientDisposed`;
+- **Safe after `dispose()`.** Setup-dependent methods throw `OnramperErrorKind.clientDisposed`;
   late native callbacks are ignored.
 - Podspec license corrected to Apache-2.0.
 
@@ -106,7 +130,17 @@ released separately; their changes are included here.
 - Pending payments are shown separately; errors show `userMessage` and the
   support code.
 - Shows plugin and SDK versions and the current transaction id.
-- **Prefill (optional)** form and a **New quote** button.
+- **Prefill (optional)** form and a **New quote** button. Purchase-form edits
+  invalidate the displayed quote and hide its checkout button until a new
+  quote is requested.
+- Development / Production selector with separate credentials and demo
+  session endpoints, missing-key feedback, and client rebuild on switching.
+  Includes crypto, amount, wallet, fiat, country/state and onramp controls,
+  plus a dark-mode switch that rebuilds the client with the selected theme.
+- Persistent **Transaction complete** / **Payment processing** panel with
+  the transaction id captured at the outcome (tap to copy, or "unavailable"
+  when absent). It remains after the payment sheet closes. **New transaction**
+  resets the client; a pending payment must be tracked before another payment.
 - SDK log viewer (app-bar icon) with a log-level picker, Clear and Copy all.
 
 ## 1.1.2 — License correction

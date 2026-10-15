@@ -1,7 +1,9 @@
 # onramper_flutter — example app
 
 A minimal Flutter app demonstrating the full `onramper_flutter` plugin integration:
-configure → initialize → getCheckoutRequirements → OnramperCheckoutButton.
+construct client (configuration starts automatically) → await initialize →
+getCheckoutRequirements → OnramperCheckoutButton. Initialize once per client;
+setup is awaited internally.
 
 ## Running the example
 
@@ -13,7 +15,7 @@ flutter pub get
 cd ios && pod install && cd ..
 # Copy the env template and fill in your credentials:
 cp .env.example .env
-flutter run --release
+flutter run --dart-define-from-file=.env --release
 ```
 
 Use `--release` (not `--debug`) — the Flutter debug overlay renders over the native
@@ -29,7 +31,9 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
   each uses its own `.env` keys (`ONRAMPER_DEV_*` / `ONRAMPER_PROD_*`, see
   `.env.example`) and demo session endpoint (`demo-stg.onramper.dev` /
   `demo-prod.onramper.com`); switching rebuilds the client. A banner lists any
-  keys missing for the selected environment.
+  keys missing for the selected environment. Legacy unprefixed
+  `ONRAMPER_API_KEY`, `ONRAMPER_CLIENT_ID` and `ONRAMPER_DEMO_AUTH_TOKEN`
+  are fallback values for Development only.
 - **Crypto** selector (BTC / ETH / SOL) with predefined demo wallets, plus
   editable **amount** and **wallet** fields (switching crypto restores its
   demo wallet)
@@ -46,6 +50,16 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
   address, or the whole prefill is dropped.
 - **New quote:** re-runs `getCheckoutRequirements`; superseded calls
   (`intentInvalidated`) are ignored
+- **Purchase-form edits invalidate the displayed quote:** changing crypto,
+  amount, wallet, fiat, country/state or onramp hides the old quote and checkout
+  button and clears the outcome. Request **New quote** before continuing.
+- **Persistent outcome panel:** **Transaction complete** for `completed`, or
+  **Payment processing** for `paymentPending`. It captures the transaction id
+  at the event and remains after the payment sheet closes. Tap the id to copy;
+  a missing id is shown as "Transaction ID unavailable". **New transaction**
+  calls `reset()` and clears the panel so another quote can be requested.
+  Track pending payments before starting another payment. Reset, Log out, a
+  new quote, purchase-form edits or a client rebuild also clear the panel.
 - **Versions banner:** plugin version, bundled SDK version and the current
   transaction id
 - **SDK log viewer** (app-bar icon), fed by `OnramperConfiguration.logHandler`:

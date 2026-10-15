@@ -166,6 +166,8 @@ await client.initialize(
 // client.state.kind == OnramperStateKind.ready
 ```
 
+The constructor starts native configuration exactly once and stores the setup future. `initialize()` and other setup-dependent calls await it internally; no separate `configure()` call or delay is needed. A setup failure is retained and thrown by dependent methods, without an unhandled configuration future. Call and await `initialize()` once per client for normal startup, before requesting a checkout; awaiting setup does not initialize a session for you.
+
 `initialize` performs App Attest, exchanges the bootstrap token for a DPoP-bound session, and prepares all subsequent backend calls. After it resolves, `client.state.kind` is `OnramperStateKind.ready`.
 
 ➡️ **See [Backend session endpoint](BACKEND_SESSION_ENDPOINT.md)** for the upstream API contract and a reference implementation.
@@ -346,9 +348,18 @@ Additional provider events in this release: `challengeStarted` / `challengeCompl
 
 ## 8. Error handling
 
-All errors thrown across the Flutter boundary are `OnramperError` instances. `kind` is the discriminator.
+Operational SDK and platform-bridge failures from public calls throw `OnramperError`, including `OnramperClient.sdkVersion()` and `dispose()`. Programming errors propagate unchanged. SDK errors delivered as `OnramperErrorDto` retain their SDK kind and structured fields. For other bridge failures, the mapping is:
 
-Failed calls throw `OnramperError`, and `failed` events carry one. Every error has `userMessage` — plain copy that's safe to show users — and `supportCode`, a short stable code that's safe to show next to it and matches what the SDK logs:
+| Native exception / code | `OnramperErrorKind` |
+|---|---|
+| `PlatformException`: `not_configured` | `notConfigured` (Dart-only) |
+| `PlatformException`: `not_initialized` | `notInitialized` (existing kind) |
+| `PlatformException`: `missing_response` | `missingResponse` (Dart-only) |
+| Any other `PlatformException`, or `MissingPluginException` | `platformFailure` (Dart-only) |
+
+The original error stack is preserved. Nullable diagnostics `cause` (`Object?`), `stackTrace` (`StackTrace?`) and `platformCode` (`String?`) retain the original exception, stack and platform code where available. Native `PlatformException.details` remains accessible through `cause`; `platformCode` is distinct from the numeric backend `code`; for `MissingPluginException`, it is synthesized as `missing_plugin` rather than copied from an original exception code. These diagnostics are not safe end-user copy: show `userMessage` and `supportCode` instead. Catch `OnramperError` rather than `PlatformException` for operational failures, and update exhaustive switches for the three new Dart-only enum cases. Existing public method signatures are unchanged.
+
+Operational failures from calls throw `OnramperError`, and `failed` events carry one. Every error has `userMessage` — plain copy that's safe to show users — and `supportCode`, a short stable code that's safe to show next to it and matches what the SDK logs:
 
 ```dart
 showError('${error.userMessage}\nError code: ${error.supportCode}');
@@ -371,6 +382,11 @@ try {
     case OnramperErrorKind.deviceBlocked:
     case OnramperErrorKind.attestationFailed:
       showTerminalMessage('Unable to continue on this device.');
+    case OnramperErrorKind.notConfigured:
+    case OnramperErrorKind.missingResponse:
+    case OnramperErrorKind.platformFailure:
+      // Inspect diagnostics; do not automatically retry bridge failures.
+      showMessage('${error.userMessage}\nError code: ${error.supportCode}');
     case OnramperErrorKind.unrecoverable:
       await client.reset();
       showRetry();
@@ -413,6 +429,9 @@ try {
 | `applePayNotConfigured` | false | Ask the user to add a card in Wallet, or offer another payment method. |
 | `intentInvalidated` | true | Ignore it; use the latest `getCheckoutRequirements` result. |
 | `clientDisposed` | false | Create a new `OnramperClient`. |
+| `notConfigured` | false | _Dart-only._ Native plugin has no configured client; inspect setup failure and lifecycle diagnostics. |
+| `missingResponse` | false | _Dart-only._ Required native response missing. Do not automatically retry; inspect diagnostics and report the bridge failure. |
+| `platformFailure` | false | _Dart-only._ Do not automatically retry; check platform support, plugin registration and native build. |
 
 The numeric backend error code is preserved on `OnramperError.code` when one was present. Switch on `kind`, not the numeric code.
 
@@ -471,12 +490,19 @@ The button label ("Buy") is fixed by the SDK and not overridable from Dart.
 - **`client.reset()`** — clears cached checkout state on both sides of the bridge, including `currentTransactionId` (read it first). Call before starting a fresh `getCheckoutRequirements` when the user changes amount, currency, or wallet. After reset, `client.state.kind` returns to `OnramperStateKind.ready`.
 - **`client.signOut()`** — wipes cached OnramperID (OIDC) tokens. The partner session (DPoP key + session token) is preserved, but the next checkout that requires identity re-prompts the login sheet.
 - **`client.cancelPreparedIntent(buttonHandle)`** — drops a specific stored native checkout button by handle without tearing down the client. Call this on `requirements.buttonHandle` when your UI navigates away from a prepared intent without ever showing the button.
-- **`client.dispose()`** — shuts the plugin down, detaches Pigeon callbacks, and closes the broadcast streams. Call it from the widget's `State.dispose()`. Idempotent. After `dispose()`, methods throw `OnramperError` with kind `clientDisposed` and late native callbacks are ignored.
+- **`client.dispose()`** — waits for pending setup and attempts native cleanup even if setup failed. Repeated calls return the same future and share its success or failure; cleanup runs once. Both stream closes are initiated without waiting for paused subscribers, and `super.dispose()` always runs, even if native cleanup fails. Native cleanup platform failures throw `OnramperError`. Callbacks are detached and late callbacks ignored. Subsequent setup-dependent methods throw `clientDisposed`. Await disposal when possible; Flutter's synchronous `State.dispose()` must attach an error handler to the returned future.
 
 ```dart
 @override
 void dispose() {
-  client.dispose();
+  client.dispose().catchError((Object error, StackTrace stack) {
+    // Report to your diagnostics; do not show raw exception details to users.
+    FlutterError.reportError(FlutterErrorDetails(
+      exception: error,
+      stack: stack,
+      context: ErrorDescription('while disposing OnramperClient'),
+    ));
+  });
   super.dispose();
 }
 ```

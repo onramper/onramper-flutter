@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart'
+    show MissingPluginException, PlatformException;
 
 import 'models/configuration.dart';
 import 'models/errors.dart';
@@ -39,8 +40,9 @@ typedef SessionExpirationHandler = Future<SessionCredentials> Function();
 ///    Riverpod, `StreamBuilder`, and `await for` consumers.
 ///
 /// The client is created with an [OnramperConfiguration] which is forwarded to
-/// the native side once during construction (fire-and-forget). Call
-/// [initialize] with [SessionCredentials] before starting a checkout flow.
+/// the native side once during construction. Calls await configuration and
+/// propagate setup failures. Call [initialize] with [SessionCredentials]
+/// before starting a checkout flow.
 ///
 /// After [dispose], methods throw [OnramperError] with kind `clientDisposed`,
 /// and late native callbacks are ignored. Create a new client to start over.
@@ -74,7 +76,8 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   /// Version of the bundled native OnramperSDK (e.g. "1.3.1"). Works without a
   /// client instance. Useful for diagnostics and support screens.
-  static Future<String> sdkVersion() => OnramperHostApi().sdkVersion();
+  static Future<String> sdkVersion() =>
+      _platformCall(() => OnramperHostApi().sdkVersion());
 
   /// Required by `dartPluginClass: OnramperClient` in `pubspec.yaml`.
   ///
@@ -94,16 +97,26 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
         _host = hostApi,
         _sessionExpirationHandler = sessionExpirationHandler {
     OnramperFlutterApi.setUp(this);
-    // Fire-and-forget — Pigeon's configure is async on iOS, but the contract
-    // is "called exactly once at construction; configuration errors surface
-    // as later state/error callbacks". Errors here become listener
-    // notifications via [onError].
-    unawaited(_host.configure(_config.toDto()));
+    _configuration = _configure();
   }
 
   final OnramperConfiguration _config;
   final OnramperHostApi _host;
   final SessionExpirationHandler? _sessionExpirationHandler;
+  late final Future<void> _configuration;
+  (Object, StackTrace)? _configurationFailure;
+  Future<void>? _disposal;
+
+  Future<void> _configure() async {
+    try {
+      await _platformCall(() => _host.configure(_config.toDto()));
+    } catch (error, stack) {
+      // Retain the failure until a caller awaits a public method. The
+      // constructor cannot return a Future, and setup may fail before that
+      // caller exists. Programming errors are retained unchanged as well.
+      _configurationFailure = (error, stack);
+    }
+  }
 
   OnramperState _state = const OnramperState(kind: OnramperStateKind.idle);
   final StreamController<OnramperState> _stateController =
@@ -234,31 +247,95 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   }
 
   /// Tears down the client, releases native resources, and closes both
-  /// broadcast streams. Idempotent.
+  /// broadcast streams. Repeated calls share the same cleanup future.
+  /// Does not wait for paused subscribers to consume the stream's done event.
   @override
-  Future<void> dispose() async {
-    if (_disposed) return;
+  // _dispose calls super.dispose in finally, once for all disposal callers.
+  // ignore: must_call_super
+  Future<void> dispose() => _disposal ??= _dispose();
+
+  Future<void> _dispose() async {
     _disposed = true;
     // Detach our FlutterApi handlers so late callbacks don't hit a disposed
     // client.
     OnramperFlutterApi.setUp(null);
-    await _host.dispose();
-    await _stateController.close();
-    await _eventController.close();
-    super.dispose();
+    try {
+      // Even failed setup may have allocated native resources. Waiting also
+      // prevents late configuration from recreating a disposed native client.
+      await _configuration;
+      await _platformCall(_host.dispose);
+    } finally {
+      // Closing prohibits further events immediately, but completion waits
+      // for paused listeners. They must not block other resources or errors.
+      unawaited(_stateController.close());
+      unawaited(_eventController.close());
+      super.dispose();
+    }
   }
 
-  /// Runs a host call, converting a native `OnramperError` (delivered as a
-  /// PlatformException whose `details` is an [OnramperErrorDto]) into a typed
-  /// [OnramperError]. Other exceptions propagate unchanged.
+  /// Waits for setup and prevents calls queued during setup after disposal.
   Future<T> _guard<T>(Future<T> Function() call) async {
     if (_disposed) throw const OnramperError.clientDisposed();
+    await _configuration;
+    if (_disposed) throw const OnramperError.clientDisposed();
+    final failure = _configurationFailure;
+    if (failure != null) Error.throwWithStackTrace(failure.$1, failure.$2);
+    return _platformCall(call);
+  }
+
+  /// Normalizes channel failures only; programming errors propagate intact.
+  static Future<T> _platformCall<T>(Future<T> Function() call) async {
     try {
       return await call();
-    } on PlatformException catch (e) {
+    } on PlatformException catch (e, stack) {
       final details = e.details;
-      if (details is OnramperErrorDto) throw OnramperError.fromDto(details);
-      rethrow;
+      if (details is OnramperErrorDto) {
+        Error.throwWithStackTrace(
+          OnramperError.fromDto(details,
+              cause: e, stackTrace: stack, platformCode: e.code),
+          stack,
+        );
+      }
+      final (kind, supportCode) = switch (e.code) {
+        'not_configured' => (
+            OnramperErrorKind.notConfigured,
+            'FLUTTER-NOT-CONFIGURED'
+          ),
+        'not_initialized' => (
+            OnramperErrorKind.notInitialized,
+            'FLUTTER-NOT-INITIALIZED'
+          ),
+        'missing_response' => (
+            OnramperErrorKind.missingResponse,
+            'FLUTTER-MISSING-RESPONSE'
+          ),
+        _ => (OnramperErrorKind.platformFailure, 'FLUTTER-PLATFORM-FAILURE'),
+      };
+      Error.throwWithStackTrace(
+        OnramperError(
+          kind: kind,
+          message: e.message ?? 'Native platform call failed (${e.code}).',
+          recoverable: false,
+          supportCode: supportCode,
+          cause: e,
+          stackTrace: stack,
+          platformCode: e.code,
+        ),
+        stack,
+      );
+    } on MissingPluginException catch (e, stack) {
+      Error.throwWithStackTrace(
+        OnramperError(
+          kind: OnramperErrorKind.platformFailure,
+          message: e.message ?? 'The native Onramper plugin is unavailable.',
+          recoverable: false,
+          supportCode: 'FLUTTER-PLATFORM-FAILURE',
+          cause: e,
+          stackTrace: stack,
+          platformCode: 'missing_plugin',
+        ),
+        stack,
+      );
     }
   }
 

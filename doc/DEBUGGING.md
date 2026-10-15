@@ -147,6 +147,36 @@ This error is rare in steady state. If it occurs frequently, check that your `se
 
 ---
 
+## Setup and platform-bridge failures
+
+Construction starts configuration once. `initialize()` and setup-dependent
+methods await the stored setup internally; adding a delay or calling configure
+again is unnecessary. Setup failure is retained and thrown by dependent calls,
+without an unhandled configure future. Initialize once per client for normal
+startup. `dispose()` waits for pending setup and attempts native cleanup even
+after setup failure. Repeated calls share one future and its success or failure,
+with no duplicate cleanup. Both stream closes are initiated without waiting for
+paused subscribers; `super.dispose()` always runs even if native cleanup fails.
+
+Operational SDK/bridge failures, including `sdkVersion()` and `dispose()`,
+throw `OnramperError`. SDK DTO errors keep their original kinds. Otherwise,
+`not_configured` maps to `notConfigured`, `not_initialized` to `notInitialized`,
+`missing_response` to `missingResponse`, and other `PlatformException`s or
+`MissingPluginException`s to `platformFailure`. For `notInitialized`, await
+initialization before requesting checkout. For the other bridge kinds, inspect
+plugin registration, platform support and the native build using the retained
+diagnostics. Programming errors propagate unchanged.
+
+Catch `OnramperError` instead of `PlatformException` for these failures. The
+nullable `cause` (`Object?`) retains the original exception and native details;
+`stackTrace` (`StackTrace?`) preserves its stack, and `platformCode` (`String?`)
+is the original platform code when available, or the synthesized `missing_plugin`
+for `MissingPluginException`. The thrown error retains the
+original stack. These fields are diagnostic only, not safe end-user copy.
+Show `userMessage` and `supportCode`; review diagnostics before sharing them.
+
+---
+
 ## Capturing SDK logs
 
 Pass a `logHandler` to receive structured, sanitized log records in Dart (Console output is kept):
@@ -176,7 +206,7 @@ For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is 
 
 ## Support codes
 
-Every `OnramperError` has a `supportCode`: a short, stable code that's safe to show users next to `userMessage` (e.g. "Error code: …") and matches what the SDK logs. Ask users to quote it, together with `client.currentTransactionId` when there is one, when they contact support. Codes starting with `FLUTTER-` come from the Flutter plugin itself (`FLUTTER-INTENT-INVALIDATED`, `FLUTTER-CLIENT-DISPOSED`).
+Every `OnramperError` has a `supportCode`: a short, stable code that's safe to show users next to `userMessage` (e.g. "Error code: …") and matches what the SDK logs. Ask users to quote it, together with `client.currentTransactionId` when there is one, when they contact support. Codes starting with `FLUTTER-` come from the Flutter plugin itself (for example, `FLUTTER-INTENT-INVALIDATED` and `FLUTTER-CLIENT-DISPOSED`).
 
 ---
 
@@ -202,11 +232,19 @@ The `example/` app shows plugin and SDK versions and the current transaction id,
 cd example
 flutter pub get
 cd ios && pod install && cd ..
-flutter run --dart-define-from-file=.env --debug
+# Copy .env.example to .env and fill in the selected environment's credentials.
+flutter run --dart-define-from-file=.env --release
 ```
 
 3. Pick a log level in the app (changing it rebuilds the client, so request a new quote afterwards).
 4. Tap the log icon in the app bar to browse records, expand their context, **Clear** them, or **Copy all** as JSON lines.
+
+The Environment selector switches between Development and Production, using
+separate credentials and demo session endpoints; it rebuilds the client.
+Purchase-form edits clear the displayed quote, so request a new one. Completed
+and pending payments remain in an outcome panel after the sheet closes, with a
+copyable transaction id and a **New transaction** reset action. Track pending
+payments before starting another payment.
 
 ---
 

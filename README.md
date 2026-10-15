@@ -3,9 +3,9 @@
 [![CI](https://github.com/onramper/onramper-flutter/actions/workflows/ci.yml/badge.svg)](https://github.com/onramper/onramper-flutter/actions/workflows/ci.yml)
 [![iOS tests](https://github.com/onramper/onramper-flutter/actions/workflows/ios-tests.yml/badge.svg)](https://github.com/onramper/onramper-flutter/actions/workflows/ios-tests.yml)
 
-Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp. Wire up three calls — `configure`, `initialize`, `getCheckoutRequirements` — and render a native checkout button. No PII, no checkout UI, no auth plumbing to maintain.
+Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp. Create a client, await `initialize`, call `getCheckoutRequirements`, and render a native checkout button. Configuration starts automatically in the constructor. No PII, no checkout UI, no auth plumbing to maintain.
 
-**iOS-only**, requires iOS 16+ and Apple's App Attest capability. Android throws `SizedBox.shrink` from the native button (no-op fallback); requests from Android throw at the platform boundary.
+**iOS-only**, requires iOS 16+ and Apple's App Attest capability. The native button renders an empty `SizedBox` on Android; unsupported platform calls surface as `OnramperErrorKind.platformFailure`.
 
 ## Contents
 
@@ -119,11 +119,13 @@ OnramperCheckoutButton(requirements: requirements)
 final transactionId = client.currentTransactionId;
 ```
 
+The constructor starts native configuration exactly once and stores the setup future. `initialize()` and other setup-dependent calls await it internally; no separate `configure()` call or delay is needed. A setup failure is retained and thrown by dependent methods, without an unhandled configuration future. Call and await `initialize()` once per client for normal startup, before requesting a checkout; awaiting setup does not initialize a session for you.
+
 See [`example/`](https://github.com/onramper/onramper-flutter/tree/master/example) for a runnable app that wires all four steps end-to-end.
 
 ## Events + errors
 
-Observe events via `client.events`, state via `client.state` / `client.stateStream`, and errors via `client.lastError`. All are `ChangeNotifier`-backed too — `AnimatedBuilder(animation: client, ...)` works.
+Observe events via `client.events`, state via `client.state` / `client.stateStream`, and native error callbacks via `client.lastError`. State and error updates also notify `ChangeNotifier` listeners — `AnimatedBuilder(animation: client, ...)` works. Catch public method failures from their returned futures; do not rely on `lastError` to report setup or bridge failures.
 
 Terminal outcomes:
 - `CheckoutEventKind.completed` — happy path; `event.checkoutId` populated.
@@ -148,7 +150,9 @@ client.events.listen((event) {
 
 Provider-lifecycle events (`checkoutCancelled`, `providerReady`, `paymentAuthorized`, `paymentProcessing`, `paymentCancelled`, `providerError`, `challengeStarted`, `challengeCompleted`, `customerOnboardingRequired`) surface everything the underlying provider emits — not every provider emits every one. They report progress, not payment completion.
 
-Errors are typed by `OnramperErrorKind` with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). Every error carries `userMessage` (safe to show users) and `supportCode` (safe to show next to it; quote it to support). Failed calls throw `OnramperError`. If you call `getCheckoutRequirements` again while an earlier call is in flight, the earlier call throws `intentInvalidated`; ignore it. See the [full error table in the integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md#8-error-handling).
+Errors are typed by `OnramperErrorKind` with structured payloads (`minAmount`, `maxAmount`, `retryAfterSeconds`, `field`, `host`, `debugInfo`, etc.). Every error carries `userMessage` (safe to show users) and `supportCode` (safe to show next to it; quote it to support). Operational SDK/bridge failures throw `OnramperError`, including setup failures and failures from `sdkVersion()` or `dispose()`; programming errors propagate unchanged. Bridge kinds include `notConfigured`, `notInitialized`, `missingResponse` and `platformFailure`. Nullable `cause`, `stackTrace` and `platformCode` preserve diagnostics and the original stack; they are not safe end-user copy. If you call `getCheckoutRequirements` again while an earlier call is in flight, the earlier call throws `intentInvalidated`; ignore it. See the [full error table in the integration guide](https://github.com/onramper/onramper-flutter/blob/master/integration-guide-flutter.md#8-error-handling).
+
+`dispose()` waits for pending setup and attempts cleanup even after setup failure. Repeated calls share one future and its success or failure; cleanup runs once. Both stream closes are initiated without waiting for paused subscribers, and notifier disposal always runs even if native cleanup fails. Await the returned future and handle operational failures as `OnramperError`.
 
 For diagnostics, pass `logHandler` to `OnramperConfiguration` to receive structured SDK log records, and use `OnramperClient.wrapperVersion` / `await OnramperClient.sdkVersion()` on support screens.
 

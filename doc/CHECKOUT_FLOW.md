@@ -42,7 +42,7 @@ Step by step:
 
 1. **Backend mints a session.** Your server calls `POST /v2/partners/{apiKey}/client-sessions` with your Ed25519 partner key and gets back a one-shot `{sessionId, sessionToken}` pair. It returns these to the app over your own authenticated channel.
 
-2. **App constructs `OnramperClient`** with configuration and `sessionExpirationHandler`, then calls `initialize(sessionId:, sessionToken:)`. The native side runs App Attest and exchanges the bootstrap token for a DPoP-bound session. State becomes `ready`.
+2. **App constructs `OnramperClient`** with configuration and `sessionExpirationHandler`, then calls and awaits `initialize(sessionId:, sessionToken:)` once per client for normal startup. Construction starts configuration once; initialization awaits the stored setup internally and throws any retained setup failure. The native side runs App Attest and exchanges the bootstrap token for a DPoP-bound session. State becomes `ready`.
 
 3. **App requests a checkout.** `getCheckoutRequirements(request)` creates a checkout intent, resolves what consent and KYC is needed for this user and amount, and returns `CheckoutRequirementsResult` with a quote and a native button handle.
 
@@ -97,7 +97,7 @@ A journey can produce several checkout ids but at most one transaction id. If yo
 - Calling `getCheckoutRequirements` again, or `reset()` / `signOut()`, supersedes any earlier call still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest result.
 - Buttons prepared by earlier calls that weren't shown yet are released and render nothing.
 - A prepared button that isn't shown within 5 minutes expires and renders nothing; request a new quote.
-- After `dispose()`, every method throws `clientDisposed`. Create a new client to start over.
+- After `dispose()`, setup-dependent methods throw `clientDisposed`; repeated disposal returns the same future and shares its success or failure without repeating cleanup. Create a new client to start over.
 
 ---
 

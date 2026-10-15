@@ -98,6 +98,8 @@ OnramperClient({
 })
 ```
 
+The constructor starts native configuration exactly once and stores the setup future. `initialize()` and other setup-dependent calls await it internally; no separate `configure()` call or delay is needed. A setup failure is retained and thrown by dependent methods, without an unhandled configuration future. Call and await `initialize()` once per client for normal startup, before requesting a checkout; awaiting setup does not initialize a session for you.
+
 **Properties:**
 
 | Property | Type | Description |
@@ -106,7 +108,7 @@ OnramperClient({
 | `state` | `OnramperState` | Latest known SDK state. Defaults to `idle`. |
 | `stateStream` | `Stream<OnramperState>` | Broadcast stream of every state change. |
 | `events` | `Stream<CheckoutEvent>` | Broadcast stream of domain events. |
-| `lastError` | `OnramperError?` | Most recent error, or `null`. |
+| `lastError` | `OnramperError?` | Most recent native error callback, or `null`. Catch failures from public method futures separately. |
 | `tosRequirements` | `List<TosRequirement>?` | Cached ToS requirements from the latest `getCheckoutRequirements` call. |
 | `currentTransactionId` | `String?` | Onramper's durable transaction id. Set at finalize, cleared by a new checkout or `reset()`. Store it and quote it to support. Notifies listeners on change. |
 
@@ -121,14 +123,23 @@ OnramperClient({
 
 | Method | Returns | Description |
 |---|---|---|
-| `initialize({required String sessionId, required String sessionToken})` | `Future<void>` | Runs App Attest and exchanges the bootstrap token for a DPoP-bound session. Call once per app launch. |
+| `initialize({required String sessionId, required String sessionToken})` | `Future<void>` | Runs App Attest and exchanges the bootstrap token for a DPoP-bound session. Call once per client for normal startup; awaits stored setup internally. |
 | `getCheckoutRequirements(CheckoutIntentRequest request, {OnramperUserPrefill? prefill, CheckoutButtonStyle? buttonStyle})` | `Future<CheckoutRequirementsResult>` | Creates a checkout intent, resolves requirements and quote, prepares the native button. A newer call (or `reset()` / `signOut()`) makes an in-flight call throw `intentInvalidated`. |
 | `reset()` | `Future<void>` | Clears cached checkout state. Returns to `ready`. |
 | `signOut()` | `Future<void>` | Wipes stored OnramperID OIDC tokens. Does not invalidate the partner session. |
 | `cancelPreparedIntent(String buttonHandle)` | `Future<void>` | Drops a specific native button by handle. Call when navigating away from a prepared intent. |
-| `dispose()` | `Future<void>` | Tears down the client, closes streams, detaches Pigeon callbacks. Idempotent. Afterwards, methods throw `clientDisposed` and late callbacks are ignored. |
+| `dispose()` | `Future<void>` | Waits for pending setup; attempts native cleanup even after setup failure. Repeated calls share one future and its success or failure, with no duplicate cleanup. Initiates both stream closes without waiting for paused subscribers; `super.dispose()` always runs. Native cleanup platform failures throw `OnramperError`; subsequent setup-dependent methods throw `clientDisposed` and late callbacks are ignored. |
 
-Failed calls throw `OnramperError`.
+Operational SDK and platform-bridge failures from public calls throw `OnramperError`, including `OnramperClient.sdkVersion()` and `dispose()`. Programming errors propagate unchanged. SDK errors delivered as `OnramperErrorDto` retain their SDK kind and structured fields. For other bridge failures, the mapping is:
+
+| Native exception / code | `OnramperErrorKind` |
+|---|---|
+| `PlatformException`: `not_configured` | `notConfigured` (Dart-only) |
+| `PlatformException`: `not_initialized` | `notInitialized` (existing kind) |
+| `PlatformException`: `missing_response` | `missingResponse` (Dart-only) |
+| Any other `PlatformException`, or `MissingPluginException` | `platformFailure` (Dart-only) |
+
+The original error stack is preserved. Nullable diagnostics `cause` (`Object?`), `stackTrace` (`StackTrace?`) and `platformCode` (`String?`) retain the original exception, stack and platform code where available. Native `PlatformException.details` remains accessible through `cause`; `platformCode` is distinct from the numeric backend `code`; for `MissingPluginException`, it is synthesized as `missing_plugin` rather than copied from an original exception code. These diagnostics are not safe end-user copy: show `userMessage` and `supportCode` instead. Catch `OnramperError` rather than `PlatformException` for operational failures, and update exhaustive switches for the three new Dart-only enum cases. Existing public method signatures are unchanged.
 
 ### `OnramperUserPrefill`
 
@@ -245,7 +256,7 @@ The events from `checkoutCancelled` onwards are forwarded from the payment surfa
 
 ### `CheckoutFinalizeResponse`
 
-Carried by the `checkoutFinalized` event.
+Carried by the `checkoutFinalized` event. **Upgrade note:** direct construction now requires the named `onramperTransactionId` argument as well as `headlessCheckoutId` and `headlessCheckoutData`; update manually constructed responses and fixtures.
 
 | Field | Type | Description |
 |---|---|---|
@@ -477,8 +488,13 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `expectedState` | `String?` | Populated for `invalidState`. |
 | `actualState` | `String?` | Populated for `invalidState`. |
 | `host` | `String?` | Populated for `securityTrustFailed` — the host whose certificate pinning check failed. |
+| `cause` | `Object?` | Original exception, including native details when available. Diagnostic only; not safe end-user copy. |
+| `stackTrace` | `StackTrace?` | Original failure stack when available; preserved when rethrowing. |
+| `platformCode` | `String?` | Original platform exception code when available; synthesized as `missing_plugin` for `MissingPluginException`. Separate from numeric backend `code`. |
 
 ### `OnramperErrorKind`
+
+The Dart-only additions `notConfigured`, `missingResponse` and `platformFailure` use the bridge mapping above. They do not add native DTO enum values. Update exhaustive switches when upgrading. The table below lists SDK and plugin kinds.
 
 | Value | `recoverable` default | Suggested action |
 |---|---|---|
@@ -513,6 +529,9 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `applePayNotConfigured` | false | No Apple Pay card in Wallet. Ask the user to add one or pick another method. |
 | `intentInvalidated` | true | _Plugin-originated._ Superseded by a newer `getCheckoutRequirements`, `reset()` or `signOut()`. Ignore. |
 | `clientDisposed` | false | _Plugin-originated._ Method called after `dispose()`. Create a new client. |
+| `notConfigured` | false | _Dart-only._ Native plugin has no configured client; inspect setup failure and lifecycle diagnostics. |
+| `missingResponse` | false | _Dart-only._ Required native response missing. Do not automatically retry; inspect diagnostics and report the bridge failure. |
+| `platformFailure` | false | _Dart-only._ Do not automatically retry; check platform support, plugin registration and native build. |
 
 ---
 

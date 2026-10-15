@@ -1,9 +1,8 @@
 import '../platform/pigeon.g.dart';
 
-/// Categorical taxonomy of errors emitted by the native SDK.
+/// Categorical taxonomy of SDK and platform-bridge failures.
 ///
-/// Mirrors `OnramperErrorKindDto` 1:1. The last two kinds originate in the
-/// Flutter plugin, not the native SDK.
+/// Includes the native `OnramperErrorKindDto` cases and Flutter bridge errors.
 enum OnramperErrorKind {
   notInitialized,
   initializationFailed,
@@ -48,6 +47,15 @@ enum OnramperErrorKind {
 
   /// An `OnramperClient` method was called after `dispose()`.
   clientDisposed,
+
+  /// The native plugin has no configured client.
+  notConfigured,
+
+  /// The native plugin could not produce the required response.
+  missingResponse,
+
+  /// The platform channel failed or the native plugin is unavailable.
+  platformFailure,
 }
 
 /// Public, throwable error type exposed by the SDK.
@@ -73,9 +81,18 @@ class OnramperError implements Exception {
     this.expectedState,
     this.actualState,
     this.host,
+    this.cause,
+    this.stackTrace,
+    this.platformCode,
   });
 
-  factory OnramperError.fromDto(OnramperErrorDto dto) => OnramperError(
+  factory OnramperError.fromDto(
+    OnramperErrorDto dto, {
+    Object? cause,
+    StackTrace? stackTrace,
+    String? platformCode,
+  }) =>
+      OnramperError(
         kind: _kindFromDto(dto.kind),
         message: dto.message,
         recoverable: dto.recoverable,
@@ -92,6 +109,9 @@ class OnramperError implements Exception {
         expectedState: dto.expectedState,
         actualState: dto.actualState,
         host: dto.host,
+        cause: cause,
+        stackTrace: stackTrace,
+        platformCode: platformCode,
       );
 
   /// Thrown by `OnramperClient` methods called after `dispose()`.
@@ -134,6 +154,17 @@ class OnramperError implements Exception {
   /// Populated for [OnramperErrorKind.securityTrustFailed]. The host whose
   /// certificate pinning check failed.
   final String? host;
+
+  /// Original bridge exception, including native details. Developer-only;
+  /// may contain sensitive information and must not be shown to end users.
+  final Object? cause;
+
+  /// Original Dart stack trace when an exception was normalized.
+  final StackTrace? stackTrace;
+
+  /// Original platform error code, distinct from the SDK's numeric [code].
+  /// `missing_plugin` is synthesized for a missing native implementation.
+  final String? platformCode;
 
   @override
   String toString() => 'OnramperError(${kind.name}, $supportCode): $message';

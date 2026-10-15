@@ -18,6 +18,19 @@ void main() {
     expect(OnramperClient.wrapperVersion, podVersion.group(1));
   });
 
+  test('sdkVersion normalizes a missing native channel', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(
+      'dev.flutter.pigeon.onramper_flutter.OnramperHostApi.sdkVersion',
+      (_) async => null,
+    );
+    await expectLater(
+        OnramperClient.sdkVersion(),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.platformFailure)
+            .having((e) => e.platformCode, 'platformCode', 'channel-error')));
+  });
+
   test('sdkVersion reads the native value over the host channel', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMessageHandler(
