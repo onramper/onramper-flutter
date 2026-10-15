@@ -483,6 +483,7 @@ final class BridgeMappersTests: XCTestCase {
     func test_checkoutFinalizeResponse_fromNative_mapsAllFields() {
         let native = CheckoutFinalizeResponse(
             headlessCheckoutId: "co_1",
+            onramperTransactionId: "01JTXN0000000000000000000",
             headlessCheckoutData: HeadlessCheckoutData(
                 checkoutPaymentType: .applePay,
                 url: "https://pay.example.com/co_1",
@@ -548,6 +549,7 @@ final class BridgeMappersTests: XCTestCase {
     func test_checkoutEvent_fromNative_checkoutFinalized_populatesBothContextAndFullResponse() {
         let response = CheckoutFinalizeResponse(
             headlessCheckoutId: "co_xyz",
+            onramperTransactionId: "01JTXN0000000000000000000",
             headlessCheckoutData: HeadlessCheckoutData(
                 checkoutPaymentType: .revolutPay,
                 url: "https://pay.example.com",
