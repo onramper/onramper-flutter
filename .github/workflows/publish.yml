@@ -28,8 +28,7 @@ jobs:
     permissions:
       # Required for pub.dev OIDC token exchange. Do not remove.
       id-token: write
-      # Create the GitHub release.
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +36,7 @@ jobs:
       # before flutter-action so `flutter pub publish` picks up the token.
       - uses: dart-lang/setup-dart@v1
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: '3.22.0'
           channel: stable
@@ -51,6 +50,16 @@ jobs:
 
       - run: flutter pub get
       - run: flutter pub publish --force
+
+  # Separate job so only this one gets contents: write, and the job holding
+  # the pub.dev OIDC permission runs no step that can write to the repo.
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Create GitHub release
         env:
