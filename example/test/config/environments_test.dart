@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
-import 'package:onramper_flutter_example/demo_environment.dart';
+import 'package:onramper_flutter_example/config/environments.dart';
 
 void main() {
   const full = {

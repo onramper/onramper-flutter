@@ -20,15 +20,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
-import 'buy_form.dart';
+import 'checkout/request.dart';
+import 'config/catalog.dart';
 import 'checkout_outcome.dart';
-import 'demo_environment.dart';
-import 'ios_diagnostics.dart';
+import 'config/environments.dart';
+import 'platform/ios_diagnostics.dart';
 import 'log_buffer.dart';
 import 'log_viewer_sheet.dart';
 import 'prefill_form.dart';
 import 'session_initializer.dart';
-import 'session_token_service.dart';
+import 'app/session_token_service.dart';
 
 void main() => runApp(const ExampleApp());
 

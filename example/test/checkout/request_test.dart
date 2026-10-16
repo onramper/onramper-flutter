@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onramper_flutter_example/buy_form.dart';
+import 'package:flutter/painting.dart';
+import 'package:onramper_flutter_example/checkout/request.dart';
+import 'package:onramper_flutter_example/config/catalog.dart';
 
 void main() {
   test('default form sends no country, subdivision or onramp filter', () {
@@ -81,5 +83,30 @@ void main() {
           reason: amount);
     }
     expect(const BuyForm().copyWith(wallet: '   ').toRequest(), isNull);
+  });
+
+  test('GBP and Revolut Pay map to the request', () {
+    final data = const BuyForm()
+        .copyWith(fiat: DemoFiat.gbp, paymentMethod: DemoPaymentMethod.revolutpay)
+        .toRequest()!
+        .transactionData;
+    expect(data.source, 'gbp');
+    expect(data.paymentMethod, 'revolutpay');
+  });
+
+  test('BuyForm has value equality', () {
+    expect(const BuyForm(), const BuyForm());
+    expect(const BuyForm().copyWith(amount: '5'), const BuyForm(amount: '5'));
+    expect(const BuyForm() == const BuyForm(amount: '5'), isFalse);
+    expect(const BuyForm().hashCode, const BuyForm().hashCode);
+  });
+
+  test('catalog matches RN', () {
+    expect(DemoFiat.values.map((f) => f.label), ['USD', 'EUR', 'GBP']);
+    expect(DemoPaymentMethod.values.map((m) => m.label),
+        ['Apple Pay', 'Revolut Pay']);
+    expect(DemoCountry.values.map((c) => c.flag), ['🇺🇸', '🇪🇸', '🇳🇱', '🇬🇷']);
+    expect(DemoCrypto.btc.displayName, 'Bitcoin');
+    expect(DemoCrypto.sol.color, const Color(0xFF32ADE6));
   });
 }
