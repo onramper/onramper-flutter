@@ -19,20 +19,18 @@ on:
         required: true
 
 jobs:
-  release:
+  # Read-only: runs Flutter and dependency code (pub get, analyze, test).
+  verify:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
-      # Push the tag.
-      contents: write
-      # Dispatch publish.yml.
-      actions: write
+      contents: read
     env:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -81,24 +79,35 @@ jobs:
       # Gates the tag on pub.dev acceptance (metadata, dependencies, layout).
       - run: flutter pub publish --dry-run
 
-      - name: Push tag
+  # Holds the write permissions; runs no checkout and no dependency code,
+  # only GitHub API calls.
+  tag:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      # Create the tag.
+      contents: write
+      # Dispatch publish.yml.
+      actions: write
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Create tag
         run: |
           set -euo pipefail
-          # Idempotent: a previous run may already have pushed the tag (e.g.
-          # its publish failed). Reuse it; the pub.dev check above already
-          # guarantees this version was not published.
-          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+          # Idempotent: a previous run may already have created the tag (e.g.
+          # its publish failed). Reuse it; verify already guaranteed this
+          # version is not on pub.dev.
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" >/dev/null 2>&1; then
             echo "::notice::Tag v${VERSION} already exists; reusing it."
             exit 0
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a "v${VERSION}" -m "onramper_flutter v${VERSION}"
-          git push origin "refs/tags/v${VERSION}"
+          # Tags exactly the commit `verify` checked.
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/v${VERSION}" -f sha="${GITHUB_SHA}" >/dev/null
 
       - name: Start publish
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           gh workflow run publish.yml --ref "v${VERSION}"
           {
