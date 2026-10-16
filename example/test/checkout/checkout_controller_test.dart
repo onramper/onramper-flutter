@@ -119,6 +119,21 @@ void main() {
         'quoteUnavailable — No quotes\nError code: FLUTTER-UNSPECIFIED');
   });
 
+  test('an invalidated quote is not reported as a failure', () async {
+    final host = FakeHost()
+      ..requirementsError = const OnramperError(
+        kind: OnramperErrorKind.intentInvalidated,
+        message: 'superseded',
+        recoverable: true,
+      );
+    update(client(host));
+    await settle();
+    expect(checkout.loading, isFalse);
+    expect(checkout.error, isNull);
+    expect(checkout.result, isNull);
+    expect(log.last, 'info: quote superseded');
+  });
+
   test('a result is hidden once the client changes', () async {
     final host = FakeHost();
     update(client(host));

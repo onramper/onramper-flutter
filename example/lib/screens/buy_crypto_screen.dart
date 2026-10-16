@@ -57,6 +57,9 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
   Timer? _prefillTimer;
   String? _actionError;
 
+  /// Button handle of the quote whose checkout failed before finalization.
+  String? _recoveryHandle;
+
   late final CheckoutController _checkout =
       CheckoutController(log: widget.demo.eventLog.add);
   late final DebouncedText _amount = DebouncedText(
@@ -376,8 +379,13 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
     final result = _checkout.result;
     final request = _form.toRequest();
     if (result != null && request != null) {
-      final needsRecovery = _demo.sdkState == OnramperStateKind.failed &&
-          !_demo.hasFinalizedCheckout;
+      if (_demo.sdkState == OnramperStateKind.failed &&
+          !_demo.hasFinalizedCheckout) {
+        _recoveryHandle = result.buttonHandle;
+      }
+      // The status box unmounts the native button and a handle can be shown
+      // only once, so this quote stays in recovery until a new one arrives.
+      final needsRecovery = _recoveryHandle == result.buttonHandle;
       return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: spaced(16, [

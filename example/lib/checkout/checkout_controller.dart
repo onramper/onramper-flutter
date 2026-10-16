@@ -102,8 +102,15 @@ class CheckoutController extends ChangeNotifier {
       _notify();
     }, onError: (Object e) {
       if (_disposed || generation != _generation) return;
-      final d = describeError(e);
       _loading = false;
+      // Reset, sign-out or a client change cancelled this preparation; the
+      // follow-up refresh (if any) requests a new quote.
+      if (e is OnramperError && e.kind == OnramperErrorKind.intentInvalidated) {
+        _log(EventLevel.info, 'quote superseded');
+        _notify();
+        return;
+      }
+      final d = describeError(e);
       if (d.code == OnramperErrorKind.amountOutOfRange.name) {
         _amountHint = d.message;
       } else {

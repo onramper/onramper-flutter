@@ -69,6 +69,11 @@ class LogFileStore {
   int _totalBytes = 0;
   bool _headerWritten = false;
 
+  /// The day file kept open for appends; closed before any file is deleted
+  /// or rewritten, and reopened by the next write.
+  RandomAccessFile? _sink;
+  String? _sinkPath;
+
   Future<T> _serial<T>(Future<T> Function() op) {
     final result = _tail.then((_) => op());
     _tail = result.then<void>((_) {}, onError: (Object _) {});
@@ -112,8 +117,13 @@ class LogFileStore {
           if (line.length - 1 <= maxRecordBytes) out.add(line);
           if (out.isEmpty) return;
           final bytes = out.takeBytes();
-          await File('${dir.path}/onramper-sdk-$day.log')
-              .writeAsBytes(bytes, mode: FileMode.append);
+          final sink = await _openSink('${dir.path}/onramper-sdk-$day.log');
+          try {
+            await sink.writeFrom(bytes);
+          } catch (_) {
+            await _closeSink();
+            rethrow;
+          }
           // Enforce the cap during the session too, as RN does per append.
           _totalBytes += bytes.length;
           if (_totalBytes > maxBytes) await _prune(dir, day);
@@ -181,6 +191,7 @@ class LogFileStore {
   }
 
   Future<void> deleteAll() => _serial(() async {
+        await _closeSink();
         for (final f in await _scan(await _ensureDir())) {
           await f.file.delete();
         }
@@ -225,7 +236,28 @@ class LogFileStore {
     }
   }
 
+  Future<RandomAccessFile> _openSink(String path) async {
+    final open = _sink;
+    if (open != null && _sinkPath == path) return open;
+    await _closeSink();
+    final sink = await File(path).open(mode: FileMode.append);
+    _sinkPath = path;
+    return _sink = sink;
+  }
+
+  Future<void> _closeSink() async {
+    final sink = _sink;
+    _sink = null;
+    _sinkPath = null;
+    try {
+      await sink?.close();
+    } catch (e) {
+      debugPrint('LogFileStore: close failed: $e');
+    }
+  }
+
   Future<void> _prune(Directory dir, String today) async {
+    await _closeSink();
     final cutoff =
         _dayOf(DateTime.parse('${today}T00:00:00Z').subtract(maxAge));
     final files = <LogFile>[];

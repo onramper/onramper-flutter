@@ -239,6 +239,32 @@ void main() {
     expect(tester.widget<MaterialApp>(find.byType(MaterialApp)), same(before));
   });
 
+  testWidgets('a failed checkout keeps its quote in recovery until re-quoted',
+      (tester) async {
+    await pumpApp(tester);
+    expect(find.byType(OnramperCheckoutButton), findsOneWidget);
+    clients.single.debugDispatchStateChanged(
+        OnramperStateDto(kind: OnramperStateKindDto.failed));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t start checkout'), findsOneWidget);
+
+    // Its native button was unmounted and its handle consumed; showing it
+    // again would render nothing.
+    clients.single.debugDispatchStateChanged(
+        OnramperStateDto(kind: OnramperStateKindDto.ready));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t start checkout'), findsOneWidget);
+    expect(find.byType(OnramperCheckoutButton), findsNothing);
+
+    await tester.ensureVisible(find.text('Get a new quote'));
+    await tester.tap(find.text('Get a new quote'));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t start checkout'), findsNothing);
+    final button = tester
+        .widget<OnramperCheckoutButton>(find.byType(OnramperCheckoutButton));
+    expect(button.requirements.buttonHandle, 'button-2');
+  });
+
   testWidgets('Save SDK logs off stops file writes', (tester) async {
     await pumpApp(tester);
     final record = OnramperLogRecord(
