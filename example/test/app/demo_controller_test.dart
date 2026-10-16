@@ -217,6 +217,45 @@ void main() {
     c.dispose();
   });
 
+  test('clearLocalSessions superseded by a theme change does not restart again',
+      () async {
+    final rig = Rig();
+    final gate = Completer<void>();
+    rig.prepareHost = (host, index) {
+      if (index == 0) host.signOutGate = gate;
+    };
+    final c = rig.build();
+    await settle();
+    final clearing = c.clearLocalSessions();
+    await settle();
+    c.setDarkMode(false);
+    gate.complete();
+    await clearing;
+    await settle();
+    expect(rig.clients.length, 2);
+    expect(rig.hosts[0].resetCalls, 0);
+    expect(c.status, InitStatus.ready);
+    expect(c.client, same(rig.clients[1]));
+    c.dispose();
+  });
+
+  test('clearLocalSessions finishing after dispose starts nothing', () async {
+    final rig = Rig();
+    final gate = Completer<void>();
+    rig.prepareHost = (host, index) {
+      if (index == 0) host.signOutGate = gate;
+    };
+    final c = rig.build();
+    await settle();
+    final clearing = c.clearLocalSessions();
+    await settle();
+    c.dispose();
+    gate.complete();
+    await clearing;
+    await settle();
+    expect(rig.mints, 1);
+  });
+
   test('clearLocalSessions throws without a client', () async {
     final c = Rig().build(defines: const {});
     await settle();

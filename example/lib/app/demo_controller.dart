@@ -123,7 +123,11 @@ class DemoController extends ChangeNotifier {
     final current = _client;
     if (current == null) throw StateError('The SDK is not initialized.');
     await current.signOut();
+    // A theme or environment change during sign-out already started a fresh
+    // run (and disposed `current`); resetting or restarting would undo it.
+    if (!identical(current, _client)) return;
     await current.reset();
+    if (!identical(current, _client)) return;
     _startRun();
   }
 

@@ -23,6 +23,7 @@ class FakeHost implements OnramperHostApi {
   Completer<void>? initializeGate;
   Object? initializeError;
   Object? signOutError;
+  Completer<void>? signOutGate;
 
   /// Each `getCheckoutRequirements` call waits for, then removes, the first
   /// gate here (if any).
@@ -92,6 +93,7 @@ class FakeHost implements OnramperHostApi {
   Future<void> signOut() async {
     journal.add('$tag.signOut');
     signOutCalls++;
+    await signOutGate?.future;
     final error = signOutError;
     if (error != null) throw error;
   }
