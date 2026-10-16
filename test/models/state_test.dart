@@ -96,6 +96,8 @@ void main() {
         failedError: OnramperErrorDto(
           kind: OnramperErrorKindDto.networkError,
           message: 'boom',
+          userMessage: 'Something went wrong. Please try again.',
+          supportCode: 'test',
           recoverable: false,
         ),
       ));
@@ -113,5 +115,11 @@ void main() {
       expect(s.requireLoginRequirements, isNull);
       expect(s.failedError, isNull);
     });
+  });
+
+  test('maps paymentPending', () {
+    final s = OnramperState.fromDto(
+        OnramperStateDto(kind: OnramperStateKindDto.paymentPending));
+    expect(s.kind, OnramperStateKind.paymentPending);
   });
 }

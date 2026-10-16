@@ -1,3 +1,4 @@
+import Combine
 import Flutter
 import SwiftUI
 import UIKit
@@ -84,10 +85,25 @@ actor SessionRefreshBridge {
 /// both `headlessCheckoutId` and the requirements list. We rebuild the
 /// missing fields from delegate callbacks fired during the call.
 @MainActor
-private final class CheckoutRequirementsCollector {
-    var headlessCheckoutId: String?
-    var requireLoginRequirements: [CheckoutRequirement]?
-    var becameReadyToCheckout: Bool = false
+final class CheckoutRequirementsCollector {
+    private(set) var headlessCheckoutId: String?
+    private(set) var requireLoginRequirements: [CheckoutRequirement]?
+
+    /// Native runs a new preparation only after the superseded one finished,
+    /// so anything recorded before this call belongs to an older call.
+    func checkoutStarted(_ checkoutId: String) {
+        headlessCheckoutId = checkoutId
+        requireLoginRequirements = nil
+    }
+
+    func loginRequired(_ requirements: [CheckoutRequirement]) {
+        requireLoginRequirements = requirements
+    }
+
+    /// Ready-to-checkout means no login is required for this preparation.
+    func readyToCheckout() {
+        requireLoginRequirements = []
+    }
 }
 
 /// Main Flutter plugin entry point. Owns the native `OnramperClient`, mirrors
@@ -108,6 +124,10 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 
     let refreshBridge = SessionRefreshBridge()
 
+    // Supersedes in-flight getCheckoutRequirements calls on a newer call,
+    // reset, signOut or dispose.
+    let preparationGate = PreparationGate()
+
     // Stores the per-call collector while `getCheckoutRequirements` is
     // in-flight. Reset to nil between calls.
     fileprivate var inFlightRequirements: CheckoutRequirementsCollector?
@@ -115,6 +135,13 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
     // Bridges `client.events` (AsyncStream) to `flutterApi.onEvent`. Cancelled
     // on dispose / reconfigure.
     private var eventForwardingTask: Task<Void, Never>?
+
+    // Mirrors `client.$currentTransactionId` to Dart. Cancelled on dispose /
+    // reconfigure.
+    private var transactionIdCancellable: AnyCancellable?
+
+    // Theme from the last configure(); applied to embedded buttons.
+    private var configuredTheme: ThemeDto = .system
 
     // Handle of the most recent button stored in CheckoutButtonRegistry.
     // Cleared on reset / dispose so stale handles don't linger.
@@ -145,11 +172,32 @@ public final class OnramperSdkPlugin: NSObject, FlutterPlugin {
 
     func testRefreshBridge() -> SessionRefreshBridge { refreshBridge }
 
+    var testLastButtonHandle: String? {
+        get { lastButtonHandle }
+        set { lastButtonHandle = newValue }
+    }
+
     // MARK: Internal helpers
+
+    /// Builds the native log handler that forwards records to Dart. Native
+    /// calls it synchronously on arbitrary threads, so it keeps Console output
+    /// and hops to main (FIFO) before touching the channel.
+    func makeLogHandler() -> OnramperLogHandler {
+        return { [weak self] (record: OnramperLogRecord) in
+            OnramperLog.systemHandler(record)
+            let dto = BridgeMappers.fromNative(record)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.flutterApi?.onLog(record: dto) { _ in }
+                }
+            }
+        }
+    }
 
     /// Cancels the event-forwarding task. Called on dispose / reconfigure.
     private func tearDownObservers() {
         eventForwardingTask?.cancel(); eventForwardingTask = nil
+        transactionIdCancellable?.cancel(); transactionIdCancellable = nil
     }
 
 }
@@ -170,7 +218,8 @@ extension OnramperSdkPlugin: OnramperHostApi {
     func configure(config: ConfigurationDto) throws {
         // Capture the bridge and a weak self for the closure the SDK retains.
         let bridge = self.refreshBridge
-        let nativeConfig = BridgeMappers.toNative(config) { [weak self] in
+        let logHandler = config.hasLogHandler ? makeLogHandler() : nil
+        let nativeConfig = BridgeMappers.toNative(config, logHandler: logHandler) { [weak self] in
             try await bridge.awaitRefresh { @Sendable in
                 // The notification runs on the main actor so the
                 // `OnramperFlutterApi` can be touched without crossing isolation.
@@ -181,37 +230,27 @@ extension OnramperSdkPlugin: OnramperHostApi {
         }
 
         tearDownObservers()
+        configuredTheme = config.theme
         let newClient = OnramperClient(configuration: nativeConfig)
         newClient.delegate = self
         client = newClient
 
         // Forward CheckoutEvents to Dart.
         let api = self.flutterApi
-        eventForwardingTask = Task { @MainActor [weak self] in
+        eventForwardingTask = Task { @MainActor in
             for await event in newClient.events {
                 let dto = BridgeMappers.fromNative(event)
                 api?.onEvent(event: dto) { _ in /* fire-and-forget */ }
-                self?.observeEventForRequirementsCollector(event)
             }
         }
-    }
 
-    /// Side-channel for the per-call requirements collector. The delegate
-    /// path is the primary source of truth, but `loginRequired` and
-    /// `checkoutStarted` events arrive at the same time and double-record
-    /// here as a belt-and-braces fallback in case the delegate fires later.
-    fileprivate func observeEventForRequirementsCollector(_ event: CheckoutEvent) {
-        guard let collector = inFlightRequirements else { return }
-        switch event {
-        case .checkoutStarted(let id):
-            if collector.headlessCheckoutId == nil { collector.headlessCheckoutId = id }
-        case .loginRequired(let reqs):
-            if collector.requireLoginRequirements == nil { collector.requireLoginRequirements = reqs }
-        case .readyToCheckout:
-            collector.becameReadyToCheckout = true
-        default:
-            break
-        }
+        // Mirror the @Published transaction id to Dart.
+        transactionIdCancellable = newClient.$currentTransactionId
+            .removeDuplicates()
+            .dropFirst() // initial nil; Dart starts at null too
+            .sink { id in
+                api?.onTransactionIdChanged(transactionId: id) { _ in }
+            }
     }
 
     func initialize(
@@ -235,7 +274,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // on the call result.
                 let dto = BridgeMappers.fromNative(onramperError)
                 self.flutterApi?.onError(error: dto) { _ in }
-                completion(.failure(PigeonError(code: "onramper_error", message: dto.message, details: nil)))
+                completion(.failure(BridgeMappers.pigeonError(dto)))
             } catch {
                 completion(.failure(error))
             }
@@ -244,6 +283,7 @@ extension OnramperSdkPlugin: OnramperHostApi {
 
     func getCheckoutRequirements(
         request: CheckoutIntentRequestDto,
+        prefill: UserPrefillDto?,
         buttonStyle: CheckoutButtonStyleDto?,
         completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void
     ) {
@@ -252,12 +292,23 @@ extension OnramperSdkPlugin: OnramperHostApi {
             return
         }
         let nativeRequest = BridgeMappers.toNative(request)
+        let nativePrefill = BridgeMappers.toNative(prefill)
         let nativeStyle = BridgeMappers.toNative(buttonStyle)
         let collector = CheckoutRequirementsCollector()
         self.inFlightRequirements = collector
 
+        // Supersede earlier preparations synchronously, before any await, and
+        // release the previous unmounted button.
+        let generation = preparationGate.begin()
+        if let prev = lastButtonHandle {
+            lastButtonHandle = nil
+            Task { await CheckoutButtonRegistry.shared.drop(prev) }
+        }
+        let invalidated = BridgeMappers.pigeonError(BridgeMappers.intentInvalidatedDto())
+
         Task { @MainActor in
-            defer { self.inFlightRequirements = nil }
+            // Only clear the collector if a newer call hasn't replaced it.
+            defer { if self.inFlightRequirements === collector { self.inFlightRequirements = nil } }
             do {
                 // `getCheckoutRequirements` is UIKit-gated and returns a
                 // SwiftUI button + quote. The button's appearance comes from
@@ -265,17 +316,13 @@ extension OnramperSdkPlugin: OnramperHostApi {
                 // consumer didn't override.
                 let result = try await client.getCheckoutRequirements(
                     nativeRequest,
+                    prefill: nativePrefill,
                     buttonStyle: nativeStyle
                 )
-
-                // Store the button in the registry and hand the handle to Dart so
-                // OnramperNativeCheckoutButton can look it up via the platform view.
-                if let prev = self.lastButtonHandle {
-                    await CheckoutButtonRegistry.shared.drop(prev)
+                guard self.preparationGate.isCurrent(generation) else {
+                    completion(.failure(invalidated))
+                    return
                 }
-                let handle = await CheckoutButtonRegistry.shared.store(result.button)
-                self.lastButtonHandle = handle
-
                 guard let headlessId = collector.headlessCheckoutId else {
                     completion(.failure(
                         PluginError.missingResponse("delegate.didStartCheckout was not invoked")
@@ -284,36 +331,60 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     return
                 }
 
+                // Store the button in the registry and hand the handle to Dart so
+                // OnramperNativeCheckoutButton can look it up via the platform view.
+                let scheme = BridgeMappers.buttonColorScheme(for: self.configuredTheme)
+                let button = scheme.map { AnyView(result.button.environment(\.colorScheme, $0)) }
+                    ?? AnyView(result.button)
+                let handle = await CheckoutButtonRegistry.shared.storeView(button)
+                // A newer call may have started while we awaited the registry.
+                guard self.preparationGate.isCurrent(generation) else {
+                    await CheckoutButtonRegistry.shared.drop(handle)
+                    completion(.failure(invalidated))
+                    return
+                }
+                self.lastButtonHandle = handle
+
                 let nativeReqs = collector.requireLoginRequirements ?? []
-                let dto = CheckoutRequirementsResultDto(
+                completion(.success(CheckoutRequirementsResultDto(
                     headlessCheckoutId: headlessId,
                     requirements: nativeReqs.map(BridgeMappers.fromNative),
                     quote: BridgeMappers.fromNative(result.quote),
                     buttonHandle: handle
-                )
-                completion(.success(dto))
-            } catch let onramperError as OnramperError {
-                let errDto = BridgeMappers.fromNative(onramperError)
-                self.flutterApi?.onError(error: errDto) { _ in }
-                completion(.failure(PigeonError(code: "onramper_error", message: errDto.message, details: nil)))
+                )))
             } catch {
-                completion(.failure(error))
+                // Native single-flight cancels the older call with
+                // CancellationError; stale failures are reported as invalidated.
+                if !self.preparationGate.isCurrent(generation) || error is CancellationError {
+                    completion(.failure(invalidated))
+                    return
+                }
+                if let onramperError = error as? OnramperError {
+                    let errDto = BridgeMappers.fromNative(onramperError)
+                    self.flutterApi?.onError(error: errDto) { _ in }
+                    completion(.failure(BridgeMappers.pigeonError(errDto)))
+                } else {
+                    completion(.failure(error))
+                }
             }
         }
     }
 
     func reset(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         let handle = self.lastButtonHandle
         Task { @MainActor in
             await client?.reset()
             if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
-            self.lastButtonHandle = nil
+            // Keep a handle a newer preparation stored during the await.
+            if self.lastButtonHandle == handle { self.lastButtonHandle = nil }
             completion(.success(()))
         }
     }
 
     func signOut(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         let handle = self.lastButtonHandle
         Task { @MainActor in
@@ -321,7 +392,8 @@ extension OnramperSdkPlugin: OnramperHostApi {
             // Drop the current button too — the intent it addressed was tied
             // to the now-cleared OIDC identity.
             if let h = handle { await CheckoutButtonRegistry.shared.drop(h) }
-            self.lastButtonHandle = nil
+            // Keep a handle a newer preparation stored during the await.
+            if self.lastButtonHandle == handle { self.lastButtonHandle = nil }
             completion(.success(()))
         }
     }
@@ -335,11 +407,22 @@ extension OnramperSdkPlugin: OnramperHostApi {
     }
 
     func dispose(completion: @escaping (Result<Void, Error>) -> Void) {
+        preparationGate.invalidate()
         let client = self.client
         Task { @MainActor in
             await client?.reset()
+            // A configure() during the await installed a newer client (and
+            // already released this one); leave its state alone.
+            guard self.client === client else {
+                completion(.success(()))
+                return
+            }
             self.tearDownObservers()
             await CheckoutButtonRegistry.shared.dropAll()
+            guard self.client === client else {
+                completion(.success(()))
+                return
+            }
             self.client = nil
             self.inFlightRequirements = nil
             self.lastButtonHandle = nil
@@ -361,6 +444,10 @@ extension OnramperSdkPlugin: OnramperHostApi {
     func failRefreshedSession(reason: String) throws {
         Task { await refreshBridge.fail(reason) }
     }
+
+    func sdkVersion() throws -> String {
+        OnramperClient.sdkVersion
+    }
 }
 
 // MARK: - OnramperDelegate conformance
@@ -376,15 +463,15 @@ extension OnramperSdkPlugin: OnramperDelegate {
     }
 
     public func onramperClient(_ client: OnramperClient, didStartCheckout checkoutId: String) {
-        inFlightRequirements?.headlessCheckoutId = checkoutId
+        inFlightRequirements?.checkoutStarted(checkoutId)
     }
 
     public func onramperClient(_ client: OnramperClient, didRequireLogin requirements: [CheckoutRequirement]) {
-        inFlightRequirements?.requireLoginRequirements = requirements
+        inFlightRequirements?.loginRequired(requirements)
     }
 
     public func onramperClient(_ client: OnramperClient, didBecomeReadyToCheckout checkoutId: String) {
-        inFlightRequirements?.becameReadyToCheckout = true
+        inFlightRequirements?.readyToCheckout()
     }
 
     public func onramperClient(_ client: OnramperClient, didCompleteCheckout checkoutId: String) {

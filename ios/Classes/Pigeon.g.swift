@@ -142,8 +142,9 @@ enum OnramperStateKindDto: Int {
   case readyToCheckout = 6
   case finalizing = 7
   case rendering = 8
-  case completed = 9
-  case failed = 10
+  case paymentPending = 9
+  case completed = 10
+  case failed = 11
 }
 
 enum CheckoutEventKindDto: Int {
@@ -162,6 +163,10 @@ enum CheckoutEventKindDto: Int {
   case paymentProcessing = 12
   case paymentCancelled = 13
   case providerError = 14
+  case paymentPending = 15
+  case challengeStarted = 16
+  case challengeCompleted = 17
+  case customerOnboardingRequired = 18
 }
 
 enum OnramperErrorKindDto: Int {
@@ -191,6 +196,11 @@ enum OnramperErrorKindDto: Int {
   case deviceBlocked = 23
   case securityStorageFailed = 24
   case securityTrustFailed = 25
+  case paymentFailed = 26
+  case providerFailed = 27
+  case applePayNotConfigured = 28
+  case intentInvalidated = 29
+  case clientDisposed = 30
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
@@ -200,6 +210,11 @@ struct ConfigurationDto {
   var environment: EnvironmentDto
   var theme: ThemeDto
   var logLevel: LogLevelDto
+  /// True when Dart set `OnramperConfiguration.logHandler`; native installs a
+  /// forwarding handler only then.
+  var hasLogHandler: Bool
+  var isEventLoggingEnabled: Bool
+  var isEventConsoleLoggingEnabled: Bool
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -209,13 +224,19 @@ struct ConfigurationDto {
     let environment = pigeonVar_list[2] as! EnvironmentDto
     let theme = pigeonVar_list[3] as! ThemeDto
     let logLevel = pigeonVar_list[4] as! LogLevelDto
+    let hasLogHandler = pigeonVar_list[5] as! Bool
+    let isEventLoggingEnabled = pigeonVar_list[6] as! Bool
+    let isEventConsoleLoggingEnabled = pigeonVar_list[7] as! Bool
 
     return ConfigurationDto(
       apiKey: apiKey,
       clientId: clientId,
       environment: environment,
       theme: theme,
-      logLevel: logLevel
+      logLevel: logLevel,
+      hasLogHandler: hasLogHandler,
+      isEventLoggingEnabled: isEventLoggingEnabled,
+      isEventConsoleLoggingEnabled: isEventConsoleLoggingEnabled
     )
   }
   func toList() -> [Any?] {
@@ -225,6 +246,49 @@ struct ConfigurationDto {
       environment,
       theme,
       logLevel,
+      hasLogHandler,
+      isEventLoggingEnabled,
+      isEventConsoleLoggingEnabled,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct LogRecordDto {
+  var timestampMs: Int64
+  var level: LogLevelDto
+  var category: String
+  var event: String
+  var context: [String: String]
+  var message: String
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> LogRecordDto? {
+    let timestampMs = pigeonVar_list[0] as! Int64
+    let level = pigeonVar_list[1] as! LogLevelDto
+    let category = pigeonVar_list[2] as! String
+    let event = pigeonVar_list[3] as! String
+    let context = pigeonVar_list[4] as! [String: String]
+    let message = pigeonVar_list[5] as! String
+
+    return LogRecordDto(
+      timestampMs: timestampMs,
+      level: level,
+      category: category,
+      event: event,
+      context: context,
+      message: message
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      timestampMs,
+      level,
+      category,
+      event,
+      context,
+      message,
     ]
   }
 }
@@ -353,6 +417,42 @@ struct CheckoutIntentRequestDto {
   }
 }
 
+/// Values the integrator already knows about the user, used to pre-populate
+/// the OnramperID sign-in and additional-info screens. All optional.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct UserPrefillDto {
+  var email: String? = nil
+  var firstName: String? = nil
+  var lastName: String? = nil
+  /// E.164, e.g. `+3712345678`.
+  var phoneNumber: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> UserPrefillDto? {
+    let email: String? = nilOrValue(pigeonVar_list[0])
+    let firstName: String? = nilOrValue(pigeonVar_list[1])
+    let lastName: String? = nilOrValue(pigeonVar_list[2])
+    let phoneNumber: String? = nilOrValue(pigeonVar_list[3])
+
+    return UserPrefillDto(
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: phoneNumber
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+    ]
+  }
+}
+
 /// Generated class from Pigeon that represents data sent in messages.
 struct QuoteDto {
   var quoteId: String
@@ -363,6 +463,10 @@ struct QuoteDto {
   var payout: Double
   var paymentMethod: String
   var recommendations: [String]? = nil
+  /// Provider-specific JSON. Values are String, double, bool, null, List or
+  /// Map (recursively). Pigeon can't model recursive types, so the standard
+  /// codec carries the raw structure.
+  var providerContext: [String: Any?]? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -375,6 +479,7 @@ struct QuoteDto {
     let payout = pigeonVar_list[5] as! Double
     let paymentMethod = pigeonVar_list[6] as! String
     let recommendations: [String]? = nilOrValue(pigeonVar_list[7])
+    let providerContext: [String: Any?]? = nilOrValue(pigeonVar_list[8])
 
     return QuoteDto(
       quoteId: quoteId,
@@ -384,7 +489,8 @@ struct QuoteDto {
       transactionFee: transactionFee,
       payout: payout,
       paymentMethod: paymentMethod,
-      recommendations: recommendations
+      recommendations: recommendations,
+      providerContext: providerContext
     )
   }
   func toList() -> [Any?] {
@@ -397,6 +503,7 @@ struct QuoteDto {
       payout,
       paymentMethod,
       recommendations,
+      providerContext,
     ]
   }
 }
@@ -714,22 +821,28 @@ struct HeadlessCheckoutDataDto {
 /// Generated class from Pigeon that represents data sent in messages.
 struct CheckoutFinalizeResponseDto {
   var headlessCheckoutId: String
+  /// Onramper's durable transaction id (ULID). The id to store and quote to
+  /// support. Distinct from the per-attempt checkout id.
+  var onramperTransactionId: String
   var headlessCheckoutData: HeadlessCheckoutDataDto
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> CheckoutFinalizeResponseDto? {
     let headlessCheckoutId = pigeonVar_list[0] as! String
-    let headlessCheckoutData = pigeonVar_list[1] as! HeadlessCheckoutDataDto
+    let onramperTransactionId = pigeonVar_list[1] as! String
+    let headlessCheckoutData = pigeonVar_list[2] as! HeadlessCheckoutDataDto
 
     return CheckoutFinalizeResponseDto(
       headlessCheckoutId: headlessCheckoutId,
+      onramperTransactionId: onramperTransactionId,
       headlessCheckoutData: headlessCheckoutData
     )
   }
   func toList() -> [Any?] {
     return [
       headlessCheckoutId,
+      onramperTransactionId,
       headlessCheckoutData,
     ]
   }
@@ -827,6 +940,10 @@ struct CheckoutEventDto {
 struct OnramperErrorDto {
   var kind: OnramperErrorKindDto
   var message: String
+  /// End-user copy, safe to display.
+  var userMessage: String
+  /// Short stable code, safe to display next to [userMessage]; matches SDK logs.
+  var supportCode: String
   var recoverable: Bool
   var code: Int64? = nil
   var minAmount: Double? = nil
@@ -845,22 +962,26 @@ struct OnramperErrorDto {
   static func fromList(_ pigeonVar_list: [Any?]) -> OnramperErrorDto? {
     let kind = pigeonVar_list[0] as! OnramperErrorKindDto
     let message = pigeonVar_list[1] as! String
-    let recoverable = pigeonVar_list[2] as! Bool
-    let code: Int64? = nilOrValue(pigeonVar_list[3])
-    let minAmount: Double? = nilOrValue(pigeonVar_list[4])
-    let maxAmount: Double? = nilOrValue(pigeonVar_list[5])
-    let retryAfterSeconds: Double? = nilOrValue(pigeonVar_list[6])
-    let field: String? = nilOrValue(pigeonVar_list[7])
-    let debugInfo: String? = nilOrValue(pigeonVar_list[8])
-    let fromState: String? = nilOrValue(pigeonVar_list[9])
-    let toState: String? = nilOrValue(pigeonVar_list[10])
-    let expectedState: String? = nilOrValue(pigeonVar_list[11])
-    let actualState: String? = nilOrValue(pigeonVar_list[12])
-    let host: String? = nilOrValue(pigeonVar_list[13])
+    let userMessage = pigeonVar_list[2] as! String
+    let supportCode = pigeonVar_list[3] as! String
+    let recoverable = pigeonVar_list[4] as! Bool
+    let code: Int64? = nilOrValue(pigeonVar_list[5])
+    let minAmount: Double? = nilOrValue(pigeonVar_list[6])
+    let maxAmount: Double? = nilOrValue(pigeonVar_list[7])
+    let retryAfterSeconds: Double? = nilOrValue(pigeonVar_list[8])
+    let field: String? = nilOrValue(pigeonVar_list[9])
+    let debugInfo: String? = nilOrValue(pigeonVar_list[10])
+    let fromState: String? = nilOrValue(pigeonVar_list[11])
+    let toState: String? = nilOrValue(pigeonVar_list[12])
+    let expectedState: String? = nilOrValue(pigeonVar_list[13])
+    let actualState: String? = nilOrValue(pigeonVar_list[14])
+    let host: String? = nilOrValue(pigeonVar_list[15])
 
     return OnramperErrorDto(
       kind: kind,
       message: message,
+      userMessage: userMessage,
+      supportCode: supportCode,
       recoverable: recoverable,
       code: code,
       minAmount: minAmount,
@@ -879,6 +1000,8 @@ struct OnramperErrorDto {
     return [
       kind,
       message,
+      userMessage,
+      supportCode,
       recoverable,
       code,
       minAmount,
@@ -1010,44 +1133,48 @@ private class PigeonPigeonCodecReader: FlutterStandardReader {
     case 142:
       return ConfigurationDto.fromList(self.readValue() as! [Any?])
     case 143:
-      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
+      return LogRecordDto.fromList(self.readValue() as! [Any?])
     case 144:
-      return WalletInfoDto.fromList(self.readValue() as! [Any?])
+      return SessionCredentialsDto.fromList(self.readValue() as! [Any?])
     case 145:
-      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
+      return WalletInfoDto.fromList(self.readValue() as! [Any?])
     case 146:
-      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
+      return OnramperTransactionDataDto.fromList(self.readValue() as! [Any?])
     case 147:
-      return QuoteDto.fromList(self.readValue() as! [Any?])
+      return CheckoutIntentRequestDto.fromList(self.readValue() as! [Any?])
     case 148:
-      return TosItemDto.fromList(self.readValue() as! [Any?])
+      return UserPrefillDto.fromList(self.readValue() as! [Any?])
     case 149:
-      return TosRequirementDto.fromList(self.readValue() as! [Any?])
+      return QuoteDto.fromList(self.readValue() as! [Any?])
     case 150:
-      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
+      return TosItemDto.fromList(self.readValue() as! [Any?])
     case 151:
-      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
+      return TosRequirementDto.fromList(self.readValue() as! [Any?])
     case 152:
-      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
+      return AmountLimitRequirementDto.fromList(self.readValue() as! [Any?])
     case 153:
-      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoFieldDto.fromList(self.readValue() as! [Any?])
     case 154:
-      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
+      return UserInfoRequirementDto.fromList(self.readValue() as! [Any?])
     case 155:
-      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
+      return ReverificationRequirementDto.fromList(self.readValue() as! [Any?])
     case 156:
-      return RenderContextDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementDto.fromList(self.readValue() as! [Any?])
     case 157:
-      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
+      return CheckoutRequirementsResultDto.fromList(self.readValue() as! [Any?])
     case 158:
-      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
+      return RenderContextDto.fromList(self.readValue() as! [Any?])
     case 159:
-      return OnramperStateDto.fromList(self.readValue() as! [Any?])
+      return HeadlessCheckoutDataDto.fromList(self.readValue() as! [Any?])
     case 160:
-      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+      return CheckoutFinalizeResponseDto.fromList(self.readValue() as! [Any?])
     case 161:
-      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+      return OnramperStateDto.fromList(self.readValue() as! [Any?])
     case 162:
+      return CheckoutEventDto.fromList(self.readValue() as! [Any?])
+    case 163:
+      return OnramperErrorDto.fromList(self.readValue() as! [Any?])
+    case 164:
       return CheckoutButtonStyleDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1099,65 +1226,71 @@ private class PigeonPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? ConfigurationDto {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? SessionCredentialsDto {
+    } else if let value = value as? LogRecordDto {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? WalletInfoDto {
+    } else if let value = value as? SessionCredentialsDto {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperTransactionDataDto {
+    } else if let value = value as? WalletInfoDto {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutIntentRequestDto {
+    } else if let value = value as? OnramperTransactionDataDto {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? QuoteDto {
+    } else if let value = value as? CheckoutIntentRequestDto {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? TosItemDto {
+    } else if let value = value as? UserPrefillDto {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? TosRequirementDto {
+    } else if let value = value as? QuoteDto {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? AmountLimitRequirementDto {
+    } else if let value = value as? TosItemDto {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoFieldDto {
+    } else if let value = value as? TosRequirementDto {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? UserInfoRequirementDto {
+    } else if let value = value as? AmountLimitRequirementDto {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? ReverificationRequirementDto {
+    } else if let value = value as? UserInfoFieldDto {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementDto {
+    } else if let value = value as? UserInfoRequirementDto {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutRequirementsResultDto {
+    } else if let value = value as? ReverificationRequirementDto {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? RenderContextDto {
+    } else if let value = value as? CheckoutRequirementDto {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? HeadlessCheckoutDataDto {
+    } else if let value = value as? CheckoutRequirementsResultDto {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutFinalizeResponseDto {
+    } else if let value = value as? RenderContextDto {
       super.writeByte(158)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperStateDto {
+    } else if let value = value as? HeadlessCheckoutDataDto {
       super.writeByte(159)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutEventDto {
+    } else if let value = value as? CheckoutFinalizeResponseDto {
       super.writeByte(160)
       super.writeValue(value.toList())
-    } else if let value = value as? OnramperErrorDto {
+    } else if let value = value as? OnramperStateDto {
       super.writeByte(161)
       super.writeValue(value.toList())
-    } else if let value = value as? CheckoutButtonStyleDto {
+    } else if let value = value as? CheckoutEventDto {
       super.writeByte(162)
+      super.writeValue(value.toList())
+    } else if let value = value as? OnramperErrorDto {
+      super.writeByte(163)
+      super.writeValue(value.toList())
+    } else if let value = value as? CheckoutButtonStyleDto {
+      super.writeByte(164)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1184,7 +1317,7 @@ class PigeonPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 protocol OnramperHostApi {
   func configure(config: ConfigurationDto) throws
   func initialize(credentials: SessionCredentialsDto, completion: @escaping (Result<Void, Error>) -> Void)
-  func getCheckoutRequirements(request: CheckoutIntentRequestDto, buttonStyle: CheckoutButtonStyleDto?, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
+  func getCheckoutRequirements(request: CheckoutIntentRequestDto, prefill: UserPrefillDto?, buttonStyle: CheckoutButtonStyleDto?, completion: @escaping (Result<CheckoutRequirementsResultDto, Error>) -> Void)
   func reset(completion: @escaping (Result<Void, Error>) -> Void)
   /// Clears the SDK's cached OIDC tokens. Distinct from [reset]: partner
   /// session (DPoP key + session token) is preserved, but the next checkout
@@ -1197,6 +1330,8 @@ protocol OnramperHostApi {
   func dispose(completion: @escaping (Result<Void, Error>) -> Void)
   func provideRefreshedSession(credentials: SessionCredentialsDto) throws
   func failRefreshedSession(reason: String) throws
+  /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+  func sdkVersion() throws -> String
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1242,8 +1377,9 @@ class OnramperHostApiSetup {
       getCheckoutRequirementsChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let requestArg = args[0] as! CheckoutIntentRequestDto
-        let buttonStyleArg: CheckoutButtonStyleDto? = nilOrValue(args[1])
-        api.getCheckoutRequirements(request: requestArg, buttonStyle: buttonStyleArg) { result in
+        let prefillArg: UserPrefillDto? = nilOrValue(args[1])
+        let buttonStyleArg: CheckoutButtonStyleDto? = nilOrValue(args[2])
+        api.getCheckoutRequirements(request: requestArg, prefill: prefillArg, buttonStyle: buttonStyleArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -1351,6 +1487,20 @@ class OnramperHostApiSetup {
     } else {
       failRefreshedSessionChannel.setMessageHandler(nil)
     }
+    /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+    let sdkVersionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.onramper_flutter.OnramperHostApi.sdkVersion\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      sdkVersionChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.sdkVersion()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      sdkVersionChannel.setMessageHandler(nil)
+    }
   }
 }
 /// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
@@ -1359,6 +1509,8 @@ protocol OnramperFlutterApiProtocol {
   func onEvent(event eventArg: CheckoutEventDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onError(error errorArg: OnramperErrorDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onSessionExpired(completion: @escaping (Result<Void, PigeonError>) -> Void)
+  func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void)
+  func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void)
 }
 class OnramperFlutterApi: OnramperFlutterApiProtocol {
   private let binaryMessenger: FlutterBinaryMessenger
@@ -1426,6 +1578,101 @@ class OnramperFlutterApi: OnramperFlutterApiProtocol {
   }
   func onSessionExpired(completion: @escaping (Result<Void, PigeonError>) -> Void) {
     let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onSessionExpired\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage(nil) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(Void()))
+      }
+    }
+  }
+  func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([transactionIdArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(Void()))
+      }
+    }
+  }
+  func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onLog\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([recordArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(Void()))
+      }
+    }
+  }
+}
+/// Native → Dart sizing callbacks for one checkout-button platform view.
+/// Set up per view with `messageChannelSuffix` = the platform view id.
+///
+/// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
+protocol CheckoutButtonFlutterApiProtocol {
+  /// Content height in points (button + ToS + payment disclosures).
+  func onHeightChanged(height heightArg: Double, completion: @escaping (Result<Void, PigeonError>) -> Void)
+  /// The handle was unknown, expired (5 min) or invalidated; nothing renders.
+  func onUnavailable(completion: @escaping (Result<Void, PigeonError>) -> Void)
+}
+class CheckoutButtonFlutterApi: CheckoutButtonFlutterApiProtocol {
+  private let binaryMessenger: FlutterBinaryMessenger
+  private let messageChannelSuffix: String
+  init(binaryMessenger: FlutterBinaryMessenger, messageChannelSuffix: String = "") {
+    self.binaryMessenger = binaryMessenger
+    self.messageChannelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+  }
+  var codec: PigeonPigeonCodec {
+    return PigeonPigeonCodec.shared
+  }
+  /// Content height in points (button + ToS + payment disclosures).
+  func onHeightChanged(height heightArg: Double, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onHeightChanged\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([heightArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(Void()))
+      }
+    }
+  }
+  /// The handle was unknown, expired (5 min) or invalidated; nothing renders.
+  func onUnavailable(completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.onramper_flutter.CheckoutButtonFlutterApi.onUnavailable\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage(nil) { response in
       guard let listResponse = response as? [Any?] else {

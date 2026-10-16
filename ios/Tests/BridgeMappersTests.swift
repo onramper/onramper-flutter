@@ -10,10 +10,13 @@ final class BridgeMappersTests: XCTestCase {
             clientId: "01HABCDEF",
             environment: .development,
             theme: .light,
-            logLevel: .debug
+            logLevel: .debug,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
 
-        let native = BridgeMappers.toNative(dto, sessionExpirationHandler: { fatalError("not invoked in this test") })
+        let native = BridgeMappers.toNative(dto, logHandler: nil, sessionExpirationHandler: { fatalError("not invoked in this test") })
 
         XCTAssertEqual(native.apiKey, "pk_test_x")
         XCTAssertEqual(native.clientId, "01HABCDEF")
@@ -28,10 +31,13 @@ final class BridgeMappersTests: XCTestCase {
             clientId: "01H",
             environment: .production,
             theme: .system,
-            logLevel: .off
+            logLevel: .off,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
 
-        let native = BridgeMappers.toNative(dto, sessionExpirationHandler: { fatalError() })
+        let native = BridgeMappers.toNative(dto, logHandler: nil, sessionExpirationHandler: { fatalError() })
 
         XCTAssertEqual(native.environment, .production)
         XCTAssertEqual(native.theme, .system)
@@ -483,6 +489,7 @@ final class BridgeMappersTests: XCTestCase {
     func test_checkoutFinalizeResponse_fromNative_mapsAllFields() {
         let native = CheckoutFinalizeResponse(
             headlessCheckoutId: "co_1",
+            onramperTransactionId: "01JTXN0000000000000000000",
             headlessCheckoutData: HeadlessCheckoutData(
                 checkoutPaymentType: .applePay,
                 url: "https://pay.example.com/co_1",
@@ -493,6 +500,7 @@ final class BridgeMappersTests: XCTestCase {
         let dto = BridgeMappers.fromNative(native)
 
         XCTAssertEqual(dto.headlessCheckoutId, "co_1")
+        XCTAssertEqual(dto.onramperTransactionId, "01JTXN0000000000000000000")
         XCTAssertEqual(dto.headlessCheckoutData.url, "https://pay.example.com/co_1")
         XCTAssertEqual(dto.headlessCheckoutData.renderType, .webview)
         XCTAssertEqual(dto.headlessCheckoutData.checkoutPaymentType, .applePay)
@@ -548,6 +556,7 @@ final class BridgeMappersTests: XCTestCase {
     func test_checkoutEvent_fromNative_checkoutFinalized_populatesBothContextAndFullResponse() {
         let response = CheckoutFinalizeResponse(
             headlessCheckoutId: "co_xyz",
+            onramperTransactionId: "01JTXN0000000000000000000",
             headlessCheckoutData: HeadlessCheckoutData(
                 checkoutPaymentType: .revolutPay,
                 url: "https://pay.example.com",
@@ -881,5 +890,122 @@ final class BridgeMappersTests: XCTestCase {
             let dto = BridgeMappers.fromNative(native)
             XCTAssertFalse(dto.message.isEmpty, "Empty message for native case: \(native)")
         }
+    }
+
+    // MARK: - Prefill
+
+    func test_userPrefillDto_toNative_mapsAllFields() {
+        let native = BridgeMappers.toNative(UserPrefillDto(
+            email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phoneNumber: "+3712345678"
+        ))
+        XCTAssertEqual(native, OnramperUserPrefill(
+            email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phoneNumber: "+3712345678"
+        ))
+    }
+
+    func test_userPrefillDto_nil_mapsToNil() {
+        XCTAssertNil(BridgeMappers.toNative(nil as UserPrefillDto?))
+    }
+
+    // MARK: - 1.3.0 cases
+
+    func test_state_paymentPending_maps() {
+        XCTAssertEqual(BridgeMappers.fromNative(OnramperState.paymentPending).kind, .paymentPending)
+    }
+
+    func test_events_1_3_0_map() {
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.paymentPending).kind, .paymentPending)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.challengeStarted).kind, .challengeStarted)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.challengeCompleted).kind, .challengeCompleted)
+        XCTAssertEqual(BridgeMappers.fromNative(CheckoutEvent.customerOnboardingRequired).kind, .customerOnboardingRequired)
+    }
+
+    func test_errors_1_3_0_map_withCopy() {
+        let failed = BridgeMappers.fromNative(OnramperError.paymentFailed("declined"))
+        XCTAssertEqual(failed.kind, .paymentFailed)
+        XCTAssertEqual(failed.debugInfo, "declined")
+        XCTAssertTrue(failed.recoverable)
+        XCTAssertEqual(failed.userMessage, OnramperError.paymentFailed("declined").userMessage)
+        XCTAssertEqual(failed.supportCode, OnramperError.paymentFailed("declined").supportCode)
+
+        let provider = BridgeMappers.fromNative(OnramperError.providerFailed("status"))
+        XCTAssertEqual(provider.kind, .providerFailed)
+        XCTAssertFalse(provider.recoverable)
+
+        let applePay = BridgeMappers.fromNative(OnramperError.applePayNotConfigured)
+        XCTAssertEqual(applePay.kind, .applePayNotConfigured)
+        XCTAssertFalse(applePay.recoverable)
+    }
+
+    func test_everyError_hasNonEmptyUserMessageAndSupportCode() {
+        let samples: [OnramperError] = [.notInitialized, .timeout, .networkError(code: 500, message: "x"),
+                                        .quoteUnavailable(debugInfo: nil), .paymentFailed("x")]
+        for e in samples {
+            let dto = BridgeMappers.fromNative(e)
+            XCTAssertFalse(dto.userMessage.isEmpty, "\(e)")
+            XCTAssertFalse(dto.supportCode.isEmpty, "\(e)")
+        }
+    }
+
+    func test_pigeonError_carriesDtoInDetails() {
+        let dto = BridgeMappers.fromNative(OnramperError.timeout)
+        let err = BridgeMappers.pigeonError(dto)
+        XCTAssertEqual(err.code, "onramper_error")
+        XCTAssertEqual((err.details as? OnramperErrorDto)?.kind, .timeout)
+    }
+
+    func test_intentInvalidatedDto_hasWrapperCode() {
+        let dto = BridgeMappers.intentInvalidatedDto()
+        XCTAssertEqual(dto.kind, .intentInvalidated)
+        XCTAssertEqual(dto.supportCode, "FLUTTER-INTENT-INVALIDATED")
+    }
+
+    // MARK: - Logging
+
+    func test_configuration_passesFlagsAndLogHandler() {
+        let dto = ConfigurationDto(apiKey: "pk", clientId: "c", environment: .production, theme: .system,
+                                   logLevel: .info, hasLogHandler: true,
+                                   isEventLoggingEnabled: true, isEventConsoleLoggingEnabled: true)
+        let native = BridgeMappers.toNative(dto, logHandler: { _ in }, sessionExpirationHandler: { fatalError() })
+        XCTAssertTrue(native.isEventLoggingEnabled)
+        XCTAssertTrue(native.isEventConsoleLoggingEnabled)
+        XCTAssertNotNil(native.logHandler)
+    }
+
+    func test_logRecord_fromNative_mapsAllFields() {
+        let record = OnramperLogRecord(timestamp: Date(timeIntervalSince1970: 1_760_500_000), level: .info,
+                                       category: "Checkout", event: "checkout.finalized", context: ["ramp": "moonpay"])
+        let dto = BridgeMappers.fromNative(record)
+        XCTAssertEqual(dto.timestampMs, 1_760_500_000_000)
+        XCTAssertEqual(dto.level, .info)
+        XCTAssertEqual(dto.category, "Checkout")
+        XCTAssertEqual(dto.event, "checkout.finalized")
+        XCTAssertEqual(dto.context, ["ramp": "moonpay"])
+        XCTAssertEqual(dto.message, "checkout.finalized ramp=moonpay")
+    }
+
+    // MARK: - providerContext
+
+    func test_quote_providerContext_mapsToPlainJSON() {
+        let native = QuoteResponse(
+            quoteId: "q", ramp: "moonpay", rate: 1, payout: 1, paymentMethod: "applepay",
+            networkFee: 0, transactionFee: 0,
+            providerContext: ["executable": .bool(true), "limits": .object(["max": .number(500)]),
+                              "list": .array([.string("a"), .null])]
+        )
+        let ctx = BridgeMappers.fromNative(native).providerContext!
+        XCTAssertEqual(ctx["executable"] as? Bool, true)
+        XCTAssertEqual((ctx["limits"] as? [String: Any])?["max"] as? Double, 500)
+        let list = ctx["list"] as? [Any]
+        XCTAssertEqual(list?.first as? String, "a")
+        XCTAssertTrue(list?.last is NSNull)
+    }
+
+    // MARK: - Button theme
+
+    func test_buttonColorScheme_forcesConfiguredThemeOnly() {
+        XCTAssertEqual(BridgeMappers.buttonColorScheme(for: .light), .light)
+        XCTAssertEqual(BridgeMappers.buttonColorScheme(for: .dark), .dark)
+        XCTAssertNil(BridgeMappers.buttonColorScheme(for: .system))
     }
 }

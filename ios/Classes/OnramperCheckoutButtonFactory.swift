@@ -30,7 +30,8 @@ final class OnramperCheckoutButtonFactory: NSObject, FlutterPlatformViewFactory 
         arguments args: Any?
     ) -> FlutterPlatformView {
         let handle = (args as? [String: Any])?["handle"] as? String ?? ""
-        return OnramperCheckoutButtonPlatformView(frame: frame, handle: handle)
+        let sizing = CheckoutButtonFlutterApi(binaryMessenger: messenger, messageChannelSuffix: "\(viewId)")
+        return OnramperCheckoutButtonPlatformView(frame: frame, handle: handle, sizing: sizing)
     }
 
     func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
@@ -43,8 +44,8 @@ final class OnramperCheckoutButtonFactory: NSObject, FlutterPlatformViewFactory 
 final class OnramperCheckoutButtonPlatformView: NSObject, FlutterPlatformView {
     private let container: CheckoutButtonContainerView
 
-    init(frame: CGRect, handle: String) {
-        container = CheckoutButtonContainerView(frame: frame, handle: handle)
+    init(frame: CGRect, handle: String, sizing: CheckoutButtonFlutterApiProtocol) {
+        container = CheckoutButtonContainerView(frame: frame, handle: handle, sizing: sizing)
         super.init()
     }
 
@@ -59,11 +60,15 @@ final class OnramperCheckoutButtonPlatformView: NSObject, FlutterPlatformView {
 private final class CheckoutButtonContainerView: UIView {
     private var hostingController: UIHostingController<AnyView>?
     private let handle: String
+    private let sizing: CheckoutButtonFlutterApiProtocol
+    private var heightReporter = HeightReporter()
 
-    init(frame: CGRect, handle: String) {
+    init(frame: CGRect, handle: String, sizing: CheckoutButtonFlutterApiProtocol) {
         self.handle = handle
+        self.sizing = sizing
         super.init(frame: frame)
         backgroundColor = .clear
+        clipsToBounds = true
         Task { await mountButton() }
     }
 
@@ -71,9 +76,28 @@ private final class CheckoutButtonContainerView: UIView {
 
     @MainActor
     private func mountButton() async {
-        guard let view = await CheckoutButtonRegistry.shared.consume(handle) else { return }
-        let hc = UIHostingController(rootView: view)
+        guard let button = await CheckoutButtonRegistry.shared.consume(handle) else {
+            sizing.onUnavailable { _ in }
+            return
+        }
+        let measured = AnyView(
+            button
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { proxy in
+                    // Zero-width first pass reports a bogus height; ignore it.
+                    Color.clear.preference(
+                        key: CheckoutContentHeightKey.self,
+                        value: proxy.size.width > 0 ? proxy.size.height : 0
+                    )
+                })
+                .onPreferenceChange(CheckoutContentHeightKey.self) { [weak self] height in
+                    Task { @MainActor in self?.report(height) }
+                }
+        )
+        let hc = UIHostingController(rootView: measured)
         hc.view.backgroundColor = .clear
+        if #available(iOS 16.4, *) { hc.safeAreaRegions = [] }
         addSubview(hc.view)
         hc.view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -94,6 +118,12 @@ private final class CheckoutButtonContainerView: UIView {
         }
     }
 
+    @MainActor
+    private func report(_ height: CGFloat) {
+        guard let value = heightReporter.accept(height) else { return }
+        sizing.onHeightChanged(height: Double(value)) { _ in }
+    }
+
     override func willMove(toWindow newWindow: UIWindow?) {
         super.willMove(toWindow: newWindow)
         guard let hc = hostingController else { return }
@@ -110,6 +140,22 @@ private final class CheckoutButtonContainerView: UIView {
             hc.removeFromParent()
         }
     }
+}
+
+/// Drops zero heights and changes of 0.5pt or less so Dart only relayouts on
+/// real content changes.
+struct HeightReporter {
+    private(set) var lastReported: CGFloat = 0
+    mutating func accept(_ height: CGFloat) -> CGFloat? {
+        guard height > 0, abs(height - lastReported) > 0.5 else { return nil }
+        lastReported = height
+        return height
+    }
+}
+
+private struct CheckoutContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 private extension UIViewController {

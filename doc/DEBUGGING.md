@@ -147,25 +147,109 @@ This error is rare in steady state. If it occurs frequently, check that your `se
 
 ---
 
-## Reading the event log in the demo app
+## Setup and platform-bridge failures
 
-The `example/` app ships an event log widget that surfaces every `CheckoutEvent` and `OnramperState` transition in real time. To use it for debugging your own integration:
+Construction starts configuration once. `initialize()` and setup-dependent
+methods await the stored setup internally; adding a delay or calling configure
+again is unnecessary. Setup failure is retained and thrown by dependent calls,
+without an unhandled configure future. Initialize once per client for normal
+startup. `dispose()` waits for pending setup and attempts native cleanup even
+after setup failure. Repeated calls share one future and its success or failure,
+with no duplicate cleanup. Both stream closes are initiated without waiting for
+paused subscribers; `super.dispose()` always runs even if native cleanup fails.
+
+Operational SDK/bridge failures, including `sdkVersion()` and `dispose()`,
+throw `OnramperError`. SDK DTO errors keep their original kinds. Otherwise,
+`not_configured` maps to `notConfigured`, `not_initialized` to `notInitialized`,
+`missing_response` to `missingResponse`, and other `PlatformException`s or
+`MissingPluginException`s to `platformFailure`. For `notInitialized`, await
+initialization before requesting checkout. For the other bridge kinds, inspect
+plugin registration, platform support and the native build using the retained
+diagnostics. Programming errors propagate unchanged.
+
+Catch `OnramperError` instead of `PlatformException` for these failures. The
+nullable `cause` (`Object?`) retains the original exception and native details;
+`stackTrace` (`StackTrace?`) preserves its stack, and `platformCode` (`String?`)
+is the original platform code when available, or the synthesized `missing_plugin`
+for `MissingPluginException`. The thrown error retains the
+original stack. These fields are diagnostic only, not safe end-user copy.
+Show `userMessage` and `supportCode`; review diagnostics before sharing them.
+
+---
+
+## Capturing SDK logs
+
+Pass a `logHandler` to receive structured, sanitized log records in Dart (Console output is kept):
+
+```dart
+final records = <OnramperLogRecord>[];
+
+OnramperConfiguration(
+  apiKey: 'pk_test_...',
+  clientId: '...',
+  environment: OnramperEnvironment.development,
+  logLevel: OnramperLogLevel.debug,
+  logHandler: records.add,
+)
+```
+
+Each record carries `timestamp`, `level`, `category`, `event`, `context` and `message`. URLs are reduced to hosts, HTTP paths to route templates, and values resembling emails, phone numbers, card numbers or tokens are redacted. **Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data** and choose retention and sharing accordingly.
+
+Two flags, both `false` by default:
+
+- `isEventLoggingEnabled` mirrors provider-lifecycle events to Onramper's backend telemetry.
+- `isEventConsoleLoggingEnabled` logs provider-lifecycle events at `info` even when `logLevel` is lower, including `off`.
+
+For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is running. The native SDK logs with the subsystem `com.onramper.sdk`.
+
+---
+
+## Support codes
+
+Every `OnramperError` has a `supportCode`: a short, stable code that's safe to show users next to `userMessage` (e.g. "Error code: …") and matches what the SDK logs. Ask users to quote it, together with `client.currentTransactionId` when there is one, when they contact support. Codes starting with `FLUTTER-` come from the Flutter plugin itself (for example, `FLUTTER-INTENT-INVALIDATED` and `FLUTTER-CLIENT-DISPOSED`).
+
+---
+
+## Versions
+
+```dart
+final plugin = OnramperClient.wrapperVersion;   // e.g. '1.3.1'
+final sdk = await OnramperClient.sdkVersion();  // bundled native SDK, e.g. '1.3.1'
+```
+
+Include both in bug reports. After upgrading the package, run `pod install` and rebuild: a Dart-only update doesn't replace the bundled iOS SDK.
+
+---
+
+## Using the example app for debugging
+
+The `example/` app shows plugin and SDK versions and the current transaction id, and includes an SDK log viewer:
 
 1. Clone the repository and open `example/`.
-2. Run with verbose logging enabled:
+2. Run it:
 
 ```bash
 cd example
 flutter pub get
 cd ios && pod install && cd ..
-flutter run --dart-define-from-file=.env --debug
+# Copy .env.example to .env and fill in the selected environment's credentials.
+flutter run --dart-define-from-file=.env --release
 ```
 
-3. In `main.dart`, set `logLevel: OnramperLogLevel.debug` on the `OnramperConfiguration`. This emits HTTP method, URL path, and status for every backend and security call to the device console.
+3. Tap the settings gear and scroll to **Diagnostic logs**. The demo uses the
+   SDK's debug log level. **Save SDK logs** controls whether records are saved
+   to local files; changing it does not rebuild the client.
+4. Tap a file name to preview its text, use **Share** to export a snapshot,
+   or **Delete all logs** to remove saved files after confirmation. Provider
+   messages may contain personal information; review logs before sharing.
 
-4. Observe the event stream. Every state transition, event, and error emitted by the native SDK is printed to the on-screen log, alongside the raw `OnramperError` fields (`kind`, `code`, `message`, `debugInfo`) when an error is present.
-
-For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is running. The native SDK logs with the subsystem `com.onramper.sdk`.
+The Environment selector switches between Development and Production, using
+separate credentials and demo session endpoints; it rebuilds the client.
+Purchase-form edits request a new quote automatically. Checkout is disabled
+immediately while text edits settle, then the quote refreshes after a short
+typing debounce. Completed and pending payments appear in status panels with
+selectable transaction information. Use **Reset** to clear the current checkout
+and request a fresh quote. Track pending payments before starting another payment.
 
 ---
 
@@ -181,5 +265,9 @@ For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is 
 | `decodingError: encryption key not found` | Plugin/backend version skew | Upgrade to `onramper_flutter` v1.1.1+; confirm backend environment matches `OnramperEnvironment`. |
 | `networkError` (code 403) on `getCheckoutRequirements` | Session token missing `checkout:write` scope | Add `checkout:write` to the scope list in your backend session-mint call. |
 | `unrecoverable` mid-flow | Recovery chain exhausted | Call `reset()`, fetch fresh credentials, call `initialize()`. |
+| `intentInvalidated` thrown from `getCheckoutRequirements` | A newer call, `reset()` or `signOut()` superseded it | Expected when re-quoting; ignore it and use the latest result. |
+| `clientDisposed` | Method called after `dispose()` | Create a new `OnramperClient`. |
+| Previously signed-in users see the OnramperID login again after upgrading | Credentials are now stored per environment (SDK 1.3.0) | Expected once per user; no action needed. |
+| Checkout button shows nothing | Prepared button expired (5 min) or was superseded | Request a new quote. |
 | Build fails — Swift module not found | Xcode < 26 | Update to Xcode 26+. |
 | Payment sheet obscured by Flutter debug overlay | Running in debug mode | Use `flutter run --release` or `--profile` for checkout testing. |

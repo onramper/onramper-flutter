@@ -1,4 +1,5 @@
 import '../platform/pigeon.g.dart';
+import 'log_record.dart';
 
 /// Session credentials returned by the partner backend, used to bootstrap and
 /// later refresh an SDK session.
@@ -22,6 +23,9 @@ enum OnramperEnvironment { development, production }
 enum OnramperTheme { system, light, dark }
 
 /// Verbosity level for SDK logging.
+///
+/// The native SDK has four levels: `warning` behaves as `error`, `trace` as
+/// `debug`.
 enum OnramperLogLevel { off, error, warning, info, debug, trace }
 
 /// Configuration passed to [OnramperClient.configure].
@@ -35,6 +39,9 @@ class OnramperConfiguration {
     this.environment = OnramperEnvironment.production,
     this.theme = OnramperTheme.system,
     this.logLevel = OnramperLogLevel.off,
+    this.logHandler,
+    this.isEventLoggingEnabled = false,
+    this.isEventConsoleLoggingEnabled = false,
   });
 
   final String apiKey;
@@ -42,6 +49,17 @@ class OnramperConfiguration {
   final OnramperEnvironment environment;
   final OnramperTheme theme;
   final OnramperLogLevel logLevel;
+
+  /// Custom log sink. When set, records are forwarded to Dart in addition to
+  /// the native Console (os.Logger) output.
+  final OnramperLogHandler? logHandler;
+
+  /// Mirrors provider-lifecycle events to Onramper's backend telemetry.
+  final bool isEventLoggingEnabled;
+
+  /// Emits provider-lifecycle events at `info` even when [logLevel] is lower,
+  /// including `off`.
+  final bool isEventConsoleLoggingEnabled;
 
   ConfigurationDto toDto() => ConfigurationDto(
         apiKey: apiKey,
@@ -63,5 +81,8 @@ class OnramperConfiguration {
           OnramperLogLevel.debug => LogLevelDto.debug,
           OnramperLogLevel.trace => LogLevelDto.trace,
         },
+        hasLogHandler: logHandler != null,
+        isEventLoggingEnabled: isEventLoggingEnabled,
+        isEventConsoleLoggingEnabled: isEventConsoleLoggingEnabled,
       );
 }

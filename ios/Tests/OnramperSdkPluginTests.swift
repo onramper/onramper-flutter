@@ -29,6 +29,20 @@ final class MockOnramperFlutterApi: OnramperFlutterApiProtocol {
         sessionExpiredCallCount += 1
         completion(.success(()))
     }
+
+    var logs: [LogRecordDto] = []
+
+    func onLog(record recordArg: LogRecordDto, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+        logs.append(recordArg)
+        completion(.success(()))
+    }
+
+    var transactionIds: [String?] = []
+
+    func onTransactionIdChanged(transactionId transactionIdArg: String?, completion: @escaping (Result<Void, PigeonError>) -> Void) {
+        transactionIds.append(transactionIdArg)
+        completion(.success(()))
+    }
 }
 
 @MainActor
@@ -48,6 +62,60 @@ final class OnramperSdkPluginTests: XCTestCase {
         plugin = nil
         mockApi = nil
         try await super.tearDown()
+    }
+
+    // MARK: - reset / signOut handle bookkeeping
+
+    /// A handle stored by a getCheckoutRequirements that finished while reset
+    /// or signOut was awaiting must survive, so the next preparation drops it.
+    func test_resetAndSignOut_keepHandleStoredDuringTheirAwait() async throws {
+        for call in ["reset", "signOut"] {
+            plugin.testLastButtonHandle = "H1"
+            let finished = expectation(description: call)
+            // Synchronous part captures H1 and schedules the native await.
+            if call == "reset" {
+                plugin.reset { _ in finished.fulfill() }
+            } else {
+                plugin.signOut { _ in finished.fulfill() }
+            }
+            // A newer preparation stores H2 before that await resumes.
+            plugin.testLastButtonHandle = "H2"
+            await fulfillment(of: [finished], timeout: 2)
+            XCTAssertEqual(plugin.testLastButtonHandle, "H2", call)
+        }
+    }
+
+    // MARK: - log forwarding
+
+    func test_logHandler_forwardsRecordsToDartOnMain() async {
+        let handler = plugin.makeLogHandler()
+        let record = OnramperLogRecord(level: .info, category: "Checkout", event: "checkout.finalized", context: [:])
+        DispatchQueue.global().async { handler(record) }   // native calls from arbitrary threads
+        let delivered = expectation(description: "delivered")
+        func poll() {
+            if mockApi.logs.count == 1 { delivered.fulfill(); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { MainActor.assumeIsolated { poll() } }
+        }
+        poll()
+        await fulfillment(of: [delivered], timeout: 2)
+        XCTAssertEqual(mockApi.logs.first?.event, "checkout.finalized")
+    }
+
+    func test_configure_installsLogHandlerOnlyWhenDartHasOne() throws {
+        var withHandler = makeConfig()
+        withHandler.hasLogHandler = true
+        try plugin.configure(config: withHandler)
+        XCTAssertNotNil(plugin.testClient()?.configuration.logHandler)
+
+        try plugin.configure(config: makeConfig())
+        XCTAssertNil(plugin.testClient()?.configuration.logHandler)
+    }
+
+    // MARK: - sdkVersion
+
+    func test_sdkVersion_returnsNativeVersion() throws {
+        XCTAssertEqual(try plugin.sdkVersion(), OnramperClient.sdkVersion)
+        XCTAssertEqual(try plugin.sdkVersion(), "1.3.1")
     }
 
     // MARK: - configure
@@ -87,6 +155,20 @@ final class OnramperSdkPluginTests: XCTestCase {
             plugin.dispose(completion: completion)
         }
         XCTAssertNil(plugin.testClient(), "expected dispose to release the native client")
+    }
+
+    func test_dispose_keepsClientConfiguredDuringTeardown() async throws {
+        try plugin.configure(config: makeConfig())
+        let disposed = expectation(description: "dispose completes")
+        plugin.dispose { _ in disposed.fulfill() }
+        // Reaches the plugin before dispose's Task runs, as a new Dart
+        // client's configure can.
+        try plugin.configure(config: makeConfig())
+        let replacement = try XCTUnwrap(plugin.testClient())
+
+        await fulfillment(of: [disposed], timeout: 5)
+        XCTAssertTrue(plugin.testClient() === replacement,
+                      "expected dispose to leave the newer client in place")
     }
 
     // MARK: - initialize before configure
@@ -195,7 +277,10 @@ final class OnramperSdkPluginTests: XCTestCase {
             clientId: "01HPLUGINTEST",
             environment: .development,
             theme: .system,
-            logLevel: .off
+            logLevel: .off,
+            hasLogHandler: false,
+            isEventLoggingEnabled: false,
+            isEventConsoleLoggingEnabled: false
         )
     }
 

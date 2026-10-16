@@ -19,6 +19,9 @@ Passed to `OnramperClient(configuration:)`.
 | `environment` | `OnramperEnvironment` | Yes | — | `production` or `development` (staging). |
 | `theme` | `OnramperTheme` | No | `system` | Visual theme applied to native checkout UI. |
 | `logLevel` | `OnramperLogLevel` | No | `off` | Verbosity of SDK logging to the device console. |
+| `logHandler` | `OnramperLogHandler?` | No | `null` | Receives structured `OnramperLogRecord`s at or above `logLevel`, in addition to Console output. Exceptions it throws are reported via `FlutterError.reportError` and don't interrupt checkout. |
+| `isEventLoggingEnabled` | `bool` | No | `false` | Mirrors provider-lifecycle events to Onramper's backend telemetry. |
+| `isEventConsoleLoggingEnabled` | `bool` | No | `false` | Emits provider-lifecycle events at `info` even when `logLevel` is lower, including `off`. |
 
 ### `OnramperEnvironment`
 
@@ -45,6 +48,21 @@ Passed to `OnramperClient(configuration:)`.
 | `info` | HTTP method, URL path, and status for every backend and security call. |
 | `debug` | Low-level bridge and state machine detail. |
 | `trace` | Maximum verbosity. _(Collapsed to `debug` on the Swift side.)_ |
+
+### `OnramperLogRecord`
+
+Delivered to `OnramperConfiguration.logHandler`. Structured and sanitized: URLs are reduced to hosts, HTTP paths to route templates, and values resembling emails, phone numbers, card numbers or tokens are redacted. Provider messages get best-effort redaction only, so treat exported logs as possibly containing personal data.
+
+| Field | Type | Description |
+|---|---|---|
+| `timestamp` | `DateTime` | UTC time the record was emitted. |
+| `level` | `OnramperLogLevel` | `off`, `error`, `info` or `debug` (the native levels). |
+| `category` | `String` | Stable category, e.g. `Checkout`, `ProviderEvents`. |
+| `event` | `String` | Stable event name, e.g. `checkout.finalized`. |
+| `context` | `Map<String, String>` | Structured key/value context. |
+| `message` | `String` | `"<event> k1=v1 k2=v2"`, keys sorted. |
+
+`OnramperLogHandler` is `void Function(OnramperLogRecord record)`.
 
 ### `SessionCredentials`
 
@@ -80,6 +98,8 @@ OnramperClient({
 })
 ```
 
+The constructor starts native configuration exactly once and stores the setup future. `initialize()` and other setup-dependent calls await it internally; no separate `configure()` call or delay is needed. A setup failure is retained and thrown by dependent methods, without an unhandled configuration future. Call and await `initialize()` once per client for normal startup, before requesting a checkout; awaiting setup does not initialize a session for you.
+
 **Properties:**
 
 | Property | Type | Description |
@@ -88,19 +108,49 @@ OnramperClient({
 | `state` | `OnramperState` | Latest known SDK state. Defaults to `idle`. |
 | `stateStream` | `Stream<OnramperState>` | Broadcast stream of every state change. |
 | `events` | `Stream<CheckoutEvent>` | Broadcast stream of domain events. |
-| `lastError` | `OnramperError?` | Most recent error, or `null`. |
+| `lastError` | `OnramperError?` | Most recent native error callback, or `null`. Catch failures from public method futures separately. |
 | `tosRequirements` | `List<TosRequirement>?` | Cached ToS requirements from the latest `getCheckoutRequirements` call. |
+| `currentTransactionId` | `String?` | Onramper's durable transaction id. Set at finalize, cleared by a new checkout or `reset()`. Store it and quote it to support. Notifies listeners on change. |
+
+**Static members:**
+
+| Member | Type | Description |
+|---|---|---|
+| `wrapperVersion` | `String` (const) | Version of this Flutter plugin, e.g. `'1.3.1'`. |
+| `sdkVersion()` | `Future<String>` | Version of the bundled native OnramperSDK, e.g. `'1.3.1'`. No client instance needed. |
 
 **Methods:**
 
 | Method | Returns | Description |
 |---|---|---|
-| `initialize({required String sessionId, required String sessionToken})` | `Future<void>` | Runs App Attest and exchanges the bootstrap token for a DPoP-bound session. Call once per app launch. |
-| `getCheckoutRequirements(CheckoutIntentRequest request, {CheckoutButtonStyle? buttonStyle})` | `Future<CheckoutRequirementsResult>` | Creates a checkout intent, resolves requirements and quote, prepares the native button. |
+| `initialize({required String sessionId, required String sessionToken})` | `Future<void>` | Runs App Attest and exchanges the bootstrap token for a DPoP-bound session. Call once per client for normal startup; awaits stored setup internally. |
+| `getCheckoutRequirements(CheckoutIntentRequest request, {OnramperUserPrefill? prefill, CheckoutButtonStyle? buttonStyle})` | `Future<CheckoutRequirementsResult>` | Creates a checkout intent, resolves requirements and quote, prepares the native button. A newer call (or `reset()` / `signOut()`) makes an in-flight call throw `intentInvalidated`. |
 | `reset()` | `Future<void>` | Clears cached checkout state. Returns to `ready`. |
 | `signOut()` | `Future<void>` | Wipes stored OnramperID OIDC tokens. Does not invalidate the partner session. |
 | `cancelPreparedIntent(String buttonHandle)` | `Future<void>` | Drops a specific native button by handle. Call when navigating away from a prepared intent. |
-| `dispose()` | `Future<void>` | Tears down the client, closes streams, detaches Pigeon callbacks. Idempotent. |
+| `dispose()` | `Future<void>` | Waits for pending setup; attempts native cleanup even after setup failure. Repeated calls share one future and its success or failure, with no duplicate cleanup. Initiates both stream closes without waiting for paused subscribers; `super.dispose()` always runs. Native cleanup platform failures throw `OnramperError`; subsequent setup-dependent methods throw `clientDisposed` (`reset`, `signOut` and `cancelPreparedIntent` do nothing) and late callbacks are ignored. Disposing an older client leaves a newer client's callbacks and native client in place. |
+
+Operational SDK and platform-bridge failures from public calls throw `OnramperError`, including `OnramperClient.sdkVersion()` and `dispose()`. Programming errors propagate unchanged. SDK errors delivered as `OnramperErrorDto` retain their SDK kind and structured fields. For other bridge failures, the mapping is:
+
+| Native exception / code | `OnramperErrorKind` |
+|---|---|
+| `PlatformException`: `not_configured` | `notConfigured` (Dart-only) |
+| `PlatformException`: `not_initialized` | `notInitialized` (existing kind) |
+| `PlatformException`: `missing_response` | `missingResponse` (Dart-only) |
+| Any other `PlatformException`, or `MissingPluginException` | `platformFailure` (Dart-only) |
+
+The original error stack is preserved. Nullable diagnostics `cause` (`Object?`), `stackTrace` (`StackTrace?`) and `platformCode` (`String?`) retain the original exception, stack and platform code where available. Native `PlatformException.details` remains accessible through `cause`; `platformCode` is distinct from the numeric backend `code`; for `MissingPluginException`, it is synthesized as `missing_plugin` rather than copied from an original exception code. These diagnostics are not safe end-user copy: show `userMessage` and `supportCode` instead. Catch `OnramperError` rather than `PlatformException` for operational failures, and update exhaustive switches for the three new Dart-only enum cases. Existing public method signatures are unchanged.
+
+### `OnramperUserPrefill`
+
+Optional `prefill:` for `getCheckoutRequirements`. Pre-populates OnramperID sign-in and additional-info screens. Best-effort; blank fields are ignored; enabled per integration.
+
+| Field | Type | Description |
+|---|---|---|
+| `email` | `String?` | Pass only when you're confident it's the sign-in address. A mismatch drops the whole prefill. |
+| `firstName` | `String?` | |
+| `lastName` | `String?` | |
+| `phoneNumber` | `String?` | E.164, e.g. `+3712345678`. The user still verifies it. |
 
 ---
 
@@ -130,6 +180,7 @@ Snapshot of the SDK state. At most one payload field is non-null per instance, m
 | `readyToCheckout` | All requirements satisfied; Buy goes straight to finalize. |
 | `finalizing` | backend finalize call is in flight. |
 | `rendering` | Payment surface is on screen. |
+| `paymentPending` | Payment accepted, settlement pending. Neither success nor failure; track with `currentTransactionId`. |
 | `completed` | Terminal success. |
 | `failed` | Terminal failure. |
 
@@ -196,16 +247,21 @@ Domain event observed from the native SDK. Inspect `kind` to decide which payloa
 | `paymentProcessing` | Provider accepted payment and is settling. | — |
 | `paymentCancelled` | Provider reports user cancelled (e.g. dismissed Apple Pay sheet). | — |
 | `providerError` | Provider reported non-recoverable failure. | `providerReason` |
+| `paymentPending` | Payment accepted but not yet settled. | — |
+| `challengeStarted` | 3-D Secure verification started. | — |
+| `challengeCompleted` | 3-D Secure verification finished. | — |
+| `customerOnboardingRequired` | MoonPay guest checkout unavailable; the SDK opens MoonPay onboarding. | — |
 
-The `checkoutCancelled` through `providerError` events are forwarded from third-party checkout webviews; not every provider emits every kind.
+The events from `checkoutCancelled` onwards are forwarded from the payment surface; not every provider emits every kind. They report progress, not payment completion.
 
 ### `CheckoutFinalizeResponse`
 
-Carried by the `checkoutFinalized` event.
+Carried by the `checkoutFinalized` event. **Upgrade note:** direct construction now requires the named `onramperTransactionId` argument as well as `headlessCheckoutId` and `headlessCheckoutData`; update manually constructed responses and fixtures.
 
 | Field | Type | Description |
 |---|---|---|
 | `headlessCheckoutId` | `String` | Finalized checkout ID. |
+| `onramperTransactionId` | `String` | Onramper's durable transaction id; same as `OnramperClient.currentTransactionId`. |
 | `headlessCheckoutData` | `HeadlessCheckoutData` | Payment surface info. |
 
 ### `HeadlessCheckoutData`
@@ -388,6 +444,23 @@ Returned inside `CheckoutRequirementsResult.quote`. All core fields are non-null
 | `payout` | `double` | Amount of the destination asset the user receives. |
 | `paymentMethod` | `String` | Payment method the quote was priced for. |
 | `recommendations` | `List<String>?` | Optional provider recommendation metadata. |
+| `providerContext` | `Map<String, ProviderJSONValue>?` | Provider-specific data (executable flags, limits, disclosures). Most integrations can ignore it. May contain tokens; don't log it. |
+| `paymentDisclosures` | `List<PaymentDisclosure>` (getter) | Disclosures listed under `providerContext['paymentDisclosures']`. The native button already shows them. |
+
+### `ProviderJSONValue`
+
+Sealed JSON value: `ProviderJSONString(String value)`, `ProviderJSONNumber(double value)`, `ProviderJSONBool(bool value)`, `ProviderJSONNull()`, `ProviderJSONArray(List<ProviderJSONValue> value)`, `ProviderJSONObject(Map<String, ProviderJSONValue> value)`. `stringValue` returns the string payload or `null`.
+
+### `PaymentDisclosure`
+
+| Field | Type |
+|---|---|
+| `code` | `String` |
+| `version` | `String` |
+| `contentMarkdown` | `String` |
+| `contentHtml` | `String` |
+
+`PaymentDisclosure.tryParse(ProviderJSONValue)` returns `null` unless all four fields are strings.
 
 ---
 
@@ -400,7 +473,9 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | Field | Type | Description |
 |---|---|---|
 | `kind` | `OnramperErrorKind` | Discriminator — always set. |
-| `message` | `String` | Human-readable description (English, non-localized). |
+| `message` | `String` | Developer-facing description (English, non-localized). |
+| `userMessage` | `String` | Plain end-user copy, safe to show users. |
+| `supportCode` | `String` | Short stable code, safe to show next to `userMessage`; matches SDK logs. Plugin-originated errors use `FLUTTER-…` codes. |
 | `recoverable` | `bool` | SDK's assessment of whether a retry is worthwhile. |
 | `code` | `int?` | Numeric backend error code when one was present. Do not switch on this; use `kind`. |
 | `minAmount` | `double?` | Populated for `amountOutOfRange`. |
@@ -413,8 +488,13 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `expectedState` | `String?` | Populated for `invalidState`. |
 | `actualState` | `String?` | Populated for `invalidState`. |
 | `host` | `String?` | Populated for `securityTrustFailed` — the host whose certificate pinning check failed. |
+| `cause` | `Object?` | Original exception, including native details when available. Diagnostic only; not safe end-user copy. |
+| `stackTrace` | `StackTrace?` | Original failure stack when available; preserved when rethrowing. |
+| `platformCode` | `String?` | Original platform exception code when available; synthesized as `missing_plugin` for `MissingPluginException`. Separate from numeric backend `code`. |
 
 ### `OnramperErrorKind`
+
+The Dart-only additions `notConfigured`, `missingResponse` and `platformFailure` use the bridge mapping above. They do not add native DTO enum values. Update exhaustive switches when upgrading. The table below lists SDK and plugin kinds.
 
 | Value | `recoverable` default | Suggested action |
 |---|---|---|
@@ -444,6 +524,14 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 | `deviceBlocked` | false | Show a "unable to continue on this device" message. |
 | `securityStorageFailed` | false | Rare; log `debugInfo` and surface a generic error. |
 | `securityTrustFailed` | false | Rare; log `error.host` and surface a generic error. |
+| `paymentFailed` | true | Provider confirmed failure (e.g. card declined). Show `userMessage`; offer another payment method. |
+| `providerFailed` | false | Outcome unknown — the payment may have gone through. Check status before offering another payment. |
+| `applePayNotConfigured` | false | No Apple Pay card in Wallet. Ask the user to add one or pick another method. |
+| `intentInvalidated` | true | _Plugin-originated._ Superseded by a newer `getCheckoutRequirements`, `reset()` or `signOut()`. Ignore. |
+| `clientDisposed` | false | _Plugin-originated._ Method called after `dispose()`. Create a new client. |
+| `notConfigured` | false | _Dart-only._ Native plugin has no configured client; inspect setup failure and lifecycle diagnostics. |
+| `missingResponse` | false | _Dart-only._ Required native response missing. Do not automatically retry; inspect diagnostics and report the bridge failure. |
+| `platformFailure` | false | _Dart-only._ Do not automatically retry; check platform support, plugin registration and native build. |
 
 ---
 
@@ -451,52 +539,52 @@ Implements `Exception`. Thrown across `async` boundaries; catch with `on Onrampe
 
 ### `OnramperCheckoutButton`
 
-Consumer-facing wrapper that renders any unsatisfied ToS items above the native `OnramperNativeCheckoutButton`. The native button handles the full checkout flow (OIDC login, finalize, payment surface) internally.
+Consumer-facing wrapper around the native `OnramperNativeCheckoutButton`. The native button renders the ToS consent sentence below Buy and handles the full checkout flow (OIDC login, finalize, payment surface) internally.
 
 ```dart
 const OnramperCheckoutButton({
   Key? key,
   required CheckoutRequirementsResult requirements,
   CheckoutButtonStyle style = const CheckoutButtonStyle(),
-  Future<bool> Function(Uri)? onLinkTap,
+  @Deprecated(...) Future<bool> Function(Uri)? onLinkTap,
 })
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `requirements` | `CheckoutRequirementsResult` | Result from `getCheckoutRequirements`. |
-| `style` | `CheckoutButtonStyle` | ToS text styling (see below). Button colors are set via `getCheckoutRequirements(buttonStyle:)`. |
-| `onLinkTap` | `Future<bool> Function(Uri)?` | Override for ToS link taps. When null, links open in an external browser via `url_launcher`. |
+| `style` | `CheckoutButtonStyle` | Kept for compatibility. Button colors are set via `getCheckoutRequirements(buttonStyle:)`. |
+| `onLinkTap` | `Future<bool> Function(Uri)?` | **Deprecated, no effect.** The native button opens ToS links itself. |
 
 ### `CheckoutButtonStyle`
 
-Styling for `OnramperCheckoutButton`. Fields split between native button appearance (forwarded via `getCheckoutRequirements`) and Dart-drawn ToS text.
+Native checkout button appearance, forwarded via `getCheckoutRequirements(buttonStyle:)`.
 
 | Field | Type | Default | Used by |
 |---|---|---|---|
 | `backgroundColor` | `Color?` | SDK default (system blue) | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
 | `foregroundColor` | `Color?` | SDK default (white) | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
 | `borderRadius` | `double` | `12` | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
-| `tosStyle` | `TextStyle?` | `TextStyle(fontSize: 12)` | Dart ToS lines — pass to `OnramperCheckoutButton(style:)`. |
-| `tosLinkStyle` | `TextStyle?` | Inherits from `tosStyle` with underline + blue | Dart ToS link lines — pass to `OnramperCheckoutButton(style:)`. |
+| `tosStyle` | `TextStyle?` | — | **Deprecated, no effect.** The native button renders the ToS text. |
+| `tosLinkStyle` | `TextStyle?` | — | **Deprecated, no effect.** |
 
 Colors are serialized as `#RRGGBBAA` hex strings across the bridge. The button label ("Buy") is fixed by the SDK and not overridable from Dart.
 
 ### `OnramperNativeCheckoutButton`
 
-Low-level wrapper. Embeds the native SwiftUI button directly via `UiKitView`. Use `OnramperCheckoutButton` unless you need to manage ToS rendering yourself.
+Low-level wrapper. Embeds the native SwiftUI button directly via `UiKitView`. Prefer `OnramperCheckoutButton`.
 
 ```dart
 const OnramperNativeCheckoutButton({
   Key? key,
   required String buttonHandle,
-  double height = 56.0,
+  @Deprecated('The button sizes itself.') double? height,
 })
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `buttonHandle` | `String` | Handle from `CheckoutRequirementsResult.buttonHandle`. |
-| `height` | `double` | Height in logical pixels. Default `56`. |
+| `height` | `double?` | **Deprecated.** The button sizes itself to its native content; if set, acts as a minimum height. |
 
-Renders an empty `SizedBox` on non-iOS platforms.
+Starts at 56 logical pixels until the native view reports its content height. Renders nothing (height 0) for an expired or superseded handle. Renders an empty `SizedBox` on non-iOS platforms.

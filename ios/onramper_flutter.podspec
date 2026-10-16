@@ -1,10 +1,10 @@
 Pod::Spec.new do |s|
   s.name             = 'onramper_flutter'
-  s.version          = '1.1.2'
+  s.version          = '1.3.1'
   s.summary          = 'Flutter plugin wrapping OnramperSDK (iOS).'
   s.description      = 'iOS-only Flutter plugin for the Onramper crypto on-ramp.'
   s.homepage         = 'https://github.com/onramper/onramper-flutter'
-  s.license          = { :type => 'MIT', :file => '../LICENSE' }
+  s.license          = { :type => 'Apache-2.0', :file => '../LICENSE' }
   s.author           = { 'Onramper' => 'engineering@onramper.com' }
   s.source           = { :path => '.' }
   s.platform         = :ios, '16.0'
@@ -34,9 +34,9 @@ Pod::Spec.new do |s|
   # the `sha256:` prefix).
   s.prepare_command = <<~CMD
     set -euo pipefail
-    ONRAMPER_SDK_VERSION="v1.1.1"
-    ONRAMPER_SDK_ASSET_ID="492870955"
-    ONRAMPER_SDK_SHA256="88235fa50561422ba3276f8008ff0a2229cff760f75f36f3f424ff5f26e2b2e2"
+    ONRAMPER_SDK_VERSION="v1.3.1"
+    ONRAMPER_SDK_ASSET_ID="616083788"
+    ONRAMPER_SDK_SHA256="c003eb348062fb755d3de304f1f7ea4f1a7253192fa7e33adb794f2ce1d90d6a"
     FRAMEWORKS_DIR="Frameworks"
     XCFRAMEWORK_DIR="$FRAMEWORKS_DIR/OnramperSDK.xcframework"
     VERSION_STAMP="$FRAMEWORKS_DIR/.version"

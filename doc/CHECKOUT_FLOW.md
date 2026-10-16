@@ -35,24 +35,24 @@ mint session  →  initialize()  →  attestation + DPoP bootstrap
                                →  OnramperID login (if needed)
                                →  finalize intent with Onramper's backend
                                →  present payment surface
-                 observe events ← completed / failed
+                 observe events ← completed / paymentPending / failed
 ```
 
 Step by step:
 
 1. **Backend mints a session.** Your server calls `POST /v2/partners/{apiKey}/client-sessions` with your Ed25519 partner key and gets back a one-shot `{sessionId, sessionToken}` pair. It returns these to the app over your own authenticated channel.
 
-2. **App constructs `OnramperClient`** with configuration and `sessionExpirationHandler`, then calls `initialize(sessionId:, sessionToken:)`. The native side runs App Attest and exchanges the bootstrap token for a DPoP-bound session. State becomes `ready`.
+2. **App constructs `OnramperClient`** with configuration and `sessionExpirationHandler`, then calls and awaits `initialize(sessionId:, sessionToken:)` once per client for normal startup. Construction starts configuration once; initialization awaits the stored setup internally and throws any retained setup failure. The native side runs App Attest and exchanges the bootstrap token for a DPoP-bound session. State becomes `ready`.
 
 3. **App requests a checkout.** `getCheckoutRequirements(request)` creates a checkout intent, resolves what consent and KYC is needed for this user and amount, and returns `CheckoutRequirementsResult` with a quote and a native button handle.
 
 4. **App embeds `OnramperCheckoutButton`.** The user sees the native Buy button and any Terms-of-Service text the plugin rendered for the selected provider.
 
-5. **User taps Buy.** The button records ToS consent, presents the OnramperID login sheet if the provider needs user identity (and the same sheet handles phone re-verification), then finalizes the intent with Onramper's backend.
+5. **User taps Buy.** The button records ToS consent, presents the OnramperID login sheet if the provider needs user identity (and the same sheet handles phone re-verification), then finalizes the intent with Onramper's backend. If you passed `prefill:`, the OnramperID screens arrive pre-populated. At finalize, `client.currentTransactionId` is set.
 
-6. **Plugin renders the payment surface.** Apple Pay, card webview, or other surface — chosen automatically from the provider's finalize response. State transitions through `finalizing` → `rendering`.
+6. **Plugin renders the payment surface.** Apple Pay, card webview, or other surface — chosen automatically from the provider's finalize response. For MoonPay Apple Pay quotes, the SDK runs MoonPay's checkout inside the payment sheet (guest checkout or onboarding, 3-D Secure, required payment disclosures). State transitions through `finalizing` → `rendering`.
 
-7. **Outcome.** `CheckoutEventKind.completed` (with `checkoutId`) or `CheckoutEventKind.failed` (with `OnramperError`). Call `client.reset()` to return to `ready` for another checkout.
+7. **Outcome.** `CheckoutEventKind.completed` (with `checkoutId`), `CheckoutEventKind.paymentPending` (accepted, not yet settled), or `CheckoutEventKind.failed` (with `OnramperError`). On failure the native screen shows the error's `userMessage` and support code, and **Try Again** closes the sheet and starts a fresh checkout. Read `client.currentTransactionId` before calling `client.reset()`, which returns to `ready` for another checkout.
 
 ---
 
@@ -71,10 +71,33 @@ Step by step:
 | `readyToCheckout` | All requirements satisfied; tapping Buy goes straight to finalize. | — |
 | `finalizing` | backend finalize call is in flight. | — |
 | `rendering` | Payment surface is on screen. | `renderContext: RenderContext` |
+| `paymentPending` | Payment accepted, settlement pending. Dismissing the sheet keeps this outcome. Neither success nor failure. | — |
 | `completed` | Terminal success. | — |
 | `failed` | Terminal failure. | `failedError: OnramperError` |
 
 State transitions are emitted as `CheckoutEventKind.stateChanged` on `client.events` and trigger `notifyListeners()` on the `ChangeNotifier`. Both observation surfaces stay in sync.
+
+---
+
+## Transaction id vs checkout id
+
+| | Checkout id | Transaction id (`client.currentTransactionId`) |
+|---|---|---|
+| Identifies | One checkout **attempt** | The **transaction** |
+| Lifetime | Single-use; a new one is issued each time the intent is re-created, including each time the user dismisses the payment sheet | Stable for the transaction |
+| Where | `checkoutStarted` / `completed` events | Set at finalize; also `CheckoutFinalizeResponse.onramperTransactionId` |
+| Use for | Correlating logs within one attempt | **Support, reconciliation, status lookups** |
+
+A journey can produce several checkout ids but at most one transaction id. If you persist one identifier, persist the transaction id. It's cleared by a new checkout and by `reset()`.
+
+---
+
+## Superseded preparations
+
+- Calling `getCheckoutRequirements` again, or `reset()` / `signOut()`, supersedes any earlier call still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest result.
+- Buttons prepared by earlier calls that weren't shown yet are released and render nothing.
+- A prepared button that isn't shown within 5 minutes expires and renders nothing; request a new quote.
+- After `dispose()`, setup-dependent methods throw `clientDisposed` (`reset()`, `signOut()` and `cancelPreparedIntent()` do nothing); repeated disposal returns the same future and shares its success or failure without repeating cleanup. Create a new client to start over.
 
 ---
 
@@ -113,6 +136,17 @@ Provider checkout webviews forward the following events over the bridge. Not eve
 | `paymentCancelled` | Provider reports the user cancelled (e.g. dismissed the Apple Pay sheet). |
 | `checkoutCancelled` | User dismissed the payment webview before completing. |
 | `providerError` | Provider reported a non-recoverable failure. `event.providerReason` carries a short human-readable string from the provider. |
+| `paymentPending` | Payment accepted but not yet settled. |
+
+### 3-D Secure and onboarding events
+
+| `CheckoutEventKind` | Fires when |
+|---|---|
+| `challengeStarted` | A 3-D Secure verification started. |
+| `challengeCompleted` | The 3-D Secure verification finished. |
+| `customerOnboardingRequired` | MoonPay guest checkout isn't available for this user; the SDK opens MoonPay onboarding. |
+
+These report progress, not payment completion.
 
 ---
 
@@ -126,7 +160,7 @@ The plugin manages two independent token hierarchies silently:
 - If both refresh paths exhaust, the plugin calls `sessionExpirationHandler` for a fresh `{sessionId, sessionToken}` pair. Your handler should call your backend and return new credentials; the plugin re-runs the bootstrap transparently.
 
 **OnramperID user token (OIDC):**
-- Obtained from the OnramperID login sheet and stored in the iOS keychain.
+- Obtained from the OnramperID login sheet and stored in the iOS keychain, separately per environment. Users who signed in before upgrading to 1.3.1 sign in once more.
 - Access and refresh tokens are managed automatically.
 - If the refresh token is terminally rejected, the plugin re-presents the login sheet. Your code only sees `CheckoutEventKind.loginRequired` — no error is emitted for this path.
 

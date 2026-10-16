@@ -44,5 +44,6 @@ What `onramper_flutter` supports in this release — regions, payment methods, p
 |---|---|
 | Coinbase | Available in supported regions subject to partner configuration. |
 | Paybis | Available in supported regions subject to partner configuration. |
+| MoonPay | Apple Pay. The checkout button runs MoonPay's checkout inside the payment sheet: guest checkout or MoonPay account onboarding when required, 3-D Secure verification, and MoonPay's required payment disclosures shown next to the Apple Pay button (they can't be hidden). Nothing extra to integrate. |
 
 Other providers may appear based on region, requested amount, and payment method. The set of eligible providers is resolved at `getCheckoutRequirements` time from Onramper's backend — the list above reflects providers available in this release, not an exhaustive list of what any single request returns. Use `onlyOnramps` in `CheckoutIntentRequest` to restrict to a specific subset.

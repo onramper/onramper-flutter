@@ -1,8 +1,9 @@
 // Tests for OnramperCheckoutButton.
 //
 // The widget no longer accepts a `client` parameter and no longer invokes
-// `presentCheckout`. It renders an OnramperNativeCheckoutButton (UiKitView on
-// iOS, empty SizedBox on other platforms) above any unsatisfied ToS lines.
+// `presentCheckout`. It renders only an OnramperNativeCheckoutButton
+// (UiKitView on iOS, empty SizedBox on other platforms); the native button
+// draws the ToS sentence itself.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
@@ -41,11 +42,10 @@ void main() {
 
     // The native button widget should be present in the tree.
     expect(find.byType(OnramperNativeCheckoutButton), findsOneWidget);
-    // No ToS lines — only the native button column.
-    expect(find.byType(Column), findsWidgets);
   });
 
-  testWidgets('ToS items render with link text', (tester) async {
+  testWidgets('unsatisfied ToS items are left to the native button',
+      (tester) async {
     const tos = TosRequirement(
       providerId: 'transak',
       items: [
@@ -56,13 +56,6 @@ void main() {
           url: 'https://example.com/tos',
           content: 'Terms of Service',
         ),
-        TosItem(
-          type: TosItemType.privacyPolicy,
-          required: true,
-          satisfied: false,
-          url: 'https://example.com/privacy',
-          content: 'Privacy Policy',
-        ),
       ],
     );
     final reqs = fixtureRequirements(requirements: const [
@@ -75,40 +68,9 @@ void main() {
       ),
     ));
 
-    expect(find.textContaining('Terms of Service'), findsOneWidget);
-    expect(find.textContaining('Privacy Policy'), findsOneWidget);
-  });
-
-  testWidgets('satisfied ToS items are not rendered', (tester) async {
-    const tos = TosRequirement(
-      providerId: 'transak',
-      items: [
-        TosItem(
-          type: TosItemType.tos,
-          required: true,
-          satisfied: true, // already satisfied — should not appear
-          url: 'https://example.com/tos',
-        ),
-        TosItem(
-          type: TosItemType.privacyPolicy,
-          required: true,
-          satisfied: false, // unsatisfied — should appear
-          url: 'https://example.com/privacy',
-        ),
-      ],
-    );
-    final reqs = fixtureRequirements(requirements: const [
-      CheckoutRequirement(kind: CheckoutRequirementKind.tos, tos: tos),
-    ]);
-
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: OnramperCheckoutButton(requirements: reqs),
-      ),
-    ));
-
+    // Dart-side lines would duplicate the native consent sentence.
     expect(find.textContaining('Terms of Service'), findsNothing);
-    expect(find.textContaining('Privacy Policy'), findsOneWidget);
+    expect(find.byType(OnramperNativeCheckoutButton), findsOneWidget);
   });
 
   testWidgets('button handle is forwarded to OnramperNativeCheckoutButton',

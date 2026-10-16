@@ -1,10 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart'
+    show MissingPluginException, PlatformException;
 
 import 'models/configuration.dart';
 import 'models/errors.dart';
 import 'models/events.dart';
+import 'models/log_record.dart';
+import 'models/prefill.dart';
 import 'models/requirements.dart';
 import 'models/state.dart';
 import 'platform/pigeon.g.dart';
@@ -36,8 +40,17 @@ typedef SessionExpirationHandler = Future<SessionCredentials> Function();
 ///    Riverpod, `StreamBuilder`, and `await for` consumers.
 ///
 /// The client is created with an [OnramperConfiguration] which is forwarded to
-/// the native side once during construction (fire-and-forget). Call
-/// [initialize] with [SessionCredentials] before starting a checkout flow.
+/// the native side once during construction. Calls await configuration and
+/// propagate setup failures. Call [initialize] with [SessionCredentials]
+/// before starting a checkout flow.
+///
+/// After [dispose], setup-dependent methods throw [OnramperError] with kind
+/// `clientDisposed`; [reset], [signOut] and [cancelPreparedIntent] do nothing.
+/// Late native callbacks are ignored. Create a new client to start over.
+///
+/// Native callbacks and the native SDK client are shared by the whole app, so
+/// the most recently constructed client owns them. Disposing an older client
+/// leaves a newer client's callbacks and native client in place.
 class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// Creates a client wired to the real native HostApi.
   OnramperClient({
@@ -62,6 +75,15 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
         sessionExpirationHandler: sessionExpirationHandler,
       );
 
+  /// Version of this Flutter plugin. `X.Y.Z` bundles native OnramperSDK
+  /// `X.Y.Z`.
+  static const String wrapperVersion = '1.3.1';
+
+  /// Version of the bundled native OnramperSDK (e.g. "1.3.1"). Works without a
+  /// client instance. Useful for diagnostics and support screens.
+  static Future<String> sdkVersion() =>
+      _platformCall(() => OnramperHostApi().sdkVersion());
+
   /// Required by `dartPluginClass: OnramperClient` in `pubspec.yaml`.
   ///
   /// Flutter's generated `dart_plugin_registrant` calls this on app start.
@@ -79,17 +101,32 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   })  : _config = configuration,
         _host = hostApi,
         _sessionExpirationHandler = sessionExpirationHandler {
+    _current = this;
     OnramperFlutterApi.setUp(this);
-    // Fire-and-forget — Pigeon's configure is async on iOS, but the contract
-    // is "called exactly once at construction; configuration errors surface
-    // as later state/error callbacks". Errors here become listener
-    // notifications via [onError].
-    unawaited(_host.configure(_config.toDto()));
+    _configuration = _configure();
   }
+
+  /// The client that last registered the global callbacks and configured the
+  /// native SDK (configure is sent synchronously from the constructor).
+  static OnramperClient? _current;
 
   final OnramperConfiguration _config;
   final OnramperHostApi _host;
   final SessionExpirationHandler? _sessionExpirationHandler;
+  late final Future<void> _configuration;
+  (Object, StackTrace)? _configurationFailure;
+  Future<void>? _disposal;
+
+  Future<void> _configure() async {
+    try {
+      await _platformCall(() => _host.configure(_config.toDto()));
+    } catch (error, stack) {
+      // Retain the failure until a caller awaits a public method. The
+      // constructor cannot return a Future, and setup may fail before that
+      // caller exists. Programming errors are retained unchanged as well.
+      _configurationFailure = (error, stack);
+    }
+  }
 
   OnramperState _state = const OnramperState(kind: OnramperStateKind.idle);
   final StreamController<OnramperState> _stateController =
@@ -98,6 +135,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
       StreamController<CheckoutEvent>.broadcast();
   OnramperError? _lastError;
   List<TosRequirement>? _tosRequirements;
+  String? _currentTransactionId;
   bool _disposed = false;
 
   /// Configuration this client was constructed with.
@@ -123,37 +161,64 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// [getCheckoutRequirements] response (or `null` if none requested yet).
   List<TosRequirement>? get tosRequirements => _tosRequirements;
 
+  /// Onramper's durable id for the current transaction, or `null`.
+  ///
+  /// Set when the checkout is finalized, before the payment surface renders.
+  /// Cleared when a new checkout starts or on [reset]. **Store this id and
+  /// quote it to Onramper support.** It's distinct from the per-attempt
+  /// checkout id on `checkoutStarted` / `completed` events. Read it before
+  /// calling [reset].
+  String? get currentTransactionId => _currentTransactionId;
+
   // ---- Public API (Dart -> native) -----------------------------------------
 
   /// Hands the bootstrap [SessionCredentials] to the native SDK so it can
   /// perform attestation and stand up a DPoP-bound session.
+  ///
+  /// Throws [OnramperError] on SDK failure.
   Future<void> initialize({
     required String sessionId,
     required String sessionToken,
   }) {
-    return _host.initialize(
-      SessionCredentialsDto(sessionId: sessionId, sessionToken: sessionToken),
-    );
+    return _guard(() => _host.initialize(
+          SessionCredentialsDto(
+              sessionId: sessionId, sessionToken: sessionToken),
+        ));
   }
 
   /// Requests a checkout intent from the BFF.
   ///
-  /// [buttonStyle] optionally overrides the appearance of the native checkout
-  /// button that will be embedded via [OnramperCheckoutButton]. Only the
-  /// visual fields (background/foreground color, border radius) are forwarded
-  /// — text/font styling for the Dart-side ToS lines lives on the widget.
+  /// [prefill] optionally pre-populates OnramperID screens; see
+  /// [OnramperUserPrefill] for the email caveat. [buttonStyle] optionally
+  /// overrides the appearance of the native checkout button embedded via
+  /// [OnramperCheckoutButton]. Only the visual fields (background/foreground
+  /// color, border radius) are forwarded — text/font styling for the
+  /// Dart-side ToS lines lives on the widget.
   ///
   /// Returns the mapped [CheckoutRequirementsResult] and caches its
   /// [CheckoutRequirementsResult.tos] under [tosRequirements] for downstream
   /// UI to render.
+  ///
+  /// Calling it again (or [reset] / [signOut]) supersedes an earlier call
+  /// still in flight; the earlier future fails with
+  /// `OnramperErrorKind.intentInvalidated`, which you can ignore when waiting
+  /// for the latest quote. Buttons from earlier calls that weren't yet shown
+  /// are released and render nothing.
+  ///
+  /// Throws [OnramperError] on SDK failure.
   Future<CheckoutRequirementsResult> getCheckoutRequirements(
     CheckoutIntentRequest request, {
+    OnramperUserPrefill? prefill,
     CheckoutButtonStyle? buttonStyle,
   }) async {
-    final dto = await _host.getCheckoutRequirements(
-      request.toDto(),
-      buttonStyle?.toNativeDto(),
-    );
+    final dto = await _guard(() => _host.getCheckoutRequirements(
+          request.toDto(),
+          prefill?.toDto(),
+          buttonStyle?.toNativeDto(),
+        ));
+    // Disposed while the call was in flight: native dispose already dropped
+    // the prepared button, so the result is unusable.
+    if (_disposed) throw const OnramperError.clientDisposed();
     final result = CheckoutRequirementsResult.fromDto(dto);
     _tosRequirements = result.tos;
     notifyListeners();
@@ -164,8 +229,9 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> reset() async {
     _tosRequirements = null;
     _lastError = null;
-    await _host.reset();
-    notifyListeners();
+    _currentTransactionId = null;
+    await _teardown(_host.reset);
+    if (!_disposed) notifyListeners();
   }
 
   /// Signs out of OnramperID. Distinct from [reset]: the partner session
@@ -176,8 +242,9 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> signOut() async {
     _tosRequirements = null;
     _lastError = null;
-    await _host.signOut();
-    notifyListeners();
+    _currentTransactionId = null;
+    await _teardown(_host.signOut);
+    if (!_disposed) notifyListeners();
   }
 
   /// Drops the native checkout button identified by [buttonHandle] without
@@ -186,28 +253,120 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// old handle so its native resources are released promptly rather than
   /// waiting for the next [reset] or [dispose].
   Future<void> cancelPreparedIntent(String buttonHandle) {
-    return _host.cancelPreparedIntent(buttonHandle);
+    return _teardown(() => _host.cancelPreparedIntent(buttonHandle));
   }
 
   /// Tears down the client, releases native resources, and closes both
-  /// broadcast streams. Idempotent.
+  /// broadcast streams. Repeated calls share the same cleanup future.
+  /// Does not wait for paused subscribers to consume the stream's done event.
   @override
-  Future<void> dispose() async {
-    if (_disposed) return;
+  // _dispose calls super.dispose in finally, once for all disposal callers.
+  // ignore: must_call_super
+  Future<void> dispose() => _disposal ??= _dispose();
+
+  Future<void> _dispose() async {
     _disposed = true;
     // Detach our FlutterApi handlers so late callbacks don't hit a disposed
-    // client.
-    OnramperFlutterApi.setUp(null);
-    await _host.dispose();
-    await _stateController.close();
-    await _eventController.close();
-    super.dispose();
+    // client, unless a newer client has registered its own.
+    if (identical(_current, this)) OnramperFlutterApi.setUp(null);
+    try {
+      // Even failed setup may have allocated native resources. Waiting also
+      // prevents late configuration from recreating a disposed native client.
+      await _configuration;
+      // A newer client's configure replaced (and released) ours natively;
+      // disposing now would tear down the newer client instead.
+      if (!identical(_current, this)) return;
+      _current = null;
+      await _platformCall(_host.dispose);
+    } finally {
+      // Closing prohibits further events immediately, but completion waits
+      // for paused listeners. They must not block other resources or errors.
+      unawaited(_stateController.close());
+      unawaited(_eventController.close());
+      super.dispose();
+    }
+  }
+
+  /// Waits for setup and prevents calls queued during setup after disposal.
+  Future<T> _guard<T>(Future<T> Function() call) async {
+    if (_disposed) throw const OnramperError.clientDisposed();
+    await _configuration;
+    if (_disposed) throw const OnramperError.clientDisposed();
+    final failure = _configurationFailure;
+    if (failure != null) Error.throwWithStackTrace(failure.$1, failure.$2);
+    return _platformCall(call);
+  }
+
+  /// Like [_guard], but a disposed client has nothing left to tear down.
+  Future<void> _teardown(Future<void> Function() call) async {
+    try {
+      await _guard(call);
+    } on OnramperError catch (e) {
+      if (e.kind != OnramperErrorKind.clientDisposed) rethrow;
+    }
+  }
+
+  /// Normalizes channel failures only; programming errors propagate intact.
+  static Future<T> _platformCall<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on PlatformException catch (e, stack) {
+      final details = e.details;
+      if (details is OnramperErrorDto) {
+        Error.throwWithStackTrace(
+          OnramperError.fromDto(details,
+              cause: e, stackTrace: stack, platformCode: e.code),
+          stack,
+        );
+      }
+      final (kind, supportCode) = switch (e.code) {
+        'not_configured' => (
+            OnramperErrorKind.notConfigured,
+            'FLUTTER-NOT-CONFIGURED'
+          ),
+        'not_initialized' => (
+            OnramperErrorKind.notInitialized,
+            'FLUTTER-NOT-INITIALIZED'
+          ),
+        'missing_response' => (
+            OnramperErrorKind.missingResponse,
+            'FLUTTER-MISSING-RESPONSE'
+          ),
+        _ => (OnramperErrorKind.platformFailure, 'FLUTTER-PLATFORM-FAILURE'),
+      };
+      Error.throwWithStackTrace(
+        OnramperError(
+          kind: kind,
+          message: e.message ?? 'Native platform call failed (${e.code}).',
+          recoverable: false,
+          supportCode: supportCode,
+          cause: e,
+          stackTrace: stack,
+          platformCode: e.code,
+        ),
+        stack,
+      );
+    } on MissingPluginException catch (e, stack) {
+      Error.throwWithStackTrace(
+        OnramperError(
+          kind: OnramperErrorKind.platformFailure,
+          message: e.message ?? 'The native Onramper plugin is unavailable.',
+          recoverable: false,
+          supportCode: 'FLUTTER-PLATFORM-FAILURE',
+          cause: e,
+          stackTrace: stack,
+          platformCode: 'missing_plugin',
+        ),
+        stack,
+      );
+    }
   }
 
   // ---- OnramperFlutterApi conformance (native -> Dart) ---------------------
 
   @override
   void onStateChanged(OnramperStateDto state) {
+    if (_disposed) return;
     _state = OnramperState.fromDto(state);
     if (!_stateController.isClosed) _stateController.add(_state);
     notifyListeners();
@@ -215,6 +374,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onEvent(CheckoutEventDto event) {
+    if (_disposed) return;
     if (!_eventController.isClosed) {
       _eventController.add(CheckoutEvent.fromDto(event));
     }
@@ -222,12 +382,40 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
 
   @override
   void onError(OnramperErrorDto error) {
+    if (_disposed) return;
     _lastError = OnramperError.fromDto(error);
     notifyListeners();
   }
 
   @override
+  void onTransactionIdChanged(String? transactionId) {
+    if (_disposed) return;
+    if (transactionId == _currentTransactionId) return;
+    _currentTransactionId = transactionId;
+    notifyListeners();
+  }
+
+  @override
+  void onLog(LogRecordDto record) {
+    if (_disposed) return;
+    final handler = _config.logHandler;
+    if (handler == null) return;
+    try {
+      handler(OnramperLogRecord.fromDto(record));
+    } catch (e, st) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'onramper_flutter',
+        context:
+            ErrorDescription('while calling OnramperConfiguration.logHandler'),
+      ));
+    }
+  }
+
+  @override
   void onSessionExpired() {
+    if (_disposed) return;
     // The Pigeon callback is synchronous; dispatch the async refresh.
     unawaited(_handleSessionExpired());
   }

@@ -23,12 +23,38 @@ class ConfigurationDto {
     required this.environment,
     required this.theme,
     required this.logLevel,
+    required this.hasLogHandler,
+    required this.isEventLoggingEnabled,
+    required this.isEventConsoleLoggingEnabled,
   });
   final String apiKey;
   final String clientId;
   final EnvironmentDto environment;
   final ThemeDto theme;
   final LogLevelDto logLevel;
+
+  /// True when Dart set `OnramperConfiguration.logHandler`; native installs a
+  /// forwarding handler only then.
+  final bool hasLogHandler;
+  final bool isEventLoggingEnabled;
+  final bool isEventConsoleLoggingEnabled;
+}
+
+class LogRecordDto {
+  LogRecordDto({
+    required this.timestampMs,
+    required this.level,
+    required this.category,
+    required this.event,
+    required this.context,
+    required this.message,
+  });
+  final int timestampMs;
+  final LogLevelDto level;
+  final String category;
+  final String event;
+  final Map<String, String> context;
+  final String message;
 }
 
 class SessionCredentialsDto {
@@ -75,6 +101,18 @@ class CheckoutIntentRequestDto {
   final List<String>? onlyOnramps;
 }
 
+/// Values the integrator already knows about the user, used to pre-populate
+/// the OnramperID sign-in and additional-info screens. All optional.
+class UserPrefillDto {
+  UserPrefillDto({this.email, this.firstName, this.lastName, this.phoneNumber});
+  final String? email;
+  final String? firstName;
+  final String? lastName;
+
+  /// E.164, e.g. `+3712345678`.
+  final String? phoneNumber;
+}
+
 // ---- Quote ----
 
 class QuoteDto {
@@ -87,6 +125,7 @@ class QuoteDto {
     required this.payout,
     required this.paymentMethod,
     this.recommendations,
+    this.providerContext,
   });
   final String quoteId;
   final String ramp;
@@ -96,6 +135,11 @@ class QuoteDto {
   final double payout;
   final String paymentMethod;
   final List<String>? recommendations;
+
+  /// Provider-specific JSON. Values are String, double, bool, null, List or
+  /// Map (recursively). Pigeon can't model recursive types, so the standard
+  /// codec carries the raw structure.
+  final Map<String, Object?>? providerContext;
 }
 
 // ---- Checkout requirements ----
@@ -253,9 +297,14 @@ class HeadlessCheckoutDataDto {
 class CheckoutFinalizeResponseDto {
   CheckoutFinalizeResponseDto({
     required this.headlessCheckoutId,
+    required this.onramperTransactionId,
     required this.headlessCheckoutData,
   });
   final String headlessCheckoutId;
+
+  /// Onramper's durable transaction id (ULID). The id to store and quote to
+  /// support. Distinct from the per-attempt checkout id.
+  final String onramperTransactionId;
   final HeadlessCheckoutDataDto headlessCheckoutData;
 }
 
@@ -271,6 +320,7 @@ enum OnramperStateKindDto {
   readyToCheckout,
   finalizing,
   rendering,
+  paymentPending,
   completed,
   failed,
 }
@@ -308,6 +358,11 @@ enum CheckoutEventKindDto {
   paymentProcessing,
   paymentCancelled,
   providerError,
+  // iOS SDK 1.3.0
+  paymentPending,
+  challengeStarted,
+  challengeCompleted,
+  customerOnboardingRequired,
 }
 
 class CheckoutEventDto {
@@ -341,7 +396,8 @@ class CheckoutEventDto {
 
 // ---- Errors ----
 
-// One enum value per native OnramperError case (1:1).
+// One value per native OnramperError case, plus wrapper-originated kinds at
+// the end.
 enum OnramperErrorKindDto {
   notInitialized,
   initializationFailed,
@@ -369,12 +425,21 @@ enum OnramperErrorKindDto {
   deviceBlocked,
   securityStorageFailed,
   securityTrustFailed,
+  // iOS SDK 1.3.0
+  paymentFailed,
+  providerFailed,
+  applePayNotConfigured,
+  // Wrapper-originated (not native SDK cases)
+  intentInvalidated,
+  clientDisposed,
 }
 
 class OnramperErrorDto {
   OnramperErrorDto({
     required this.kind,
     required this.message,
+    required this.userMessage,
+    required this.supportCode,
     required this.recoverable,
     this.code,
     this.minAmount,
@@ -390,6 +455,12 @@ class OnramperErrorDto {
   });
   final OnramperErrorKindDto kind;
   final String message;
+
+  /// End-user copy, safe to display.
+  final String userMessage;
+
+  /// Short stable code, safe to display next to [userMessage]; matches SDK logs.
+  final String supportCode;
   final bool recoverable;
   // Variant payloads (nullable; only populated for the relevant kind):
   final int? code; // networkError.code, securityStorageFailed.status
@@ -431,6 +502,7 @@ abstract class OnramperHostApi {
   @async
   CheckoutRequirementsResultDto getCheckoutRequirements(
     CheckoutIntentRequestDto request,
+    UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   );
   @async
@@ -454,6 +526,9 @@ abstract class OnramperHostApi {
   // Aborts a pending session refresh (e.g. user signed out). Causes the
   // in-flight SDK call to fail with sessionRefreshAborted.
   void failRefreshedSession(String reason);
+
+  /// Native OnramperSDK semver, e.g. "1.3.1". Doesn't need configure().
+  String sdkVersion();
 }
 
 @FlutterApi()
@@ -464,4 +539,21 @@ abstract class OnramperFlutterApi {
   // Fired when the native SDK Session expires; Dart MUST respond with either
   // provideRefreshedSession or failRefreshedSession or the in-flight call hangs.
   void onSessionExpired();
+
+  // Mirrors native `@Published currentTransactionId`. Null when cleared (new
+  // intent or reset).
+  void onTransactionIdChanged(String? transactionId);
+
+  void onLog(LogRecordDto record);
+}
+
+/// Native → Dart sizing callbacks for one checkout-button platform view.
+/// Set up per view with `messageChannelSuffix` = the platform view id.
+@FlutterApi()
+abstract class CheckoutButtonFlutterApi {
+  /// Content height in points (button + ToS + payment disclosures).
+  void onHeightChanged(double height);
+
+  /// The handle was unknown, expired (5 min) or invalidated; nothing renders.
+  void onUnavailable();
 }

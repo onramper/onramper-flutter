@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../platform/pigeon.g.dart';
 
-/// Visual customization for [OnramperCheckoutButton] plus the ToS lines
-/// rendered above it.
+/// Visual customization for the native checkout button.
 ///
 /// The `backgroundColor`, `foregroundColor`, and `borderRadius` fields are
 /// forwarded to the native checkout button (via
-/// [OnramperClient.getCheckoutRequirements]). The `tosStyle` and
-/// `tosLinkStyle` fields style the Dart-side ToS text.
+/// [OnramperClient.getCheckoutRequirements]). The ToS sentence below Buy is
+/// rendered natively and follows the configured [OnramperTheme].
 ///
 /// The native button's label text ("Buy") is fixed by the SDK and not
 /// currently overridable from Dart.
@@ -17,9 +16,12 @@ class CheckoutButtonStyle {
     this.backgroundColor,
     this.foregroundColor,
     this.borderRadius = 12,
-    this.tosStyle,
-    this.tosLinkStyle,
+    @Deprecated(_tosDeprecation) this.tosStyle,
+    @Deprecated(_tosDeprecation) this.tosLinkStyle,
   });
+
+  static const _tosDeprecation = 'The native button renders the ToS text. '
+      'Has no effect; will be removed in a future major version.';
 
   /// Fill color of the native checkout button. Null → SDK default
   /// (system blue).
@@ -31,10 +33,12 @@ class CheckoutButtonStyle {
   /// Corner radius in logical points. Applied to the native button.
   final double borderRadius;
 
-  /// Style for the ToS lines rendered above the native button.
+  /// No effect. The native button renders the ToS text.
+  @Deprecated(_tosDeprecation)
   final TextStyle? tosStyle;
 
-  /// Style for the ToS lines that carry a link (`item.url != null`).
+  /// No effect. The native button renders the ToS links.
+  @Deprecated(_tosDeprecation)
   final TextStyle? tosLinkStyle;
 
   /// Serializes the native-visible fields into a pigeon DTO so

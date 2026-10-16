@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
@@ -11,6 +14,17 @@ QuoteDto _sampleQuoteDto() => QuoteDto(
       transactionFee: 0,
       payout: 0.000017,
       paymentMethod: 'credit_debit_card',
+    );
+
+CheckoutIntentRequest _sampleRequest() => const CheckoutIntentRequest(
+      transactionData: OnramperTransactionData(
+        source: 'usd',
+        destination: 'btc',
+        amount: 100,
+        type: TransactionType.buy,
+        paymentMethod: 'credit_debit_card',
+        wallet: WalletInfo(network: 'bitcoin', address: 'bc1q...'),
+      ),
     );
 
 void main() {
@@ -95,6 +109,514 @@ void main() {
       ));
       expect(result.headlessCheckoutId, 'co_123');
       expect(client.tosRequirements, isEmpty);
+      await client.dispose();
+    });
+
+    test('currentTransactionId mirrors native and notifies once per change',
+        () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      var notifications = 0;
+      client.addListener(() => notifications++);
+
+      expect(client.currentTransactionId, isNull);
+      client.onTransactionIdChanged('01JTXN');
+      client.onTransactionIdChanged('01JTXN');
+      expect(client.currentTransactionId, '01JTXN');
+      expect(notifications, 1);
+
+      await client.reset();
+      expect(client.currentTransactionId, isNull);
+      await client.dispose();
+    });
+
+    test('host PlatformException carrying OnramperErrorDto rethrows typed',
+        () async {
+      final fakeHost = FakeOnramperHostApi()
+        ..nextGetRequirementsError = PlatformException(
+          code: 'onramper_error',
+          message: 'quote unavailable',
+          details: OnramperErrorDto(
+            kind: OnramperErrorKindDto.quoteUnavailable,
+            message: 'quote unavailable',
+            userMessage: 'No quote is available right now.',
+            supportCode: 'quoteUnavailable',
+            recoverable: true,
+          ),
+        );
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.quoteUnavailable)
+            .having((e) => e.supportCode, 'supportCode', 'quoteUnavailable')
+            .having((e) => e.cause, 'cause',
+                same(fakeHost.nextGetRequirementsError))
+            .having((e) => e.platformCode, 'platformCode', 'onramper_error')),
+      );
+      await client.dispose();
+    });
+
+    for (final entry in {
+      'not_configured': 'notConfigured',
+      'not_initialized': 'notInitialized',
+      'missing_response': 'missingResponse',
+      'channel-error': 'platformFailure',
+      'unexpected_native_code': 'platformFailure',
+    }.entries) {
+      test('normalizes bridge code ${entry.key}', () async {
+        final fakeHost = FakeOnramperHostApi()
+          ..nextGetRequirementsError = PlatformException(
+            code: entry.key,
+            message: 'native diagnostic',
+            details: {'debug': 'native details'},
+          );
+        final client = OnramperClient.forTesting(
+          configuration:
+              const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+          hostApi: fakeHost,
+        );
+        await expectLater(
+          client.getCheckoutRequirements(_sampleRequest()),
+          throwsA(isA<OnramperError>()
+              .having((e) => e.kind.name, 'kind', entry.value)
+              .having((e) => e.message, 'message', 'native diagnostic')
+              .having((e) => e.platformCode, 'platformCode', entry.key)
+              .having((e) => e.cause, 'cause',
+                  same(fakeHost.nextGetRequirementsError))
+              .having((e) => e.stackTrace, 'stackTrace', isNotNull)),
+        );
+        await client.dispose();
+      });
+    }
+
+    test('missing plugin is normalized but programming errors propagate',
+        () async {
+      final host = FakeOnramperHostApi();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      host.nextGetRequirementsError = MissingPluginException('not registered');
+      await expectLater(
+          client.getCheckoutRequirements(_sampleRequest()),
+          throwsA(isA<OnramperError>()
+              .having((e) => e.kind.name, 'kind', 'platformFailure')));
+      for (final error in [StateError('bug'), ArgumentError('bad argument')]) {
+        host.nextGetRequirementsError = error;
+        await expectLater(client.getCheckoutRequirements(_sampleRequest()),
+            throwsA(same(error)));
+      }
+      await client.dispose();
+    });
+
+    test('normalization preserves the original thrown stack and cause',
+        () async {
+      final original = PlatformException(
+          code: 'missing_response',
+          details: {'reason': 'no usable native response'},
+          stacktrace: 'native stack');
+      final originalStack = StackTrace.fromString('original bridge call');
+      final host = FakeOnramperHostApi()
+        ..nextGetRequirementsError = original
+        ..requirementsErrorStack = originalStack;
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      try {
+        await client.getCheckoutRequirements(_sampleRequest());
+        fail('Expected a normalized error');
+      } on OnramperError catch (error, stack) {
+        expect(error.cause, same(original));
+        expect(error.stackTrace.toString(), 'original bridge call');
+        expect(stack.toString(), 'original bridge call');
+        expect(error.userMessage, isNot(contains('no usable native response')));
+      }
+      await client.dispose();
+    });
+
+    test('programming errors from configuration reach the awaiting caller',
+        () async {
+      final error = StateError('configuration bug');
+      final host = FakeOnramperHostApi()..configureError = error;
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      await Future<void>.delayed(Duration.zero);
+      await expectLater(client.initialize(sessionId: 's', sessionToken: 't'),
+          throwsA(same(error)));
+      expect(host.lastInitializeCredentials, isNull);
+      await client.dispose();
+    });
+
+    test('calls wait for configuration and share its completion', () async {
+      final host = FakeOnramperHostApi()..configureGate = Completer<void>();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      final initialize = client.initialize(sessionId: 's', sessionToken: 't');
+      final cancel = client.cancelPreparedIntent('old-button');
+      await Future<void>.delayed(Duration.zero);
+      expect(host.lastInitializeCredentials, isNull);
+      expect(host.lastCancelledHandle, isNull);
+      host.configureGate!.complete();
+      await Future.wait([initialize, cancel]);
+      expect(host.lastInitializeCredentials?.sessionId, 's');
+      expect(host.lastCancelledHandle, 'old-button');
+      expect(host.configureCallCount, 1);
+      await client.dispose();
+    });
+
+    test('configuration failure is retained without an unhandled future',
+        () async {
+      final host = FakeOnramperHostApi()
+        ..configureError = PlatformException(code: 'channel-error');
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      // Let configuration fail before any consumer awaits initialization.
+      await Future<void>.delayed(Duration.zero);
+      for (var i = 0; i < 2; i++) {
+        await expectLater(
+          client.initialize(sessionId: 's', sessionToken: 't'),
+          throwsA(isA<OnramperError>()
+              .having((e) => e.kind.name, 'kind', 'platformFailure')),
+        );
+      }
+      expect(host.lastInitializeCredentials, isNull);
+      expect(host.configureCallCount, 1);
+      await client.dispose();
+      expect(host.disposeCallCount, 1);
+    });
+
+    test('dispose during setup blocks waiting calls and cleans up after setup',
+        () async {
+      final host = FakeOnramperHostApi()..configureGate = Completer<void>();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      final waiting = expectLater(
+        client.initialize(sessionId: 's', sessionToken: 't'),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.clientDisposed)),
+      );
+      final disposal = client.dispose();
+      await Future<void>.delayed(Duration.zero);
+      expect(host.disposeCallCount, 0);
+      host.configureGate!.complete();
+      await Future.wait([waiting, disposal]);
+      expect(host.lastInitializeCredentials, isNull);
+      expect(host.disposeCallCount, 1);
+    });
+
+    test('failed native dispose still closes Dart streams', () async {
+      final host = FakeOnramperHostApi()
+        ..disposeError = PlatformException(code: 'channel-error');
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      var stateClosed = false;
+      var eventsClosed = false;
+      client.stateStream.listen((_) {}, onDone: () => stateClosed = true);
+      client.events.listen((_) {}, onDone: () => eventsClosed = true);
+      await expectLater(client.dispose(), throwsA(isA<OnramperError>()));
+      await Future<void>.delayed(Duration.zero);
+      expect(stateClosed, isTrue);
+      expect(eventsClosed, isTrue);
+    });
+
+    test('concurrent disposal callers wait for the same cleanup', () async {
+      final host = FakeOnramperHostApi()..configureGate = Completer<void>();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      final first = client.dispose();
+      var secondDone = false;
+      final second = client.dispose().then((_) => secondDone = true);
+      try {
+        await Future<void>.delayed(Duration.zero);
+        expect(secondDone, isFalse);
+      } finally {
+        host.configureGate!.complete();
+        await Future.wait([first, second]);
+      }
+      expect(host.disposeCallCount, 1);
+    });
+
+    test('paused subscribers do not block cleanup or disposal failures',
+        () async {
+      final host = FakeOnramperHostApi()
+        ..disposeError = PlatformException(code: 'channel-error');
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk', clientId: 'id'),
+        hostApi: host,
+      );
+      client.addListener(() {});
+      final paused = client.stateStream.listen((_) {})..pause();
+      var eventsClosed = false;
+      final events =
+          client.events.listen((_) {}, onDone: () => eventsClosed = true);
+      Object? failure;
+      final disposal = client.dispose().then<void>((_) {}, onError: (Object e) {
+        failure = e;
+      });
+      try {
+        await Future<void>.delayed(Duration.zero);
+        expect(failure, isA<OnramperError>());
+        expect(eventsClosed, isTrue);
+        expect(() => client.addListener(() {}), throwsFlutterError);
+      } finally {
+        await paused.cancel();
+        await events.cancel();
+        await disposal;
+      }
+    });
+
+    LogRecordDto sampleLog() => LogRecordDto(
+          timestampMs: 0,
+          level: LogLevelDto.debug,
+          category: 'c',
+          event: 'e',
+          context: const {},
+          message: 'e',
+        );
+
+    test('onLog forwards records to logHandler', () async {
+      final got = <OnramperLogRecord>[];
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+            apiKey: 'pk_x', clientId: '01H', logHandler: got.add),
+        hostApi: FakeOnramperHostApi(),
+      );
+      client.onLog(sampleLog());
+      expect(got.single.event, 'e');
+      await client.dispose();
+    });
+
+    test('a throwing logHandler is reported, not propagated', () async {
+      final reported = <FlutterErrorDetails>[];
+      final previous = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previous);
+
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+          apiKey: 'pk_x',
+          clientId: '01H',
+          logHandler: (_) => throw StateError('boom'),
+        ),
+        hostApi: FakeOnramperHostApi(),
+      );
+      expect(() => client.onLog(sampleLog()), returnsNormally);
+      expect(reported.single.exception, isA<StateError>());
+      await client.dispose();
+    });
+
+    test('methods after dispose throw clientDisposed', () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await client.dispose();
+      await client.dispose(); // idempotent
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>()
+            .having((e) => e.kind, 'kind', OnramperErrorKind.clientDisposed)),
+      );
+      await expectLater(
+        client.initialize(sessionId: 's', sessionToken: 't'),
+        throwsA(isA<OnramperError>()),
+      );
+    });
+
+    test('late native callbacks after dispose are ignored', () async {
+      final logs = <OnramperLogRecord>[];
+      final client = OnramperClient.forTesting(
+        configuration: OnramperConfiguration(
+            apiKey: 'pk_x', clientId: '01H', logHandler: logs.add),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await client.dispose();
+      expect(
+        () {
+          client.debugDispatchStateChanged(
+              OnramperStateDto(kind: OnramperStateKindDto.ready));
+          client.debugDispatchEvent(
+              CheckoutEventDto(kind: CheckoutEventKindDto.readyToCheckout));
+          client.onTransactionIdChanged('x');
+          client.onLog(LogRecordDto(
+            timestampMs: 0,
+            level: LogLevelDto.info,
+            category: 'c',
+            event: 'e',
+            context: const {},
+            message: 'e',
+          ));
+        },
+        returnsNormally,
+      );
+      expect(client.state.kind, OnramperStateKind.idle);
+      expect(client.currentTransactionId, isNull);
+      expect(logs, isEmpty);
+    });
+
+    test('intentInvalidated from native surfaces as typed error', () async {
+      final fakeHost = FakeOnramperHostApi()
+        ..nextGetRequirementsError = PlatformException(
+          code: 'onramper_error',
+          message: 'superseded',
+          details: OnramperErrorDto(
+            kind: OnramperErrorKindDto.intentInvalidated,
+            message: 'superseded',
+            userMessage: 'Your checkout details have changed.',
+            supportCode: 'FLUTTER-INTENT-INVALIDATED',
+            recoverable: true,
+          ),
+        );
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await expectLater(
+        client.getCheckoutRequirements(_sampleRequest()),
+        throwsA(isA<OnramperError>().having(
+            (e) => e.kind, 'kind', OnramperErrorKind.intentInvalidated)),
+      );
+      await client.dispose();
+    });
+
+    test('dispose during reset/signOut does not notify a disposed client',
+        () async {
+      for (final call in ['reset', 'signOut', 'getCheckoutRequirements']) {
+        final fakeHost = FakeOnramperHostApi()
+          ..resetGate = Completer<void>()
+          ..signOutGate = Completer<void>()
+          ..requirementsGate = Completer<void>();
+        final client = OnramperClient.forTesting(
+          configuration:
+              const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+          hostApi: fakeHost,
+        );
+        final Future<Object?> pending = switch (call) {
+          'reset' => client.reset(),
+          'signOut' => client.signOut(),
+          _ => client.getCheckoutRequirements(_sampleRequest()),
+        };
+        // Let the call reach native before testing disposal in flight.
+        await Future<void>.delayed(Duration.zero);
+        await client.dispose();
+        fakeHost.resetGate!.complete();
+        fakeHost.signOutGate!.complete();
+        fakeHost.requirementsGate!.complete();
+        if (call == 'getCheckoutRequirements') {
+          // Native dispose already dropped the prepared button.
+          await expectLater(
+            pending,
+            throwsA(isA<OnramperError>().having(
+                (e) => e.kind, 'kind', OnramperErrorKind.clientDisposed)),
+          );
+        } else {
+          await expectLater(pending, completes, reason: call);
+        }
+      }
+    });
+
+    test('teardown methods after dispose do nothing', () async {
+      final host = FakeOnramperHostApi();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: host,
+      );
+      await client.dispose();
+      await expectLater(client.reset(), completes);
+      await expectLater(client.signOut(), completes);
+      await expectLater(client.cancelPreparedIntent('h'), completes);
+      expect(host.signOutCallCount, 0);
+      expect(host.lastCancelledHandle, isNull);
+    });
+
+    test('disposing an older client leaves a newer client in place', () async {
+      final oldHost = FakeOnramperHostApi();
+      final old = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: oldHost,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final newer = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_y', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await old.dispose();
+      // The newer client's configure replaced the native client already.
+      expect(oldHost.disposeCallCount, 0);
+
+      // Its FlutterApi handlers are still registered.
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged',
+        OnramperHostApi.pigeonChannelCodec.encodeMessage(<Object?>['tx-1']),
+        (_) {},
+      );
+      expect(newer.currentTransactionId, 'tx-1');
+      await newer.dispose();
+    });
+
+    test('signOut clears currentTransactionId', () async {
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      client.onTransactionIdChanged('01JTXN');
+      await client.signOut();
+      expect(client.currentTransactionId, isNull);
+      await client.dispose();
+    });
+
+    test('getCheckoutRequirements forwards prefill', () async {
+      final fakeHost = FakeOnramperHostApi();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: fakeHost,
+      );
+      await client.getCheckoutRequirements(
+        _sampleRequest(),
+        prefill: const OnramperUserPrefill(firstName: 'Ada'),
+      );
+      expect(fakeHost.lastPrefillDto?.firstName, 'Ada');
+
+      await client.getCheckoutRequirements(_sampleRequest());
+      expect(fakeHost.lastPrefillDto, isNull);
       await client.dispose();
     });
 
@@ -222,6 +744,8 @@ void main() {
       client.debugDispatchError(OnramperErrorDto(
         kind: OnramperErrorKindDto.timeout,
         message: 'gateway timeout',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: true,
       ));
       await Future<void>.delayed(Duration.zero);
@@ -241,6 +765,8 @@ void main() {
       client.debugDispatchError(OnramperErrorDto(
         kind: OnramperErrorKindDto.securityTrustFailed,
         message: 'trust failed',
+        userMessage: 'Something went wrong. Please try again.',
+        supportCode: 'test',
         recoverable: false,
         host: 'api.example.com',
       ));
@@ -305,9 +831,18 @@ class FakeOnramperHostApi implements OnramperHostApi {
   SessionCredentialsDto? lastInitializeCredentials;
   CheckoutRequirementsResultDto? nextRequirementsResult;
   CheckoutButtonStyleDto? lastButtonStyleDto;
+  UserPrefillDto? lastPrefillDto;
   SessionCredentialsDto? lastProvidedCredentials;
   String? lastFailReason;
   String? lastCancelledHandle;
+  Object? nextGetRequirementsError;
+  StackTrace? requirementsErrorStack;
+  Completer<void>? configureGate;
+  Object? configureError;
+  Object? disposeError;
+  Completer<void>? resetGate;
+  Completer<void>? requirementsGate;
+  Completer<void>? signOutGate;
 
   @override
   // ignore: non_constant_identifier_names
@@ -321,6 +856,8 @@ class FakeOnramperHostApi implements OnramperHostApi {
   Future<void> configure(ConfigurationDto config) async {
     configureCallCount++;
     lastConfigDto = config;
+    await configureGate?.future;
+    if (configureError != null) throw configureError!;
   }
 
   @override
@@ -331,8 +868,16 @@ class FakeOnramperHostApi implements OnramperHostApi {
   @override
   Future<CheckoutRequirementsResultDto> getCheckoutRequirements(
     CheckoutIntentRequestDto request,
+    UserPrefillDto? prefill,
     CheckoutButtonStyleDto? buttonStyle,
   ) async {
+    await requirementsGate?.future;
+    final error = nextGetRequirementsError;
+    if (error != null) {
+      Error.throwWithStackTrace(
+          error, requirementsErrorStack ?? StackTrace.current);
+    }
+    lastPrefillDto = prefill;
     lastButtonStyleDto = buttonStyle;
     return nextRequirementsResult ??
         CheckoutRequirementsResultDto(
@@ -344,11 +889,14 @@ class FakeOnramperHostApi implements OnramperHostApi {
   }
 
   @override
-  Future<void> reset() async {}
+  Future<void> reset() async {
+    await resetGate?.future;
+  }
 
   @override
   Future<void> signOut() async {
     signOutCallCount++;
+    await signOutGate?.future;
   }
 
   @override
@@ -359,6 +907,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
   @override
   Future<void> dispose() async {
     disposeCallCount++;
+    if (disposeError != null) throw disposeError!;
   }
 
   @override
@@ -371,4 +920,7 @@ class FakeOnramperHostApi implements OnramperHostApi {
   Future<void> failRefreshedSession(String reason) async {
     lastFailReason = reason;
   }
+
+  @override
+  Future<String> sdkVersion() async => '0.0.0-fake';
 }

@@ -26,9 +26,40 @@ import UIKit
           "bundleId": Bundle.main.bundleIdentifier ?? "unknown",
           "teamId": Self.readTeamId() ?? "unknown",
         ])
+      case "getDeviceInfo":
+        let info = Bundle.main.infoDictionary
+        result([
+          "appVersion": info?["CFBundleShortVersionString"] as? String ?? "?",
+          "build": info?["CFBundleVersion"] as? String ?? "?",
+          "device": Self.modelIdentifier(),
+          "ios": UIDevice.current.systemVersion,
+        ])
+      case "excludeFromBackup":
+        guard let path = call.arguments as? String else {
+          result(FlutterError(code: "bad_args", message: "Expected a path", details: nil))
+          return
+        }
+        var url = URL(fileURLWithPath: path)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+          try url.setResourceValues(values)
+          result(nil)
+        } catch {
+          result(FlutterError(code: "backup_exclude_failed", message: error.localizedDescription, details: nil))
+        }
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// Hardware model id, e.g. `iPhone15,2` (`arm64` on the simulator).
+  private static func modelIdentifier() -> String {
+    var info = utsname()
+    uname(&info)
+    return withUnsafeBytes(of: &info.machine) { raw in
+      String(decoding: raw.prefix(while: { $0 != 0 }), as: UTF8.self)
     }
   }
 

@@ -1,8 +1,8 @@
 import '../platform/pigeon.g.dart';
 
-/// Categorical taxonomy of errors emitted by the native SDK.
+/// Categorical taxonomy of SDK and platform-bridge failures.
 ///
-/// Mirrors `OnramperErrorKindDto` 1:1.
+/// Includes the native `OnramperErrorKindDto` cases and Flutter bridge errors.
 enum OnramperErrorKind {
   notInitialized,
   initializationFailed,
@@ -30,6 +30,32 @@ enum OnramperErrorKind {
   deviceBlocked,
   securityStorageFailed,
   securityTrustFailed,
+
+  /// The provider confirmed the payment failed (e.g. card declined).
+  paymentFailed,
+
+  /// The payment surface failed without confirming the outcome. The payment
+  /// may have gone through; follow `userMessage` before retrying.
+  providerFailed,
+
+  /// No Apple Pay card in Wallet on this device.
+  applePayNotConfigured,
+
+  /// A newer `getCheckoutRequirements`, `reset` or `signOut` superseded this
+  /// preparation. Ignore it when waiting for the latest quote.
+  intentInvalidated,
+
+  /// An `OnramperClient` method was called after `dispose()`.
+  clientDisposed,
+
+  /// The native plugin has no configured client.
+  notConfigured,
+
+  /// The native plugin could not produce the required response.
+  missingResponse,
+
+  /// The platform channel failed or the native plugin is unavailable.
+  platformFailure,
 }
 
 /// Public, throwable error type exposed by the SDK.
@@ -42,6 +68,8 @@ class OnramperError implements Exception {
     required this.kind,
     required this.message,
     required this.recoverable,
+    this.userMessage = OnramperError.genericUserMessage,
+    this.supportCode = 'FLUTTER-UNSPECIFIED',
     this.code,
     this.minAmount,
     this.maxAmount,
@@ -53,12 +81,23 @@ class OnramperError implements Exception {
     this.expectedState,
     this.actualState,
     this.host,
+    this.cause,
+    this.stackTrace,
+    this.platformCode,
   });
 
-  factory OnramperError.fromDto(OnramperErrorDto dto) => OnramperError(
+  factory OnramperError.fromDto(
+    OnramperErrorDto dto, {
+    Object? cause,
+    StackTrace? stackTrace,
+    String? platformCode,
+  }) =>
+      OnramperError(
         kind: _kindFromDto(dto.kind),
         message: dto.message,
         recoverable: dto.recoverable,
+        userMessage: dto.userMessage,
+        supportCode: dto.supportCode,
         code: dto.code,
         minAmount: dto.minAmount,
         maxAmount: dto.maxAmount,
@@ -70,11 +109,37 @@ class OnramperError implements Exception {
         expectedState: dto.expectedState,
         actualState: dto.actualState,
         host: dto.host,
+        cause: cause,
+        stackTrace: stackTrace,
+        platformCode: platformCode,
       );
+
+  /// Thrown by `OnramperClient` methods called after `dispose()`.
+  const OnramperError.clientDisposed()
+      : this(
+          kind: OnramperErrorKind.clientDisposed,
+          message: 'This OnramperClient has been disposed. Create a new '
+              'client before making SDK calls.',
+          recoverable: false,
+          userMessage: 'This checkout session has ended. Please reopen '
+              'checkout.',
+          supportCode: 'FLUTTER-CLIENT-DISPOSED',
+        );
+
+  /// Generic end-user copy used when no specific copy is available.
+  static const String genericUserMessage =
+      'Something went wrong. Please try again.';
 
   final OnramperErrorKind kind;
   final String message;
   final bool recoverable;
+
+  /// Plain end-user copy, safe to show users.
+  final String userMessage;
+
+  /// Short stable code, safe to show next to [userMessage] (e.g. "Error code:
+  /// …"). Matches what the native SDK logs.
+  final String supportCode;
   final int? code;
   final double? minAmount;
   final double? maxAmount;
@@ -90,8 +155,19 @@ class OnramperError implements Exception {
   /// certificate pinning check failed.
   final String? host;
 
+  /// Original bridge exception, including native details. Developer-only;
+  /// may contain sensitive information and must not be shown to end users.
+  final Object? cause;
+
+  /// Original Dart stack trace when an exception was normalized.
+  final StackTrace? stackTrace;
+
+  /// Original platform error code, distinct from the SDK's numeric [code].
+  /// `missing_plugin` is synthesized for a missing native implementation.
+  final String? platformCode;
+
   @override
-  String toString() => 'OnramperError(${kind.name}): $message';
+  String toString() => 'OnramperError(${kind.name}, $supportCode): $message';
 
   static OnramperErrorKind _kindFromDto(OnramperErrorKindDto dto) {
     return switch (dto) {
@@ -137,6 +213,13 @@ class OnramperError implements Exception {
         OnramperErrorKind.securityStorageFailed,
       OnramperErrorKindDto.securityTrustFailed =>
         OnramperErrorKind.securityTrustFailed,
+      OnramperErrorKindDto.paymentFailed => OnramperErrorKind.paymentFailed,
+      OnramperErrorKindDto.providerFailed => OnramperErrorKind.providerFailed,
+      OnramperErrorKindDto.applePayNotConfigured =>
+        OnramperErrorKind.applePayNotConfigured,
+      OnramperErrorKindDto.intentInvalidated =>
+        OnramperErrorKind.intentInvalidated,
+      OnramperErrorKindDto.clientDisposed => OnramperErrorKind.clientDisposed,
     };
   }
 }

@@ -1,4 +1,5 @@
 import '../platform/pigeon.g.dart';
+import 'provider_json.dart';
 
 /// Quote returned by the BFF for a given checkout intent.
 ///
@@ -17,6 +18,7 @@ class QuoteResponse {
     required this.payout,
     required this.paymentMethod,
     this.recommendations,
+    this.providerContext,
   });
 
   factory QuoteResponse.fromDto(QuoteDto dto) => QuoteResponse(
@@ -30,6 +32,11 @@ class QuoteResponse {
         recommendations: dto.recommendations == null
             ? null
             : List<String>.unmodifiable(dto.recommendations!),
+        providerContext: dto.providerContext == null
+            ? null
+            : Map.unmodifiable(dto.providerContext!.map(
+                (k, v) => MapEntry(k, ProviderJSONValue.fromObject(v)),
+              )),
       );
 
   final String quoteId;
@@ -40,4 +47,18 @@ class QuoteResponse {
   final double payout;
   final String paymentMethod;
   final List<String>? recommendations;
+
+  /// Provider-specific data (e.g. executable flags, limits, disclosures).
+  /// Most integrations can ignore it. May contain tokens; don't log it.
+  final Map<String, ProviderJSONValue>? providerContext;
+
+  /// Disclosures listed under `providerContext['paymentDisclosures']`.
+  List<PaymentDisclosure> get paymentDisclosures {
+    final raw = providerContext?['paymentDisclosures'];
+    if (raw is! ProviderJSONArray) return const [];
+    return raw.value
+        .map(PaymentDisclosure.tryParse)
+        .whereType<PaymentDisclosure>()
+        .toList(growable: false);
+  }
 }
