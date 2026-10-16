@@ -18,10 +18,5 @@ jobs:
       - run: flutter pub get
       - name: pod lib lint
         # onramper/onramper-ios is public; the podspec's prepare_command
-        # can fetch the xcframework anonymously. The token below is
-        # passed through when RELEASE_REPO_TOKEN is set (bumps GitHub's
-        # anonymous rate limit from 60/h to 5000/h) but the lint works
-        # even if the secret is absent.
-        env:
-          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        # fetches the xcframework anonymously.
         run: pod lib lint ios/onramper_flutter.podspec --allow-warnings
