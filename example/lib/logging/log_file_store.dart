@@ -21,15 +21,10 @@ class LogFile {
   String get name => file.uri.pathSegments.last;
 }
 
-/// `<event> <message> k=v …` — the record's text for one log line.
-String formatRecordMessage(OnramperLogRecord r) {
-  final b = StringBuffer(r.event);
-  if (r.message.isNotEmpty) b.write(' ${r.message}');
-  for (final e in r.context.entries) {
-    b.write(' ${e.key}=${e.value}');
-  }
-  return b.toString();
-}
+/// The record's text for one log line. The native SDK's `message` is already
+/// `<event> k1=v1 …` (keys sorted), so it's written as-is, as RN does.
+String formatRecordMessage(OnramperLogRecord r) =>
+    r.message.isEmpty ? r.event : r.message;
 
 /// Daily SDK log files — a Dart port of the RN demo's `DemoDailyLogStore`.
 /// Every operation runs through one queue, so writes never interleave with

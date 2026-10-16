@@ -79,16 +79,29 @@ void main() {
     expect(text, isNot(contains('xxxxxxxxxx')));
   });
 
-  test('formatRecordMessage joins event, message and context', () {
+  test('formatRecordMessage writes the native message once', () {
+    // The native SDK's message is already "<event> k1=v1 …" (keys sorted).
     final r = OnramperLogRecord(
       timestamp: DateTime.utc(2026),
       level: OnramperLogLevel.info,
       category: 'Checkout',
       event: 'checkout.finalized',
-      context: const {'ramp': 'moonpay'},
-      message: 'done',
+      context: const {'ramp': 'moonpay', 'id': 'x'},
+      message: 'checkout.finalized id=x ramp=moonpay',
     );
-    expect(formatRecordMessage(r), 'checkout.finalized done ramp=moonpay');
+    expect(formatRecordMessage(r), 'checkout.finalized id=x ramp=moonpay');
+  });
+
+  test('formatRecordMessage falls back to the event for an empty message', () {
+    final r = OnramperLogRecord(
+      timestamp: DateTime.utc(2026),
+      level: OnramperLogLevel.info,
+      category: 'Checkout',
+      event: 'checkout.started',
+      context: const {},
+      message: '',
+    );
+    expect(formatRecordMessage(r), 'checkout.started');
   });
 
   test('prunes files older than 7 days on the first write', () async {
