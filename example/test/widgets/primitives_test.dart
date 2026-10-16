@@ -4,6 +4,7 @@ import 'package:onramper_flutter_example/widgets/demo_card.dart';
 import 'package:onramper_flutter_example/widgets/demo_dropdown.dart';
 import 'package:onramper_flutter_example/widgets/option_sheet.dart';
 import 'package:onramper_flutter_example/widgets/segmented.dart';
+import 'package:onramper_flutter_example/widgets/sheet_header.dart';
 import 'package:onramper_flutter_example/widgets/status_box.dart';
 import 'package:onramper_flutter_example/widgets/switch_row.dart';
 import 'package:onramper_flutter_example/widgets/tile.dart';
@@ -20,6 +21,17 @@ void main() {
     expect(find.text('Amount'), findsOneWidget);
     expect(find.text('body'), findsOneWidget);
     expect(find.text('Footnote'), findsOneWidget);
+  });
+
+  testWidgets('SheetHeader keeps the close mark on the leading edge',
+      (tester) async {
+    // Sheets lay the header out in a Column that doesn't stretch children.
+    await tester.pumpWidget(harness(Column(children: [
+      SheetHeader(title: 'Settings', onClose: () {}),
+    ])));
+    expect(tester.getTopLeft(find.byIcon(Icons.close)).dx, lessThan(40));
+    expect(tester.getCenter(find.text('Settings')).dx,
+        moreOrLessEquals(400, epsilon: 1));
   });
 
   testWidgets('Segmented reports taps and ignores them when disabled',

@@ -12,7 +12,10 @@ class SheetHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = DemoTheme.of(context);
+    // Full width even inside a non-stretching Column, so the close mark sits
+    // on the leading edge and the title is centred on the sheet.
     return SizedBox(
+      width: double.infinity,
       height: 56,
       child: Stack(alignment: Alignment.center, children: [
         Padding(
