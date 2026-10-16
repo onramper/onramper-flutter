@@ -126,7 +126,8 @@ void main() {
     c.dispose();
   });
 
-  test('a run superseded during initialize is disposed before the next client is configured',
+  test(
+      'a run superseded during initialize is disposed before the next client is configured',
       () async {
     final rig = Rig();
     final gate = Completer<void>();
@@ -149,7 +150,8 @@ void main() {
     c.dispose();
   });
 
-  test('switching environment signs out, re-initializes, and unlocks when settled',
+  test(
+      'switching environment signs out, re-initializes, and unlocks when settled',
       () async {
     final rig = Rig();
     final c = rig.build();
@@ -211,8 +213,15 @@ void main() {
     await settle();
     await c.clearLocalSessions();
     await settle();
-    expect(rig.journal, containsAllInOrder(
-        ['h0.signOut', 'h0.reset', 'h0.dispose', 'h1.configure', 'h1.initialize']));
+    expect(
+        rig.journal,
+        containsAllInOrder([
+          'h0.signOut',
+          'h0.reset',
+          'h0.dispose',
+          'h1.configure',
+          'h1.initialize'
+        ]));
     expect(c.status, InitStatus.ready);
     c.dispose();
   });

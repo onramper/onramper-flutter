@@ -167,6 +167,16 @@ void main() {
     expect(statusBarStyle(tester), SystemUiOverlayStyle.dark);
   });
 
+  testWidgets('SDK events do not rebuild the MaterialApp', (tester) async {
+    await pumpApp(tester);
+    final before = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    clients.single.debugDispatchStateChanged(
+        OnramperStateDto(kind: OnramperStateKindDto.checkoutPreparing));
+    await tester.pumpAndSettle();
+    expect(find.text('SDK: checkoutPreparing'), findsOneWidget);
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)), same(before));
+  });
+
   testWidgets('Save SDK logs off stops file writes', (tester) async {
     await pumpApp(tester);
     final record = OnramperLogRecord(

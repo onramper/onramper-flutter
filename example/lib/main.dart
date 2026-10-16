@@ -67,6 +67,7 @@ class ExampleApp extends StatefulWidget {
 
 class _ExampleAppState extends State<ExampleApp> {
   late final DemoController _demo;
+  late bool _isDark;
 
   @override
   void initState() {
@@ -76,36 +77,44 @@ class _ExampleAppState extends State<ExampleApp> {
       mintSession: widget.mintSession,
       defines: widget.defines,
       onSdkLog: (record) {
-        if (widget.logSettings.enabled) unawaited(widget.logStore.append(record));
+        if (widget.logSettings.enabled) {
+          unawaited(widget.logStore.append(record));
+        }
       },
     );
+    _isDark = _demo.isDark;
+    _demo.addListener(_onDemoChanged);
+  }
+
+  /// Only the theme lives up here; the screen listens to everything else, so
+  /// SDK state and events don't rebuild the MaterialApp.
+  void _onDemoChanged() {
+    if (_demo.isDark != _isDark) setState(() => _isDark = _demo.isDark);
   }
 
   @override
   void dispose() {
+    _demo.removeListener(_onDemoChanged);
     _demo.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: _demo,
-        builder: (context, _) {
-          final palette = DemoPalette.of(_demo.isDark);
-          return DemoTheme(
-            palette: palette,
-            child: MaterialApp(
-              title: 'Onramper Flutter Demo',
-              debugShowCheckedModeBanner: false,
-              theme: buildMaterialTheme(palette),
-              home: BuyCryptoScreen(
-                demo: _demo,
-                logSettings: widget.logSettings,
-                logStore: widget.logStore,
-                shareFile: widget.shareFile,
-              ),
-            ),
-          );
-        },
-      );
+  Widget build(BuildContext context) {
+    final palette = DemoPalette.of(_isDark);
+    return DemoTheme(
+      palette: palette,
+      child: MaterialApp(
+        title: 'Onramper Flutter Demo',
+        debugShowCheckedModeBanner: false,
+        theme: buildMaterialTheme(palette),
+        home: BuyCryptoScreen(
+          demo: _demo,
+          logSettings: widget.logSettings,
+          logStore: widget.logStore,
+          shareFile: widget.shareFile,
+        ),
+      ),
+    );
+  }
 }
