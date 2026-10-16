@@ -189,18 +189,12 @@ Calling `getCheckoutRequirements` again (or `reset()` / `signOut()`) supersedes 
 
 ## 6. Render the button
 
-Embed `OnramperCheckoutButton` anywhere a regular Flutter widget would go. It renders the native SwiftUI checkout button (via a Flutter platform view) with any unsatisfied ToS lines above it.
+Embed `OnramperCheckoutButton` anywhere a regular Flutter widget would go. It renders the native SwiftUI checkout button (via a Flutter platform view), including the ToS consent sentence below Buy, and sizes itself to its content.
 
 ```dart
-OnramperCheckoutButton(
-  requirements: requirements,
-  // Optional: styling for the ToS text below the button.
-  // The button's own colors / border radius are set via
-  // getCheckoutRequirements(buttonStyle:) earlier — see §5.
-  style: CheckoutButtonStyle(
-    tosStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-  ),
-)
+// The button's colors / border radius are set via
+// getCheckoutRequirements(buttonStyle:) earlier — see §5.
+OnramperCheckoutButton(requirements: requirements)
 ```
 
 Tapping the button drives the native checkout flow internally:
@@ -376,7 +370,7 @@ The native SDK preserves Onramper's backend's numeric error code on `OnramperErr
 
 ## 9. Theming
 
-`CheckoutButtonStyle` splits its fields between two places:
+`CheckoutButtonStyle` styles the native checkout button.
 
 **Native button appearance** — passed to `getCheckoutRequirements(buttonStyle:)` (see §5) and rendered inside the SwiftUI checkout button:
 
@@ -386,17 +380,9 @@ The native SDK preserves Onramper's backend's numeric error code on `OnramperErr
 | `foregroundColor` | `Color?` | SDK default (white) | Hex string `#RRGGBBAA` |
 | `borderRadius` | `double` | `12` | Points |
 
-**ToS-line text styling** — passed to `OnramperCheckoutButton(style:)` for the Dart-drawn text above the button:
-
-| Property | Type | Default |
-|---|---|---|
-| `tosStyle` | `TextStyle?` | `TextStyle(fontSize: 12)` |
-| `tosLinkStyle` | `TextStyle?` | inherits from `tosStyle` with underline + blue color |
-
 A custom-styled example:
 
 ```dart
-// Native button appearance goes to getCheckoutRequirements.
 final requirements = await client.getCheckoutRequirements(
   request,
   buttonStyle: const CheckoutButtonStyle(
@@ -406,21 +392,10 @@ final requirements = await client.getCheckoutRequirements(
   ),
 );
 
-// ToS text styling goes to the widget.
-OnramperCheckoutButton(
-  requirements: requirements,
-  style: CheckoutButtonStyle(
-    tosStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-    tosLinkStyle: const TextStyle(
-      fontSize: 12,
-      color: Color(0xFF0050FF),
-      decoration: TextDecoration.underline,
-    ),
-  ),
-  // Optional: route ToS link taps through your own in-app browser.
-  onLinkTap: (uri) => YourInAppBrowser.open(uri),
-)
+OnramperCheckoutButton(requirements: requirements)
 ```
+
+The native button renders the Terms of Service consent sentence (with its links) below Buy and opens the links itself. `CheckoutButtonStyle.tosStyle` / `tosLinkStyle` and `OnramperCheckoutButton.onLinkTap` are deprecated and have no effect.
 
 The native button's label text ("Buy") is fixed by the SDK and not currently overridable from Dart.
 
@@ -429,7 +404,7 @@ The native button's label text ("Buy") is fixed by the SDK and not currently ove
 - **`client.reset()`** clears cached checkout state on both sides of the bridge, including `currentTransactionId` (read it first). Call it before starting a fresh `getCheckoutRequirements` with inputs that aren't a continuation of the previous flow (e.g., user navigated back and changed the amount). After reset the client returns to `OnramperStateKind.ready` and is immediately reusable.
 - **`client.signOut()`** wipes cached OnramperID (OIDC) tokens. Distinct from `reset()`: the partner session (DPoP key + session token) is preserved, but the next checkout that requires identity re-prompts the login sheet. Call this from an "Sign out" button in your app.
 - **`client.cancelPreparedIntent(buttonHandle)`** drops a specific stored native checkout button by handle without tearing down the client. Useful when your UI navigates away from a prepared intent without ever showing the button — call this on the previous `requirements.buttonHandle` so the native resources are released promptly.
-- **`client.dispose()`** — waits for pending setup and attempts native cleanup even if setup failed. Repeated calls return the same future and share its success or failure; cleanup runs once. Both stream closes are initiated without waiting for paused subscribers, and `super.dispose()` always runs, even if native cleanup fails. Native cleanup platform failures throw `OnramperError`. Callbacks are detached and late callbacks ignored. Subsequent setup-dependent methods throw `clientDisposed`. Await disposal when possible; Flutter's synchronous `State.dispose()` must attach an error handler to the returned future.
+- **`client.dispose()`** — waits for pending setup and attempts native cleanup even if setup failed. Repeated calls return the same future and share its success or failure; cleanup runs once. Both stream closes are initiated without waiting for paused subscribers, and `super.dispose()` always runs, even if native cleanup fails. Native cleanup platform failures throw `OnramperError`. Callbacks are detached and late callbacks ignored; if a newer client has been created since, its callbacks and native client are left in place. Subsequent setup-dependent methods throw `clientDisposed`; `reset()`, `signOut()` and `cancelPreparedIntent()` do nothing. Await disposal when possible; Flutter's synchronous `State.dispose()` must attach an error handler to the returned future.
 - **Do not** instantiate a new `OnramperClient` for each checkout intent. One client per app session is the intended lifecycle; `reset()` exists precisely so you don't have to recreate it.
 
 ```dart

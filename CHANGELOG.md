@@ -110,6 +110,11 @@ released separately; their changes are included here.
   resizes to match. `OnramperNativeCheckoutButton.height` is deprecated and
   now acts only as a minimum. A new `buttonHandle` now creates a new native
   view instead of keeping the previous quote's button.
+- **ToS text is rendered once, natively.** `OnramperCheckoutButton` no longer
+  adds Dart ToS lines under the native button, which shows the consent
+  sentence itself. `CheckoutButtonStyle.tosStyle` / `tosLinkStyle` and
+  `OnramperCheckoutButton.onLinkTap` are deprecated and have no effect; the
+  plugin no longer depends on `url_launcher`.
 - **Superseded preparations are released.** A new `getCheckoutRequirements`,
   `reset()` or `signOut()` invalidates earlier unshown buttons. A superseded
   in-flight call throws `OnramperError` with kind `intentInvalidated`; ignore
@@ -122,7 +127,9 @@ released separately; their changes are included here.
   `OnramperTheme.system` still follows the device. Set the theme to match
   your app.
 - **Safe after `dispose()`.** Setup-dependent methods throw `OnramperErrorKind.clientDisposed`;
-  late native callbacks are ignored.
+  `reset()`, `signOut()` and `cancelPreparedIntent()` do nothing, and late
+  native callbacks are ignored. Disposing an older client no longer detaches
+  or tears down a client created after it.
 - Podspec license corrected to Apache-2.0.
 
 ### Example app

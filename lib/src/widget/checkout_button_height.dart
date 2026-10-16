@@ -34,7 +34,8 @@ class CheckoutButtonHeightController extends ChangeNotifier
 
   @override
   void onHeightChanged(double height) {
-    if (height <= 0 || height == _reported) return;
+    // An unchanged height still restores a collapsed button.
+    if (height <= 0 || (height == _reported && !_unavailable)) return;
     _reported = height;
     _unavailable = false;
     notifyListeners();

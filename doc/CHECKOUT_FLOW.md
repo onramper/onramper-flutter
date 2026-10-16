@@ -97,7 +97,7 @@ A journey can produce several checkout ids but at most one transaction id. If yo
 - Calling `getCheckoutRequirements` again, or `reset()` / `signOut()`, supersedes any earlier call still in flight. The earlier call throws `OnramperError` with kind `intentInvalidated`; ignore it while you wait for the latest result.
 - Buttons prepared by earlier calls that weren't shown yet are released and render nothing.
 - A prepared button that isn't shown within 5 minutes expires and renders nothing; request a new quote.
-- After `dispose()`, setup-dependent methods throw `clientDisposed`; repeated disposal returns the same future and shares its success or failure without repeating cleanup. Create a new client to start over.
+- After `dispose()`, setup-dependent methods throw `clientDisposed` (`reset()`, `signOut()` and `cancelPreparedIntent()` do nothing); repeated disposal returns the same future and shares its success or failure without repeating cleanup. Create a new client to start over.
 
 ---
 

@@ -128,7 +128,7 @@ The constructor starts native configuration exactly once and stores the setup fu
 | `reset()` | `Future<void>` | Clears cached checkout state. Returns to `ready`. |
 | `signOut()` | `Future<void>` | Wipes stored OnramperID OIDC tokens. Does not invalidate the partner session. |
 | `cancelPreparedIntent(String buttonHandle)` | `Future<void>` | Drops a specific native button by handle. Call when navigating away from a prepared intent. |
-| `dispose()` | `Future<void>` | Waits for pending setup; attempts native cleanup even after setup failure. Repeated calls share one future and its success or failure, with no duplicate cleanup. Initiates both stream closes without waiting for paused subscribers; `super.dispose()` always runs. Native cleanup platform failures throw `OnramperError`; subsequent setup-dependent methods throw `clientDisposed` and late callbacks are ignored. |
+| `dispose()` | `Future<void>` | Waits for pending setup; attempts native cleanup even after setup failure. Repeated calls share one future and its success or failure, with no duplicate cleanup. Initiates both stream closes without waiting for paused subscribers; `super.dispose()` always runs. Native cleanup platform failures throw `OnramperError`; subsequent setup-dependent methods throw `clientDisposed` (`reset`, `signOut` and `cancelPreparedIntent` do nothing) and late callbacks are ignored. Disposing an older client leaves a newer client's callbacks and native client in place. |
 
 Operational SDK and platform-bridge failures from public calls throw `OnramperError`, including `OnramperClient.sdkVersion()` and `dispose()`. Programming errors propagate unchanged. SDK errors delivered as `OnramperErrorDto` retain their SDK kind and structured fields. For other bridge failures, the mapping is:
 
@@ -539,40 +539,40 @@ The Dart-only additions `notConfigured`, `missingResponse` and `platformFailure`
 
 ### `OnramperCheckoutButton`
 
-Consumer-facing wrapper that renders any unsatisfied ToS items above the native `OnramperNativeCheckoutButton`. The native button handles the full checkout flow (OIDC login, finalize, payment surface) internally.
+Consumer-facing wrapper around the native `OnramperNativeCheckoutButton`. The native button renders the ToS consent sentence below Buy and handles the full checkout flow (OIDC login, finalize, payment surface) internally.
 
 ```dart
 const OnramperCheckoutButton({
   Key? key,
   required CheckoutRequirementsResult requirements,
   CheckoutButtonStyle style = const CheckoutButtonStyle(),
-  Future<bool> Function(Uri)? onLinkTap,
+  @Deprecated(...) Future<bool> Function(Uri)? onLinkTap,
 })
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `requirements` | `CheckoutRequirementsResult` | Result from `getCheckoutRequirements`. |
-| `style` | `CheckoutButtonStyle` | ToS text styling (see below). Button colors are set via `getCheckoutRequirements(buttonStyle:)`. |
-| `onLinkTap` | `Future<bool> Function(Uri)?` | Override for ToS link taps. When null, links open in an external browser via `url_launcher`. |
+| `style` | `CheckoutButtonStyle` | Kept for compatibility. Button colors are set via `getCheckoutRequirements(buttonStyle:)`. |
+| `onLinkTap` | `Future<bool> Function(Uri)?` | **Deprecated, no effect.** The native button opens ToS links itself. |
 
 ### `CheckoutButtonStyle`
 
-Styling for `OnramperCheckoutButton`. Fields split between native button appearance (forwarded via `getCheckoutRequirements`) and Dart-drawn ToS text.
+Native checkout button appearance, forwarded via `getCheckoutRequirements(buttonStyle:)`.
 
 | Field | Type | Default | Used by |
 |---|---|---|---|
 | `backgroundColor` | `Color?` | SDK default (system blue) | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
 | `foregroundColor` | `Color?` | SDK default (white) | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
 | `borderRadius` | `double` | `12` | Native button — pass to `getCheckoutRequirements(buttonStyle:)`. |
-| `tosStyle` | `TextStyle?` | `TextStyle(fontSize: 12)` | Dart ToS lines — pass to `OnramperCheckoutButton(style:)`. |
-| `tosLinkStyle` | `TextStyle?` | Inherits from `tosStyle` with underline + blue | Dart ToS link lines — pass to `OnramperCheckoutButton(style:)`. |
+| `tosStyle` | `TextStyle?` | — | **Deprecated, no effect.** The native button renders the ToS text. |
+| `tosLinkStyle` | `TextStyle?` | — | **Deprecated, no effect.** |
 
 Colors are serialized as `#RRGGBBAA` hex strings across the bridge. The button label ("Buy") is fixed by the SDK and not overridable from Dart.
 
 ### `OnramperNativeCheckoutButton`
 
-Low-level wrapper. Embeds the native SwiftUI button directly via `UiKitView`. Use `OnramperCheckoutButton` unless you need to manage ToS rendering yourself.
+Low-level wrapper. Embeds the native SwiftUI button directly via `UiKitView`. Prefer `OnramperCheckoutButton`.
 
 ```dart
 const OnramperNativeCheckoutButton({

@@ -34,6 +34,17 @@ void main() {
     expect(c.height, 0);
   });
 
+  test('a height after onUnavailable restores the button', () {
+    final c = CheckoutButtonHeightController()..onHeightChanged(80);
+    c.onUnavailable();
+    var notified = 0;
+    c.addListener(() => notified++);
+    c.onHeightChanged(80);
+    expect(c.isUnavailable, isFalse);
+    expect(c.height, 80);
+    expect(notified, 1);
+  });
+
   test('minHeight can change after creation', () {
     final c = CheckoutButtonHeightController(minHeight: 56)
       ..onHeightChanged(50);

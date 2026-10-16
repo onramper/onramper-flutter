@@ -14,8 +14,7 @@ final class CheckoutRequirementsCollectorTests: XCTestCase {
         c.checkoutStarted("co_B")        // call B starts
         c.readyToCheckout()              // B needs no login
         XCTAssertEqual(c.headlessCheckoutId, "co_B")
-        XCTAssertEqual(c.requireLoginRequirements?.count ?? 0, 0)
-        XCTAssertTrue(c.becameReadyToCheckout)
+        XCTAssertEqual(c.requireLoginRequirements?.count, 0)
     }
 
     func test_loginRequiredAfterStart_isKept() {

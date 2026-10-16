@@ -122,6 +122,4 @@ CheckoutButtonStyle checkoutButtonStyle(DemoPalette p) => CheckoutButtonStyle(
       backgroundColor: p.accent,
       foregroundColor: p.onAccent,
       borderRadius: DemoRadius.button,
-      tosStyle: TextStyle(color: p.textSecondary, fontSize: 12),
-      tosLinkStyle: TextStyle(color: p.accent, fontSize: 12),
     );

@@ -157,6 +157,20 @@ final class OnramperSdkPluginTests: XCTestCase {
         XCTAssertNil(plugin.testClient(), "expected dispose to release the native client")
     }
 
+    func test_dispose_keepsClientConfiguredDuringTeardown() async throws {
+        try plugin.configure(config: makeConfig())
+        let disposed = expectation(description: "dispose completes")
+        plugin.dispose { _ in disposed.fulfill() }
+        // Reaches the plugin before dispose's Task runs, as a new Dart
+        // client's configure can.
+        try plugin.configure(config: makeConfig())
+        let replacement = try XCTUnwrap(plugin.testClient())
+
+        await fulfillment(of: [disposed], timeout: 5)
+        XCTAssertTrue(plugin.testClient() === replacement,
+                      "expected dispose to leave the newer client in place")
+    }
+
     // MARK: - initialize before configure
 
     func test_initialize_withoutConfigure_failsWithNotConfigured() async throws {

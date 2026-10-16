@@ -88,14 +88,12 @@ actor SessionRefreshBridge {
 final class CheckoutRequirementsCollector {
     private(set) var headlessCheckoutId: String?
     private(set) var requireLoginRequirements: [CheckoutRequirement]?
-    private(set) var becameReadyToCheckout: Bool = false
 
     /// Native runs a new preparation only after the superseded one finished,
     /// so anything recorded before this call belongs to an older call.
     func checkoutStarted(_ checkoutId: String) {
         headlessCheckoutId = checkoutId
         requireLoginRequirements = nil
-        becameReadyToCheckout = false
     }
 
     func loginRequired(_ requirements: [CheckoutRequirement]) {
@@ -104,7 +102,6 @@ final class CheckoutRequirementsCollector {
 
     /// Ready-to-checkout means no login is required for this preparation.
     func readyToCheckout() {
-        becameReadyToCheckout = true
         requireLoginRequirements = []
     }
 }
@@ -326,6 +323,13 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     completion(.failure(invalidated))
                     return
                 }
+                guard let headlessId = collector.headlessCheckoutId else {
+                    completion(.failure(
+                        PluginError.missingResponse("delegate.didStartCheckout was not invoked")
+                            .asPigeonError
+                    ))
+                    return
+                }
 
                 // Store the button in the registry and hand the handle to Dart so
                 // OnramperNativeCheckoutButton can look it up via the platform view.
@@ -340,14 +344,6 @@ extension OnramperSdkPlugin: OnramperHostApi {
                     return
                 }
                 self.lastButtonHandle = handle
-
-                guard let headlessId = collector.headlessCheckoutId else {
-                    completion(.failure(
-                        PluginError.missingResponse("delegate.didStartCheckout was not invoked")
-                            .asPigeonError
-                    ))
-                    return
-                }
 
                 let nativeReqs = collector.requireLoginRequirements ?? []
                 completion(.success(CheckoutRequirementsResultDto(
@@ -415,8 +411,18 @@ extension OnramperSdkPlugin: OnramperHostApi {
         let client = self.client
         Task { @MainActor in
             await client?.reset()
+            // A configure() during the await installed a newer client (and
+            // already released this one); leave its state alone.
+            guard self.client === client else {
+                completion(.success(()))
+                return
+            }
             self.tearDownObservers()
             await CheckoutButtonRegistry.shared.dropAll()
+            guard self.client === client else {
+                completion(.success(()))
+                return
+            }
             self.client = nil
             self.inFlightRequirements = nil
             self.lastButtonHandle = nil

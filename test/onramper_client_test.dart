@@ -547,6 +547,49 @@ void main() {
       }
     });
 
+    test('teardown methods after dispose do nothing', () async {
+      final host = FakeOnramperHostApi();
+      final client = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: host,
+      );
+      await client.dispose();
+      await expectLater(client.reset(), completes);
+      await expectLater(client.signOut(), completes);
+      await expectLater(client.cancelPreparedIntent('h'), completes);
+      expect(host.signOutCallCount, 0);
+      expect(host.lastCancelledHandle, isNull);
+    });
+
+    test('disposing an older client leaves a newer client in place', () async {
+      final oldHost = FakeOnramperHostApi();
+      final old = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_x', clientId: '01H'),
+        hostApi: oldHost,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final newer = OnramperClient.forTesting(
+        configuration:
+            const OnramperConfiguration(apiKey: 'pk_y', clientId: '01H'),
+        hostApi: FakeOnramperHostApi(),
+      );
+      await old.dispose();
+      // The newer client's configure replaced the native client already.
+      expect(oldHost.disposeCallCount, 0);
+
+      // Its FlutterApi handlers are still registered.
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        'dev.flutter.pigeon.onramper_flutter.OnramperFlutterApi.onTransactionIdChanged',
+        OnramperHostApi.pigeonChannelCodec.encodeMessage(<Object?>['tx-1']),
+        (_) {},
+      );
+      expect(newer.currentTransactionId, 'tx-1');
+      await newer.dispose();
+    });
+
     test('signOut clears currentTransactionId', () async {
       final client = OnramperClient.forTesting(
         configuration:

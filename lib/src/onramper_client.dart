@@ -44,8 +44,13 @@ typedef SessionExpirationHandler = Future<SessionCredentials> Function();
 /// propagate setup failures. Call [initialize] with [SessionCredentials]
 /// before starting a checkout flow.
 ///
-/// After [dispose], methods throw [OnramperError] with kind `clientDisposed`,
-/// and late native callbacks are ignored. Create a new client to start over.
+/// After [dispose], setup-dependent methods throw [OnramperError] with kind
+/// `clientDisposed`; [reset], [signOut] and [cancelPreparedIntent] do nothing.
+/// Late native callbacks are ignored. Create a new client to start over.
+///
+/// Native callbacks and the native SDK client are shared by the whole app, so
+/// the most recently constructed client owns them. Disposing an older client
+/// leaves a newer client's callbacks and native client in place.
 class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// Creates a client wired to the real native HostApi.
   OnramperClient({
@@ -96,9 +101,14 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   })  : _config = configuration,
         _host = hostApi,
         _sessionExpirationHandler = sessionExpirationHandler {
+    _current = this;
     OnramperFlutterApi.setUp(this);
     _configuration = _configure();
   }
+
+  /// The client that last registered the global callbacks and configured the
+  /// native SDK (configure is sent synchronously from the constructor).
+  static OnramperClient? _current;
 
   final OnramperConfiguration _config;
   final OnramperHostApi _host;
@@ -220,7 +230,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     _tosRequirements = null;
     _lastError = null;
     _currentTransactionId = null;
-    await _guard(_host.reset);
+    await _teardown(_host.reset);
     if (!_disposed) notifyListeners();
   }
 
@@ -233,7 +243,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     _tosRequirements = null;
     _lastError = null;
     _currentTransactionId = null;
-    await _guard(_host.signOut);
+    await _teardown(_host.signOut);
     if (!_disposed) notifyListeners();
   }
 
@@ -243,7 +253,7 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   /// old handle so its native resources are released promptly rather than
   /// waiting for the next [reset] or [dispose].
   Future<void> cancelPreparedIntent(String buttonHandle) {
-    return _guard(() => _host.cancelPreparedIntent(buttonHandle));
+    return _teardown(() => _host.cancelPreparedIntent(buttonHandle));
   }
 
   /// Tears down the client, releases native resources, and closes both
@@ -257,12 +267,16 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
   Future<void> _dispose() async {
     _disposed = true;
     // Detach our FlutterApi handlers so late callbacks don't hit a disposed
-    // client.
-    OnramperFlutterApi.setUp(null);
+    // client, unless a newer client has registered its own.
+    if (identical(_current, this)) OnramperFlutterApi.setUp(null);
     try {
       // Even failed setup may have allocated native resources. Waiting also
       // prevents late configuration from recreating a disposed native client.
       await _configuration;
+      // A newer client's configure replaced (and released) ours natively;
+      // disposing now would tear down the newer client instead.
+      if (!identical(_current, this)) return;
+      _current = null;
       await _platformCall(_host.dispose);
     } finally {
       // Closing prohibits further events immediately, but completion waits
@@ -281,6 +295,15 @@ class OnramperClient extends ChangeNotifier implements OnramperFlutterApi {
     final failure = _configurationFailure;
     if (failure != null) Error.throwWithStackTrace(failure.$1, failure.$2);
     return _platformCall(call);
+  }
+
+  /// Like [_guard], but a disposed client has nothing left to tear down.
+  Future<void> _teardown(Future<void> Function() call) async {
+    try {
+      await _guard(call);
+    } on OnramperError catch (e) {
+      if (e.kind != OnramperErrorKind.clientDisposed) rethrow;
+    }
   }
 
   /// Normalizes channel failures only; programming errors propagate intact.

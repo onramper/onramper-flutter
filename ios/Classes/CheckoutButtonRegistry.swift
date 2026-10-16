@@ -23,10 +23,6 @@ actor CheckoutButtonRegistry {
         self.now = now
     }
 
-    func store(_ button: OnramperCheckoutButton) -> String {
-        storeView(AnyView(button))
-    }
-
     func storeView(_ view: AnyView) -> String {
         let handle = UUID().uuidString
         entries[handle] = Entry(view: view, createdAt: now())
