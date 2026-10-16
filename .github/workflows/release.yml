@@ -66,8 +66,10 @@ jobs:
 
       - name: Refuse if already on pub.dev
         run: |
-          if curl -fsS https://pub.dev/api/packages/onramper_flutter \
-            | jq -e --arg v "$VERSION" '.versions[] | select(.version == $v)' >/dev/null; then
+          set -euo pipefail
+          PACKAGE=$(curl -fsS https://pub.dev/api/packages/onramper_flutter)
+          MATCHES=$(jq -e --arg v "$VERSION" '[.versions[] | select(.version == $v)] | length' <<< "$PACKAGE")
+          if [ "$MATCHES" -gt 0 ]; then
             echo "::error::onramper_flutter $VERSION is already on pub.dev."; exit 1
           fi
 
