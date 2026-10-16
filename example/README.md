@@ -27,44 +27,43 @@ Use `--release` (not `--debug`) — the Flutter debug overlay renders over the n
 - Observing `client.events` in real time, with pending payments shown separately
   from completion and failures shown as `userMessage` + support code
 - Rendering the self-sizing `OnramperCheckoutButton`
-- **Environment** selector (Development / Production, default Development):
-  each uses its own `.env` keys (`ONRAMPER_DEV_*` / `ONRAMPER_PROD_*`, see
-  `.env.example`) and demo session endpoint (`demo-stg.onramper.dev` /
-  `demo-prod.onramper.com`); switching rebuilds the client. A banner lists any
-  keys missing for the selected environment. Legacy unprefixed
-  `ONRAMPER_API_KEY`, `ONRAMPER_CLIENT_ID` and `ONRAMPER_DEMO_AUTH_TOKEN`
-  are fallback values for Development only.
-- **Crypto** selector (BTC / ETH / SOL) with predefined demo wallets, plus
-  editable **amount** and **wallet** fields (switching crypto restores its
-  demo wallet)
-- **Dark mode** switch (starts from the device appearance): sets the app theme
-  and passes an explicit `OnramperTheme.light`/`.dark` to the SDK (rebuilds
-  the client)
-- **Override country and state** (off by default — no `country`/`subdivision`
-  is sent and the backend infers them); US/ES/NL/GR with a US state picker
-- **Pay with** USD or EUR (choosing a country selects its default currency)
-- **Onramp** filter: Any, MoonPay, Paybis or Coinbase Pay (`onlyOnramps`)
+- Layout and behaviour match the React Native example app
+  (`onramper-react-native/example`): one **Buy Crypto** screen plus a
+  **Settings** sheet (⚙︎ in the header)
+- **Live quotes:** any change to the form re-runs `getCheckoutRequirements`
+  (400 ms after typing stops); a response for older inputs is dropped. If the
+  SDK fails before checkout is finalized, **Get a new quote** replaces the
+  checkout button
+- **Crypto** tiles (BTC / ETH / SOL) with predefined demo wallets, editable
+  **wallet** and **amount**, **USD / EUR / GBP**, **Apple Pay / Revolut Pay**,
+  and an **Onramp** filter (Any, MoonPay, Paybis, Coinbase Pay → `onlyOnramps`)
+- **Override country and state** (off by default — the backend infers them);
+  US/ES/NL/GR, with a US state picker
+- **Prefill** (collapsed, off by default): first/last name, phone, and an
+  optional email; the header shows which fields are sent
 - **Reset** (`client.reset()`) and **Log out** (`client.signOut()`)
-- **Prefill (optional):** email, first/last name and phone passed to
-  `getCheckoutRequirements(prefill:)`. Email must match the OnramperID sign-in
-  address, or the whole prefill is dropped.
-- **New quote:** re-runs `getCheckoutRequirements`; superseded calls
-  (`intentInvalidated`) are ignored
-- **Purchase-form edits invalidate the displayed quote:** changing crypto,
-  amount, wallet, fiat, country/state or onramp hides the old quote and checkout
-  button and clears the outcome. Request **New quote** before continuing.
-- **Persistent outcome panel:** **Transaction complete** for `completed`, or
-  **Payment processing** for `paymentPending`. It captures the transaction id
-  at the event and remains after the payment sheet closes. Tap the id to copy;
-  a missing id is shown as "Transaction ID unavailable". **New transaction**
-  calls `reset()` and clears the panel so another quote can be requested.
-  Track pending payments before starting another payment. Reset, Log out, a
-  new quote, purchase-form edits or a client rebuild also clear the panel.
-- **Versions banner:** plugin version, bundled SDK version and the current
-  transaction id
-- **SDK log viewer** (app-bar icon), fed by `OnramperConfiguration.logHandler`:
-  pick a log level (rebuilds the client), browse records, Clear, Copy all
-  (JSON lines). Exported logs may contain personal data.
+- Status boxes for **Payment processing**, **Transaction complete**, the
+  **Onramper transaction ID**, and errors (initialization, quote, action,
+  checkout)
+- **Settings → Environment** (Development / Production, default Development):
+  signs out, then re-initializes against the selected environment. Each uses
+  its own `.env` keys (`ONRAMPER_DEV_*` / `ONRAMPER_PROD_*`, see
+  `.env.example`); missing keys show as an initialization error. Legacy
+  unprefixed `ONRAMPER_API_KEY`, `ONRAMPER_CLIENT_ID` and
+  `ONRAMPER_DEMO_AUTH_TOKEN` are fallback values for Development only
+- **Settings → Clear local sessions:** sign out, reset, and re-initialize
+  with a fresh demo session
+- **Settings → Dark mode** (on by default): app theme plus
+  `OnramperTheme.dark`/`.light` for the SDK (re-initializes)
+- **Settings → Diagnostic logs:** SDK records (`logLevel: debug`) are written
+  to daily UTC files `onramper-sdk-YYYY-MM-DD.log` in Application Support
+  (excluded from backup), kept for 7 days / 5 MB. Turn **Save SDK logs** off to
+  stop writing (remembered across launches). Preview, share (system share
+  sheet) or delete all. Logs may contain personal information
+- **Settings → SDK events:** in-memory list of what the demo did and saw
+  (init steps, state changes, quotes, checkout events)
+- **Settings → About:** plugin and SDK versions, environment, bundle ID and
+  team ID (useful for App Attest allowlist checks)
 
 `pubspec.yaml` points `onramper_flutter` at this checkout through
 `dependency_overrides` (`path: ../`) so the app always runs the local plugin

@@ -25,6 +25,9 @@ dependencies:
 
   # Used by SessionTokenService to mint demo sessionId/sessionToken pairs.
   http: ^1.2.0
+  share_plus: ^12.0.2
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
 
 dev_dependencies:
   integration_test:
@@ -38,6 +41,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+  fake_async: ^1.3.1
 
 # Keeps the example on this checkout's plugin code for on-device testing.
 # Removed as part of the release (see spec §11).
