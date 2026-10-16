@@ -25,6 +25,9 @@ Future<void> main() async {
     excludeFromBackup: IosDiagnostics.excludeFromBackup,
     shareDirectory: getTemporaryDirectory,
   );
+  unawaited(logStore.initialize().catchError((Object error) {
+    debugPrint('LogFileStore: startup cleanup failed: $error');
+  }));
   runApp(ExampleApp(logSettings: logSettings, logStore: logStore));
 }
 

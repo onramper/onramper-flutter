@@ -1,3 +1,6 @@
+import 'dart:ui' show SemanticsAction, SemanticsFlag;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter_example/widgets/demo_card.dart';
@@ -62,6 +65,41 @@ void main() {
     await tester.tap(find.byType(Switch));
     expect(value, isTrue);
   });
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    for (final disabled in [false, true]) {
+      testWidgets(
+          'SwitchRow labels its ${platform.name} ${disabled ? 'disabled' : 'enabled'} toggle',
+          (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        final semantics = tester.ensureSemantics();
+        try {
+          bool? changed;
+          await tester.pumpWidget(harness(SwitchRow(
+            label: 'Dark mode',
+            value: !disabled,
+            disabled: disabled,
+            onChanged: (value) => changed = value,
+          )));
+          final node = tester.getSemantics(find.byType(Switch));
+          final data = node.getSemanticsData();
+          expect(data.label, 'Dark mode');
+          expect(data.hasFlag(SemanticsFlag.hasToggledState), isTrue);
+          expect(data.hasFlag(SemanticsFlag.isToggled), !disabled);
+          expect(data.hasFlag(SemanticsFlag.isEnabled), !disabled);
+          expect(data.hasAction(SemanticsAction.tap), !disabled);
+          if (!disabled) {
+            await tester.tap(find.byType(Switch));
+            await tester.pump();
+            expect(changed, isFalse);
+          }
+        } finally {
+          semantics.dispose();
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
+  }
 
   testWidgets('Tile taps unless disabled', (tester) async {
     var taps = 0;

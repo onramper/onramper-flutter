@@ -24,6 +24,8 @@ class FakeHost implements OnramperHostApi {
   Object? initializeError;
   Object? signOutError;
   Completer<void>? signOutGate;
+  Object? resetError;
+  Completer<void>? resetGate;
 
   /// Each `getCheckoutRequirements` call waits for, then removes, the first
   /// gate here (if any).
@@ -87,6 +89,9 @@ class FakeHost implements OnramperHostApi {
   Future<void> reset() async {
     journal.add('$tag.reset');
     resetCalls++;
+    await resetGate?.future;
+    final error = resetError;
+    if (error != null) throw error;
   }
 
   @override

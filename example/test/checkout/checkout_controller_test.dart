@@ -100,10 +100,11 @@ void main() {
       );
     update(client(host));
     await settle();
-    expect(checkout.amountHint, 'Minimum is 20 USD');
+    expect(checkout.amountHint,
+        'Minimum is 20 USD\nError code: FLUTTER-UNSPECIFIED');
     expect(checkout.error, isNull);
-    expect(
-        log.last, 'error: quote failed: amountOutOfRange — Minimum is 20 USD');
+    expect(log.last,
+        'error: quote failed: amountOutOfRange — Minimum is 20 USD\nError code: FLUTTER-UNSPECIFIED');
 
     host.requirementsError = const OnramperError(
       kind: OnramperErrorKind.quoteUnavailable,
@@ -114,7 +115,8 @@ void main() {
     checkout.refresh();
     expect(checkout.amountHint, isNull);
     await settle();
-    expect(checkout.error, 'quoteUnavailable — No quotes');
+    expect(checkout.error,
+        'quoteUnavailable — No quotes\nError code: FLUTTER-UNSPECIFIED');
   });
 
   test('a result is hidden once the client changes', () async {

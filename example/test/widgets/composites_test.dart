@@ -76,6 +76,35 @@ void main() {
     expect(find.text('(empty)'), findsOneWidget);
   });
 
+  testWidgets('PrefillCard wraps a full summary with large accessibility text',
+      (tester) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(harness(MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: PrefillCard(
+          value: const PrefillInput(
+              enabled: true,
+              phoneNumber: '+3712345678',
+              sendEmail: true,
+              email: 'ada@example.com'),
+          onChanged: (_) {},
+        ),
+      ),
+    )));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Prefill'), findsOneWidget);
+    expect(find.text('Sends: firstName, lastName, phoneNumber, email ▸'),
+        findsOneWidget);
+    await tester.tap(find.text('Prefill'));
+    await tester.pump();
+    expect(find.text('Send prefill'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   group('DiagnosticsCard', () {
     late LogSettings settings;
     setUp(() async {

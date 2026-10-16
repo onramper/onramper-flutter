@@ -69,10 +69,8 @@ class _LogPreviewSheetState extends State<LogPreviewSheet> {
                   ? null
                   : () {
                       final origin = originOf(shareContext);
-                      _run(() async {
-                        final copy = await widget.store.snapshot(widget.file);
-                        await widget.share(copy, origin);
-                      });
+                      _run(() => widget.store.withSnapshot(
+                          widget.file, (copy) => widget.share(copy, origin)));
                     },
               child: Text('Share', style: TextStyle(color: p.accent)),
             ),

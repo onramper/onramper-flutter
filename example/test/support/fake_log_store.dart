@@ -26,6 +26,10 @@ class FakeLogFileStore extends LogFileStore {
   Future<File> snapshot(LogFile file) async => file.file;
 
   @override
+  Future<void> withSnapshot(LogFile file, Future<void> Function(File) share) =>
+      share(file.file);
+
+  @override
   Future<void> deleteAll() async {
     deleted = true;
     files = [];

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,8 @@ import 'package:onramper_flutter/onramper_flutter.dart';
 import 'package:onramper_flutter/src/platform/pigeon.g.dart';
 import 'package:onramper_flutter_example/logging/log_settings.dart';
 import 'package:onramper_flutter_example/main.dart';
+import 'package:onramper_flutter_example/config/environments.dart';
+import 'package:onramper_flutter_example/screens/buy_crypto_screen.dart';
 import 'package:onramper_flutter_example/theme/demo_theme.dart';
 import 'package:onramper_flutter_example/widgets/demo_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -70,6 +74,62 @@ void main() {
       of: find.widgetWithText(DemoCard, 'Amount'),
       matching: find.byType(TextField));
 
+  for (final action in ['Reset', 'Log out']) {
+    for (final environmentChange in [false, true]) {
+      for (final fails in [false, true]) {
+        testWidgets(
+            'stale $action ${fails ? 'failure' : 'success'} after ${environmentChange ? 'environment' : 'theme'} change is ignored',
+            (tester) async {
+          await pumpApp(tester);
+          final old = hosts.single;
+          final gate = Completer<void>();
+          if (action == 'Reset') {
+            old.resetGate = gate;
+            if (fails) old.resetError = StateError('old action failed');
+          } else {
+            old.signOutGate = gate;
+            if (fails) old.signOutError = StateError('old action failed');
+          }
+          await tester.scrollUntilVisible(find.text(action), 300,
+              scrollable: find.byType(Scrollable).first);
+          await tester.tap(find.text(action));
+          await tester.pump();
+          expect(action == 'Reset' ? old.resetCalls : old.signOutCalls, 1);
+          final demo =
+              tester.widget<BuyCryptoScreen>(find.byType(BuyCryptoScreen)).demo;
+          if (environmentChange) {
+            // The switch's own sign-out is independent of the pending action.
+            old.signOutGate = null;
+            old.signOutError = null;
+            await demo.switchEnvironment(DemoEnvironment.production);
+          } else {
+            demo.setDarkMode(false);
+          }
+          await tester.pumpAndSettle();
+          expect(clients.length, 2);
+          clients.last.debugDispatchEvent(CheckoutEventDto(
+              kind: CheckoutEventKindDto.completed,
+              checkoutId: 'new-checkout'));
+          await tester.pumpAndSettle();
+          expect(demo.completedCheckoutId, 'new-checkout');
+          final quotes = hosts.last.requirementsCalls;
+          if (action == 'Log out' && fails) {
+            old.signOutError = StateError('old action failed');
+          }
+          gate.complete();
+          await tester.pumpAndSettle();
+          expect(demo.completedCheckoutId, 'new-checkout');
+          expect(hosts.last.requirementsCalls, quotes);
+          expect(find.textContaining('old action failed'), findsNothing);
+          expect(
+              demo.eventLog.entries
+                  .any((entry) => entry.line.contains('old action failed')),
+              isFalse);
+        });
+      }
+    }
+  }
+
   testWidgets('renders the Buy Crypto screen and quotes on launch',
       (tester) async {
     await pumpApp(tester);
@@ -122,11 +182,13 @@ void main() {
       message: 'raw',
       recoverable: true,
       userMessage: 'No quotes',
+      supportCode: 'IOS-QUOTE-123',
     );
     await tester.tap(find.text('BTC'));
     await tester.pumpAndSettle();
     expect(find.text('Quote failed'), findsOneWidget);
-    expect(find.text('quoteUnavailable — No quotes'), findsOneWidget);
+    expect(find.text('quoteUnavailable — No quotes\nError code: IOS-QUOTE-123'),
+        findsOneWidget);
   });
 
   testWidgets(

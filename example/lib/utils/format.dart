@@ -16,7 +16,10 @@ String plainNumber(double value) =>
 
 /// RN `describeError`: code + the user-facing message when there is one.
 ({String code, String message}) describeError(Object error) => switch (error) {
-      OnramperError e => (code: e.kind.name, message: e.userMessage),
+      OnramperError e => (
+          code: e.kind.name,
+          message: '${e.userMessage}\nError code: ${e.supportCode}',
+        ),
       FormatException e => (code: 'unknown', message: e.message),
       HttpException e => (code: 'unknown', message: e.message),
       StateError e => (code: 'unknown', message: e.message),

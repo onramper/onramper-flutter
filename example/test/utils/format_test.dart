@@ -22,9 +22,12 @@ void main() {
       message: 'raw',
       recoverable: true,
       userMessage: 'Amount too low',
+      supportCode: 'IOS-AMOUNT-123',
     );
-    expect(describeError(e),
-        (code: 'amountOutOfRange', message: 'Amount too low'));
+    expect(describeError(e), (
+      code: 'amountOutOfRange',
+      message: 'Amount too low\nError code: IOS-AMOUNT-123'
+    ));
   });
 
   test('describeError reads messages from Dart exceptions', () {

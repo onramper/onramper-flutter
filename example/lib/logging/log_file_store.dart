@@ -36,6 +36,7 @@ class LogFileStore {
     Future<String> Function()? launchHeader,
     Future<void> Function(String path)? excludeFromBackup,
     Future<Directory> Function()? shareDirectory,
+    DateTime Function()? clock,
     this.maxAge = const Duration(days: 7),
     this.maxBytes = 5 * 1024 * 1024,
     this.maxRecordBytes = 64 * 1024,
@@ -43,6 +44,7 @@ class LogFileStore {
   })  : _directory = directory,
         _launchHeader = launchHeader,
         _excludeFromBackup = excludeFromBackup,
+        _clock = clock ?? DateTime.now,
         _shareDirectory = shareDirectory ?? (() async => Directory.systemTemp);
 
   static const trimNotice = '… trimmed to the newest entries …\n';
@@ -53,6 +55,7 @@ class LogFileStore {
   final Future<String> Function()? _launchHeader;
   final Future<void> Function(String path)? _excludeFromBackup;
   final Future<Directory> Function() _shareDirectory;
+  final DateTime Function() _clock;
   final Duration maxAge;
   final int maxBytes;
   final int maxRecordBytes;
@@ -78,6 +81,11 @@ class LogFileStore {
         category: record.category,
         message: formatRecordMessage(record),
       );
+
+  /// Apply retention and remove abandoned exports even when saving is off.
+  Future<void> initialize() => _serial(() async {
+        await _prepareRead();
+      });
 
   Future<void> write({
     required DateTime at,
@@ -115,11 +123,14 @@ class LogFileStore {
       });
 
   /// Newest first.
-  Future<List<LogFile>> listFiles() =>
-      _serial(() async => (await _scan(await _ensureDir())).reversed.toList());
+  Future<List<LogFile>> listFiles() => _serial(() async {
+        final dir = await _prepareRead();
+        return (await _scan(dir)).reversed.toList();
+      });
 
   /// The file's text, or its last [previewBytes] behind a marker line.
   Future<String> preview(LogFile file) => _serial(() async {
+        await _prepareRead();
         final raf = await file.file.open();
         try {
           final length = await raf.length();
@@ -138,12 +149,36 @@ class LogFileStore {
       });
 
   /// A copy to hand to the share sheet, so later writes can't change it.
+  /// Use [withSnapshot] to release it after sharing.
   Future<File> snapshot(LogFile file) => _serial(() async {
+        await _prepareRead();
         final dir =
             Directory('${(await _shareDirectory()).path}/onramper-log-share');
         await dir.create(recursive: true);
-        return file.file.copy('${dir.path}/${file.name}');
+        final export = await dir.createTemp('share-');
+        try {
+          return await file.file.copy('${export.path}/${file.name}');
+        } catch (_) {
+          await export.delete(recursive: true);
+          rethrow;
+        }
       });
+
+  /// Keep the copy until the share sheet finishes (including cancellation or
+  /// failure), without holding up the store's queue while the sheet is open.
+  Future<void> withSnapshot(
+      LogFile file, Future<void> Function(File copy) share) async {
+    final copy = await snapshot(file);
+    try {
+      await share(copy);
+    } finally {
+      await _serial(() async {
+        if (await copy.parent.exists()) {
+          await copy.parent.delete(recursive: true);
+        }
+      });
+    }
+  }
 
   Future<void> deleteAll() => _serial(() async {
         for (final f in await _scan(await _ensureDir())) {
@@ -152,6 +187,7 @@ class LogFileStore {
         // The next file starts fresh: launch line first, nothing counted yet.
         _headerWritten = false;
         _totalBytes = 0;
+        await _clearExports();
       });
 
   Future<Directory> _ensureDir() async {
@@ -164,7 +200,21 @@ class LogFileStore {
     } catch (e) {
       debugPrint('LogFileStore: excludeFromBackup failed: $e');
     }
+    // Anything left from a previous launch is no longer being shared.
+    await _clearExports();
     return _dir = dir;
+  }
+
+  Future<Directory> _prepareRead() async {
+    final dir = await _ensureDir();
+    await _prune(dir, _dayOf(_clock()));
+    return dir;
+  }
+
+  Future<void> _clearExports() async {
+    final dir =
+        Directory('${(await _shareDirectory()).path}/onramper-log-share');
+    if (await dir.exists()) await dir.delete(recursive: true);
   }
 
   Future<String> _header() async {

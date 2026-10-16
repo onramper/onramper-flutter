@@ -187,7 +187,10 @@ void main() {
     await settle();
     await c.switchEnvironment(DemoEnvironment.production);
     await settle();
-    expect(lines(c), contains('sign out failed: networkError — No connection'));
+    expect(
+        lines(c),
+        contains(
+            'sign out failed: networkError — No connection\nError code: FLUTTER-UNSPECIFIED'));
     expect(c.status, InitStatus.ready);
     expect(c.environment, DemoEnvironment.production);
     c.dispose();
@@ -309,7 +312,7 @@ void main() {
     ));
     await settle();
     expect(c.completedCheckoutId, isNull);
-    expect(c.lastFailure, 'paymentFailed — Card declined');
+    expect(c.lastFailure, 'paymentFailed — Card declined\nError code: X');
     expect(lines(c), contains('failed paymentFailed — declined'));
 
     client.debugDispatchEvent(

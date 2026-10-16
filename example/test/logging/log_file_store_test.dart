@@ -7,9 +7,11 @@ import 'package:onramper_flutter_example/logging/log_file_store.dart';
 void main() {
   late Directory root;
   late Directory logs;
+  late DateTime now;
   setUp(() {
     root = Directory.systemTemp.createTempSync('log_store_test');
     logs = Directory('${root.path}/Logs');
+    now = DateTime.utc(2026, 10, 16);
   });
   tearDown(() => root.deleteSync(recursive: true));
 
@@ -19,6 +21,7 @@ void main() {
         directory: () async => logs,
         launchHeader: () async => 'appVersion=1 build=2 device=x ios=18',
         shareDirectory: () async => Directory('${root.path}/share'),
+        clock: () => now,
         maxBytes: maxBytes,
         previewBytes: previewBytes,
       );
@@ -196,6 +199,123 @@ void main() {
     await s.deleteAll();
     expect(await s.listFiles(), isEmpty);
   });
+
+  test('deleteAll also removes exported copies', () async {
+    seed('2026-10-16', 'personal information\n');
+    final s = store();
+    final copy = await s.snapshot((await s.listFiles()).single);
+    await s.deleteAll();
+    expect(copy.existsSync(), isFalse);
+  });
+
+  for (final fails in [false, true]) {
+    test('sharing cleans its snapshot on ${fails ? 'failure' : 'completion'}',
+        () async {
+      seed('2026-10-16', 'personal information\n');
+      final s = store();
+      final file = (await s.listFiles()).single;
+      late File copy;
+      final sharing = s.withSnapshot(file, (snapshot) async {
+        copy = snapshot;
+        expect(copy.readAsStringSync(), 'personal information\n');
+        // Reads must neither block behind the share sheet nor delete its file.
+        await s.listFiles();
+        expect(copy.existsSync(), isTrue);
+        if (fails) throw StateError('share failed');
+      });
+      if (fails) {
+        await expectLater(sharing, throwsStateError);
+      } else {
+        await sharing;
+      }
+      expect(copy.existsSync(), isFalse);
+      expect(copy.parent.existsSync(), isFalse);
+      expect(file.file.existsSync(), isTrue);
+    });
+  }
+
+  test('overlapping shares keep independent snapshots', () async {
+    seed('2026-10-16', 'personal information\n');
+    final s = store();
+    final file = (await s.listFiles()).single;
+    await s.withSnapshot(file, (first) async {
+      await s.withSnapshot(file, (second) async {
+        expect(first.path, isNot(second.path));
+        expect(first.existsSync(), isTrue);
+        expect(second.existsSync(), isTrue);
+      });
+      expect(first.existsSync(), isTrue);
+    });
+  });
+
+  test('Delete all during sharing leaves cleanup safe', () async {
+    seed('2026-10-16', 'personal information\n');
+    final s = store();
+    final file = (await s.listFiles()).single;
+    await s.withSnapshot(file, (copy) async {
+      await s.deleteAll();
+      expect(copy.existsSync(), isFalse);
+    });
+  });
+
+  test('first access removes abandoned exports from a previous launch',
+      () async {
+    final exports = Directory('${root.path}/share/onramper-log-share')
+      ..createSync(recursive: true);
+    final abandoned = File('${exports.path}/onramper-sdk-2000-01-01.log')
+      ..writeAsStringSync('personal information\n');
+    await store().listFiles();
+    expect(abandoned.existsSync(), isFalse);
+  });
+
+  test('startup maintenance removes expired logs and abandoned exports',
+      () async {
+    seed('2000-01-01', 'expired\n');
+    final exports = Directory('${root.path}/share/onramper-log-share')
+      ..createSync(recursive: true);
+    File('${exports.path}/abandoned.log').writeAsStringSync('private\n');
+    await store().initialize();
+    expect(day('2000-01-01').existsSync(), isFalse);
+    expect(exports.existsSync(), isFalse);
+  });
+
+  test('listing enforces retention without new writes', () async {
+    seed('2000-01-01', 'expired\n');
+    seed('2026-10-16', 'current\n');
+    final files = await store().listFiles();
+    expect(files.map((f) => f.name), ['onramper-sdk-2026-10-16.log']);
+    expect(day('2000-01-01').existsSync(), isFalse);
+  });
+
+  test('listing rechecks the UTC cutoff as time passes without writes',
+      () async {
+    seed('2026-10-10', 'keep until tomorrow\n');
+    final s = store();
+    expect(await s.listFiles(), hasLength(1));
+    now = DateTime.utc(2026, 10, 17);
+    expect(await s.listFiles(), isEmpty);
+  });
+
+  test('listing enforces the size cap without writes', () async {
+    seed('2026-10-15', '${'a' * 199}\n');
+    seed('2026-10-16', '${'b' * 199}\n');
+    final files = await store(maxBytes: 300).listFiles();
+    expect(files.map((f) => f.name), ['onramper-sdk-2026-10-16.log']);
+    expect(day('2026-10-15').existsSync(), isFalse);
+  });
+
+  for (final snapshot in [false, true]) {
+    test('${snapshot ? 'snapshot' : 'preview'} rejects expired file handles',
+        () async {
+      seed('2000-01-01', 'expired\n');
+      final file = LogFile(
+          file: day('2000-01-01'), sizeBytes: 8, modified: DateTime.utc(2000));
+      final s = store();
+      await expectLater(snapshot ? s.snapshot(file) : s.preview(file),
+          throwsA(isA<FileSystemException>()));
+      expect(file.file.existsSync(), isFalse);
+    });
+  }
 
   test('a file started after Delete all gets the launch header again',
       () async {

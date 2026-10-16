@@ -19,7 +19,8 @@ class SwitchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = DemoTheme.of(context);
-    return Row(children: [
+    return MergeSemantics(
+        child: Row(children: [
       Expanded(
           child: Text(label, style: TextStyle(color: p.text, fontSize: 15))),
       Switch.adaptive(
@@ -27,6 +28,6 @@ class SwitchRow extends StatelessWidget {
         onChanged: disabled ? null : onChanged,
         activeTrackColor: p.accent,
       ),
-    ]);
+    ]));
   }
 }

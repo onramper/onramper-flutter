@@ -134,13 +134,13 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
     setState(() => _actionError = null);
     try {
       await action(c);
-      if (!mounted) return;
+      if (!mounted || !identical(c, _demo.client)) return;
       _demo.clearOutcome();
       _demo.eventLog.add(EventLevel.info, '$label OK');
       _checkout.refresh();
     } catch (e) {
+      if (!mounted || !identical(c, _demo.client)) return;
       final d = describeError(e);
-      if (!mounted) return;
       setState(() => _actionError = '$label failed: ${d.code} — ${d.message}');
       _demo.eventLog
           .add(EventLevel.error, '$label failed: ${d.code} — ${d.message}');

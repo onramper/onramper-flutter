@@ -54,8 +54,13 @@ class _PrefillCardState extends State<PrefillCard> {
                     fontSize: 15,
                     fontWeight: FontWeight.w500)),
           ),
-          Text('${prefillSummary(v)} ${_open ? '▾' : '▸'}',
-              style: TextStyle(color: p.textSecondary, fontSize: 12)),
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 3,
+            child: Text('${prefillSummary(v)} ${_open ? '▾' : '▸'}',
+                textAlign: TextAlign.end,
+                style: TextStyle(color: p.textSecondary, fontSize: 12)),
+          ),
         ]),
       ),
       if (_open)
