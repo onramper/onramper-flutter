@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/demo_theme.dart';
+import 'spaced.dart';
 
 enum StatusTone { success, error, info }
 
@@ -33,14 +34,13 @@ class StatusBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.faded(0.15),
         border: Border.all(color: color),
         borderRadius: BorderRadius.circular(DemoRadius.tile),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 6,
-        children: [
+        children: spaced(6, [
           Text(title,
               style: TextStyle(
                   color: color, fontSize: 15, fontWeight: FontWeight.w600)),
@@ -55,11 +55,9 @@ class StatusBox extends StatelessWidget {
               onTap: onAction,
               child: Text(actionLabel!,
                   style: TextStyle(
-                      color: color,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600)),
+                      color: color, fontSize: 14, fontWeight: FontWeight.w600)),
             ),
-        ],
+        ]),
       ),
     );
   }

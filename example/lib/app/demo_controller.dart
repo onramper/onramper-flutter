@@ -281,8 +281,8 @@ class DemoController extends ChangeNotifier {
         final error = e.error;
         final d = describeError(error ?? 'unknown');
         _lastFailure = '${d.code} — ${d.message}';
-        _log(EventLevel.error,
-            'failed ${error?.kind.name} — ${error?.message}');
+        _log(
+            EventLevel.error, 'failed ${error?.kind.name} — ${error?.message}');
       case CheckoutEventKind.checkoutCancelled:
         _log(EventLevel.event, 'checkout cancelled');
       case CheckoutEventKind.checkoutStarted:

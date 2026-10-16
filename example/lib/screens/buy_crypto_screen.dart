@@ -29,6 +29,7 @@ import '../widgets/status_box.dart';
 import '../widgets/switch_row.dart';
 import '../widgets/tile.dart';
 import 'settings_sheet.dart';
+import '../widgets/spaced.dart';
 
 /// RN `BuyCryptoScreen`.
 class BuyCryptoScreen extends StatefulWidget {
@@ -179,8 +180,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
               padding: EdgeInsets.fromLTRB(16, 16, 16, insets.bottom + 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 16,
-                children: [
+                children: spaced(16, [
                   _countryCard(),
                   DemoCard(title: 'Select currency', children: [
                     TileRow(children: [
@@ -235,12 +235,13 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                   ]),
                   PrefillCard(value: _prefillDraft, onChanged: _changePrefill),
                   _checkoutSection(p),
-                  Row(spacing: 8, children: [
+                  Row(
+                      children: spaced(8, [
                     _actionButton('Reset', p.danger,
                         () => _runAction('reset', (c) => c.reset())),
                     _actionButton('Log out', p.warning,
                         () => _runAction('sign out', (c) => c.signOut())),
-                  ]),
+                  ])),
                   Text(
                     'SDK: ${_demo.status == InitStatus.ready ? _demo.sdkState.name : _demo.status.name}',
                     style: TextStyle(
@@ -250,7 +251,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                   ),
                   ..._statusBoxes(),
                   EventLogCard(log: _demo.eventLog),
-                ],
+                ]),
               ),
             ),
           ),
@@ -262,7 +263,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
   Widget _header(DemoPalette p, double top) => Container(
         color: p.headerBg,
         padding: EdgeInsets.fromLTRB(16, top + 8, 16, 12),
-        child: Row(spacing: 12, children: [
+        child: Row(
+            children: spaced(12, [
           Expanded(
             child: Text('Buy Crypto',
                 style: TextStyle(
@@ -296,7 +298,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
               ),
             ),
           ),
-        ]),
+        ])),
       );
 
   Widget _countryCard() => DemoCard(children: [
@@ -341,7 +343,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
         ? 'Enter an amount greater than 0'
         : _checkout.amountHint;
     return DemoCard(title: 'Amount', children: [
-      Row(spacing: 8, children: [
+      Row(
+          children: spaced(8, [
         Expanded(
           child: DemoField(
             controller: _amount.controller,
@@ -364,7 +367,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
             onChanged: (f) => _setForm(_form.copyWith(fiat: f)),
           ),
         ),
-      ]),
+      ])),
       if (hint != null) Text(hint, style: TextStyle(color: p.danger)),
     ]);
   }
@@ -377,8 +380,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
           !_demo.hasFinalizedCheckout;
       return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 16,
-          children: [
+          children: spaced(16, [
             QuoteCard(
               quote: result.quote,
               amount: request.transactionData.amount,
@@ -400,7 +402,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                 requirements: result,
                 style: checkoutButtonStyle(p),
               ),
-          ]);
+          ]));
     }
     if (_checkout.loading ||
         (request != null && _demo.status == InitStatus.initializing)) {
@@ -437,7 +439,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
+              color: color.faded(0.15),
               borderRadius: BorderRadius.circular(DemoRadius.button),
             ),
             child: Text(label,

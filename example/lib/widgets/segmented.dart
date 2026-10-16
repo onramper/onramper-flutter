@@ -44,11 +44,8 @@ class Segmented<T> extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: option.value == value
-                        ? p.accent.withValues(alpha: 0.25)
-                        : null,
-                    borderRadius:
-                        BorderRadius.circular(DemoRadius.input - 2),
+                    color: option.value == value ? p.accent.faded(0.25) : null,
+                    borderRadius: BorderRadius.circular(DemoRadius.input - 2),
                   ),
                   child: Text(
                     option.label,

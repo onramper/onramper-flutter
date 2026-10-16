@@ -8,6 +8,7 @@ import '../theme/demo_theme.dart';
 import 'demo_card.dart';
 import 'page_sheet.dart';
 import 'switch_row.dart';
+import 'spaced.dart';
 
 String fileSize(int bytes) => bytes < 1024 * 1024
     ? '${(bytes / 1024).ceil()} KB'
@@ -100,7 +101,8 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
     final total = _files.fold<int>(0, (sum, f) => sum + f.sizeBytes);
     return DemoCard(
       title: 'Diagnostic logs',
-      footer: 'Logging is on by default. Daily files use UTC dates and stay on this '
+      footer:
+          'Logging is on by default. Daily files use UTC dates and stay on this '
           'device until shared. Logs are kept for up to 7 days and 5 MB; older '
           'entries are removed first. Provider messages may contain personal '
           'information.',
@@ -122,7 +124,8 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
           GestureDetector(
             onTap: _busy
                 ? null
-                : () => _run(() async => _files = await widget.store.listFiles()),
+                : () =>
+                    _run(() async => _files = await widget.store.listFiles()),
             child: Text('Refresh', style: TextStyle(color: p.accent)),
           ),
         ]),
@@ -133,7 +136,8 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
             padding: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: p.border, width: 0.5))),
-            child: Row(spacing: 12, children: [
+            child: Row(
+                children: spaced(12, [
               Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -144,12 +148,15 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
                               file: file,
                               store: widget.store,
                               share: widget.share)),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(file.name, style: TextStyle(color: p.text)),
-                    const SizedBox(height: 4),
-                    Text('${fileSize(file.sizeBytes)} · UTC',
-                        style: TextStyle(color: p.textSecondary, fontSize: 12)),
-                  ]),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(file.name, style: TextStyle(color: p.text)),
+                        const SizedBox(height: 4),
+                        Text('${fileSize(file.sizeBytes)} · UTC',
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: 12)),
+                      ]),
                 ),
               ),
               Builder(
@@ -166,10 +173,12 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
                   child: Text('Share', style: TextStyle(color: p.accent)),
                 ),
               ),
-            ]),
+            ])),
           ),
-        if (_busy) Center(child: CircularProgressIndicator.adaptive(
-            valueColor: AlwaysStoppedAnimation(p.accent))),
+        if (_busy)
+          Center(
+              child: CircularProgressIndicator.adaptive(
+                  valueColor: AlwaysStoppedAnimation(p.accent))),
         GestureDetector(
           onTap: _busy || _files.isEmpty ? null : _confirmDelete,
           child: Text('Delete all logs',

@@ -5,6 +5,7 @@ import '../logging/share_log_file.dart';
 import '../theme/demo_theme.dart';
 import '../widgets/diagnostics_card.dart' show originOf;
 import '../widgets/sheet_header.dart';
+import '../widgets/spaced.dart';
 
 class LogPreviewSheet extends StatefulWidget {
   const LogPreviewSheet({
@@ -58,8 +59,10 @@ class _LogPreviewSheetState extends State<LogPreviewSheet> {
       SheetHeader(title: 'Log preview', onClose: () => Navigator.pop(context)),
       Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(spacing: 12, children: [
-          Expanded(child: Text(widget.file.name, style: TextStyle(color: p.text))),
+        child: Row(
+            children: spaced(12, [
+          Expanded(
+              child: Text(widget.file.name, style: TextStyle(color: p.text))),
           Builder(
             builder: (shareContext) => GestureDetector(
               onTap: _busy
@@ -74,11 +77,12 @@ class _LogPreviewSheetState extends State<LogPreviewSheet> {
               child: Text('Share', style: TextStyle(color: p.accent)),
             ),
           ),
-        ]),
+        ])),
       ),
       if (_busy)
-        Center(child: CircularProgressIndicator.adaptive(
-            valueColor: AlwaysStoppedAnimation(p.accent))),
+        Center(
+            child: CircularProgressIndicator.adaptive(
+                valueColor: AlwaysStoppedAnimation(p.accent))),
       if (_error != null)
         Padding(
           padding: const EdgeInsets.all(16),
@@ -90,7 +94,10 @@ class _LogPreviewSheetState extends State<LogPreviewSheet> {
           child: SelectableText(
             _text.isEmpty && !_busy ? '(empty)' : _text,
             style: TextStyle(
-                color: p.text, fontFamily: kMonoFont, fontSize: 12, height: 18 / 12),
+                color: p.text,
+                fontFamily: kMonoFont,
+                fontSize: 12,
+                height: 18 / 12),
           ),
         ),
       ),

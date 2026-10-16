@@ -39,7 +39,8 @@ void main() {
     expect(find.text('MOONPAY'), findsOneWidget);
   });
 
-  testWidgets('PrefillCard collapses, shows the summary, and edits', (tester) async {
+  testWidgets('PrefillCard collapses, shows the summary, and edits',
+      (tester) async {
     var value = const PrefillInput();
     await tester.pumpWidget(harness(StatefulBuilder(
       builder: (context, setState) => PrefillCard(
@@ -59,7 +60,8 @@ void main() {
     expect(value.phoneNumber, '+371');
   });
 
-  testWidgets('EventLogCard expands, colours by level and clears', (tester) async {
+  testWidgets('EventLogCard expands, colours by level and clears',
+      (tester) async {
     final log = EventLog(clock: () => DateTime.utc(2026, 1, 1, 8, 0, 1))
       ..add(EventLevel.info, 'hello')
       ..add(EventLevel.error, 'boom');
@@ -81,9 +83,13 @@ void main() {
       settings = await LogSettings.load();
     });
 
-    testWidgets('lists files, toggles saving, shares and deletes', (tester) async {
+    testWidgets('lists files, toggles saving, shares and deletes',
+        (tester) async {
       final store = FakeLogFileStore()
-        ..files = [fakeLogFile('2026-10-16', 2048), fakeLogFile('2026-10-15', 100)];
+        ..files = [
+          fakeLogFile('2026-10-16', 2048),
+          fakeLogFile('2026-10-15', 100)
+        ];
       File? shared;
       await tester.pumpWidget(harness(DiagnosticsCard(
         settings: settings,
@@ -132,5 +138,4 @@ void main() {
     expect(fileSize(2048), '2 KB');
     expect(fileSize(3 * 1024 * 1024 + 1), '3.0 MB');
   });
-
 }

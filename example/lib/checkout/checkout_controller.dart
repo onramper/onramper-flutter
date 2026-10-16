@@ -11,7 +11,8 @@ import 'request.dart';
 /// changes — the Flutter port of RN `useCheckout`. A response for older
 /// inputs, or for a client that has since been replaced, is dropped.
 class CheckoutController extends ChangeNotifier {
-  CheckoutController({required void Function(EventLevel level, String line) log})
+  CheckoutController(
+      {required void Function(EventLevel level, String line) log})
       : _log = log;
 
   final void Function(EventLevel level, String line) _log;
@@ -69,24 +70,28 @@ class CheckoutController extends ChangeNotifier {
     final request = _form?.toRequest();
     final prefill = _prefill;
     final palette = _palette;
-    if (client == null || request == null || prefill == null || palette == null) {
+    if (client == null ||
+        request == null ||
+        prefill == null ||
+        palette == null) {
       _loading = false;
       _notify();
       return;
     }
     _loading = true;
     final data = request.transactionData;
-    _log(EventLevel.info,
+    _log(
+        EventLevel.info,
         'quote: ${plainNumber(data.amount)} ${data.source.toUpperCase()} → '
         '${data.destination.toUpperCase()} via ${data.paymentMethod}');
     _log(EventLevel.info, prefillSummary(prefill));
     _notify();
     client
         .getCheckoutRequirements(
-          request,
-          prefill: buildPrefill(prefill),
-          buttonStyle: checkoutButtonStyle(palette),
-        )
+      request,
+      prefill: buildPrefill(prefill),
+      buttonStyle: checkoutButtonStyle(palette),
+    )
         .then((r) {
       if (_disposed || generation != _generation) return;
       _result = r;

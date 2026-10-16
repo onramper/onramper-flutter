@@ -117,8 +117,8 @@ void main() {
   });
 
   test('deletes oldest files while over the size cap', () async {
-    seed('2026-10-14', 'a' * 199 + '\n');
-    seed('2026-10-15', 'b' * 199 + '\n');
+    seed('2026-10-14', '${'a' * 199}\n');
+    seed('2026-10-15', '${'b' * 199}\n');
     await store(maxBytes: 350).write(
         at: DateTime.utc(2026, 10, 16),
         level: 'info',

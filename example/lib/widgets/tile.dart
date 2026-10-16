@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/demo_theme.dart';
+import 'spaced.dart';
 
 /// RN `Tile`: bordered choice; accent border + tint when selected.
 class Tile extends StatelessWidget {
@@ -35,7 +36,7 @@ class Tile extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             decoration: BoxDecoration(
-              color: selected ? p.accent.withValues(alpha: 0.2) : null,
+              color: selected ? p.accent.faded(0.2) : null,
               border: Border.all(
                 color: selected ? p.accent : p.border,
                 width: selected ? 1.5 : 1,
@@ -44,8 +45,7 @@ class Tile extends StatelessWidget {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              spacing: 4,
-              children: [
+              children: spaced(4, [
                 if (leading != null) leading!,
                 Text(label,
                     style: TextStyle(
@@ -55,7 +55,7 @@ class Tile extends StatelessWidget {
                 if (sublabel != null)
                   Text(sublabel!,
                       style: TextStyle(color: p.textSecondary, fontSize: 12)),
-              ],
+              ]),
             ),
           ),
         ),
@@ -70,7 +70,6 @@ class TileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        spacing: 8,
-        children: [for (final c in children) Expanded(child: c)],
+        children: spaced(8, [for (final c in children) Expanded(child: c)]),
       );
 }

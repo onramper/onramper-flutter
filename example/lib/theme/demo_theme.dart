@@ -81,6 +81,12 @@ abstract final class DemoRadius {
 
 const kMonoFont = 'Menlo';
 
+extension DemoColor on Color {
+  /// This colour at [opacity] (RN `withAlpha`). Works on Flutter 3.22, which
+  /// has no `Color.withValues`.
+  Color faded(double opacity) => withAlpha((opacity * 255).round());
+}
+
 /// Makes the active [DemoPalette] available to every route.
 class DemoTheme extends InheritedWidget {
   const DemoTheme({super.key, required this.palette, required super.child});

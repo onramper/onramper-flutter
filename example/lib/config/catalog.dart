@@ -41,8 +41,8 @@ enum DemoCrypto {
   sol('SOL', 'Solana', 'solana', Color(0xFF32ADE6),
       'Br2jjHYskB1JJikv3Qw2QcmWVQGfZvkJFng4ZEwiGSjv');
 
-  const DemoCrypto(
-      this.symbol, this.displayName, this.network, this.color, this.defaultWallet);
+  const DemoCrypto(this.symbol, this.displayName, this.network, this.color,
+      this.defaultWallet);
   final String symbol;
   final String displayName;
   final String network;

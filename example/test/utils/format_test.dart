@@ -23,7 +23,8 @@ void main() {
       recoverable: true,
       userMessage: 'Amount too low',
     );
-    expect(describeError(e), (code: 'amountOutOfRange', message: 'Amount too low'));
+    expect(describeError(e),
+        (code: 'amountOutOfRange', message: 'Amount too low'));
   });
 
   test('describeError reads messages from Dart exceptions', () {

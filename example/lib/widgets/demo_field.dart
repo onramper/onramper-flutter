@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/demo_theme.dart';
+import 'spaced.dart';
 
 /// RN `Field`: optional small label above a filled, borderless input.
 class DemoField extends StatelessWidget {
@@ -30,8 +31,7 @@ class DemoField extends StatelessWidget {
     final p = DemoTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 4,
-      children: [
+      children: spaced(4, [
         if (label != null)
           Text(label!, style: TextStyle(color: p.textSecondary, fontSize: 12)),
         Semantics(
@@ -63,7 +63,7 @@ class DemoField extends StatelessWidget {
             ),
           ),
         ),
-      ],
+      ]),
     );
   }
 }

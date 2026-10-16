@@ -26,11 +26,15 @@ void main() {
   late CheckoutController checkout;
   setUp(() {
     log = [];
-    checkout = CheckoutController(log: (level, line) => log.add('${level.name}: $line'));
+    checkout = CheckoutController(
+        log: (level, line) => log.add('${level.name}: $line'));
   });
 
-  void update(OnramperClient? c, {BuyForm form = const BuyForm(), PrefillInput prefill = const PrefillInput()}) =>
-      checkout.update(client: c, form: form, prefill: prefill, palette: DemoPalette.dark);
+  void update(OnramperClient? c,
+          {BuyForm form = const BuyForm(),
+          PrefillInput prefill = const PrefillInput()}) =>
+      checkout.update(
+          client: c, form: form, prefill: prefill, palette: DemoPalette.dark);
 
   test('no client or invalid form means idle', () async {
     update(null);
@@ -85,7 +89,8 @@ void main() {
     expect(checkout.result?.headlessCheckoutId, 'checkout-2');
   });
 
-  test('amountOutOfRange becomes the amount hint; other errors become error', () async {
+  test('amountOutOfRange becomes the amount hint; other errors become error',
+      () async {
     final host = FakeHost()
       ..requirementsError = const OnramperError(
         kind: OnramperErrorKind.amountOutOfRange,
@@ -97,7 +102,8 @@ void main() {
     await settle();
     expect(checkout.amountHint, 'Minimum is 20 USD');
     expect(checkout.error, isNull);
-    expect(log.last, 'error: quote failed: amountOutOfRange — Minimum is 20 USD');
+    expect(
+        log.last, 'error: quote failed: amountOutOfRange — Minimum is 20 USD');
 
     host.requirementsError = const OnramperError(
       kind: OnramperErrorKind.quoteUnavailable,

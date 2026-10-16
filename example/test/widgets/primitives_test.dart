@@ -66,7 +66,11 @@ void main() {
   testWidgets('Tile taps unless disabled', (tester) async {
     var taps = 0;
     await tester.pumpWidget(harness(TileRow(children: [
-      Tile(label: 'BTC', sublabel: 'Bitcoin', selected: true, onTap: () => taps++),
+      Tile(
+          label: 'BTC',
+          sublabel: 'Bitcoin',
+          selected: true,
+          onTap: () => taps++),
       Tile(label: 'ETH', selected: false, disabled: true, onTap: () => taps++),
     ])));
     await tester.tap(find.text('BTC'));
@@ -85,7 +89,8 @@ void main() {
         actionLabel: 'Retry',
         onAction: () => taps++,
       ),
-      const StatusBox(tone: StatusTone.info, title: 'Info', actionLabel: 'Nope'),
+      const StatusBox(
+          tone: StatusTone.info, title: 'Info', actionLabel: 'Nope'),
     ])));
     await tester.tap(find.text('Retry'));
     expect(taps, 1);

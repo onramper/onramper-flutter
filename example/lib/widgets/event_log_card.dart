@@ -5,7 +5,8 @@ import '../theme/demo_theme.dart';
 import 'demo_card.dart';
 
 class EventLogCard extends StatefulWidget {
-  const EventLogCard({super.key, required this.log, this.initiallyOpen = false});
+  const EventLogCard(
+      {super.key, required this.log, this.initiallyOpen = false});
 
   final EventLog log;
   final bool initiallyOpen;
@@ -24,7 +25,8 @@ class _EventLogCardState extends State<EventLogCard> {
       listenable: widget.log,
       builder: (context, _) {
         final entries = widget.log.entries;
-        const line = TextStyle(fontFamily: kMonoFont, fontSize: 11, height: 15 / 11);
+        const line =
+            TextStyle(fontFamily: kMonoFont, fontSize: 11, height: 15 / 11);
         Color colorFor(EventLevel level) => switch (level) {
               EventLevel.error => p.danger,
               EventLevel.event => p.accent,
@@ -36,7 +38,8 @@ class _EventLogCardState extends State<EventLogCard> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => setState(() => _open = !_open),
-                child: Text('SDK events (${entries.length}) ${_open ? '▾' : '▸'}',
+                child: Text(
+                    'SDK events (${entries.length}) ${_open ? '▾' : '▸'}',
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: 15,

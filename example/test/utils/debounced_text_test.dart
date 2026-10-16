@@ -20,7 +20,8 @@ void main() {
     });
   });
 
-  test('an outside change replaces the draft and cancels the pending commit', () {
+  test('an outside change replaces the draft and cancels the pending commit',
+      () {
     fakeAsync((async) {
       final commits = <String>[];
       final t = DebouncedText(initial: 'a', onCommit: commits.add);

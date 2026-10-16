@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/demo_theme.dart';
+import 'spaced.dart';
 
 /// RN `Card`: padded rounded surface with optional title and footer.
 class DemoCard extends StatelessWidget {
@@ -28,8 +29,7 @@ class DemoCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: gap,
-        children: [
+        children: spaced(gap, [
           if (title != null)
             Text(title!,
                 style: TextStyle(
@@ -41,7 +41,7 @@ class DemoCard extends StatelessWidget {
             Text(footer!,
                 style: TextStyle(
                     color: p.textSecondary, fontSize: 12, height: 16 / 12)),
-        ],
+        ]),
       ),
     );
   }

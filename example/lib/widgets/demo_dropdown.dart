@@ -77,7 +77,7 @@ class _DemoDropdownState<T> extends State<DemoDropdown<T>> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: option.value == widget.value
-                        ? p.accent.withValues(alpha: 0.15)
+                        ? p.accent.faded(0.15)
                         : null,
                     border: i == 0
                         ? null

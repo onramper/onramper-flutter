@@ -15,6 +15,7 @@ import '../widgets/event_log_card.dart';
 import '../widgets/segmented.dart';
 import '../widgets/sheet_header.dart';
 import '../widgets/switch_row.dart';
+import '../widgets/spaced.dart';
 
 /// RN `SettingsSheet`.
 class SettingsSheet extends StatefulWidget {
@@ -51,8 +52,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
     IosDiagnostics.readAppIdentifiers().then(
       (ids) => mounted ? setState(() => _ids = ids) : null,
       onError: (Object _) => mounted
-          ? setState(() =>
-              _ids = const IosAppIdentifiers(bundleId: 'unknown', teamId: 'unknown'))
+          ? setState(() => _ids =
+              const IosAppIdentifiers(bundleId: 'unknown', teamId: 'unknown'))
           : null,
     );
   }
@@ -86,23 +87,25 @@ class _SettingsSheetState extends State<SettingsSheet> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
-              children: [
+              children: spaced(16, [
                 DemoCard(
                   title: 'Environment',
-                  footer: 'Switching signs out, then re-initializes the SDK against the '
+                  footer:
+                      'Switching signs out, then re-initializes the SDK against the '
                       'selected environment.',
                   children: [
                     Segmented<DemoEnvironment>(
                       options: [
-                        for (final e in DemoEnvironment.values) SegmentOption(e, e.label),
+                        for (final e in DemoEnvironment.values)
+                          SegmentOption(e, e.label),
                       ],
                       value: demo.environment,
                       disabled: demo.isSwitching,
                       onChanged: demo.switchEnvironment,
                     ),
                     if (demo.isSwitching)
-                      Row(spacing: 8, children: [
+                      Row(
+                          children: spaced(8, [
                         SizedBox.square(
                           dimension: 16,
                           child: CircularProgressIndicator.adaptive(
@@ -111,7 +114,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         ),
                         Text('Switching environment…',
                             style: TextStyle(color: p.textSecondary)),
-                      ]),
+                      ])),
                   ],
                 ),
                 DemoCard(
@@ -127,15 +130,17 @@ class _SettingsSheetState extends State<SettingsSheet> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: p.danger.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(DemoRadius.button),
+                            color: p.danger.faded(0.15),
+                            borderRadius:
+                                BorderRadius.circular(DemoRadius.button),
                           ),
                           child: _clearing
                               ? SizedBox.square(
                                   dimension: 20,
                                   child: CircularProgressIndicator.adaptive(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation(p.danger)))
+                                      valueColor:
+                                          AlwaysStoppedAnimation(p.danger)))
                               : Text('Clear local sessions',
                                   style: TextStyle(
                                       color: p.danger,
@@ -173,15 +178,18 @@ class _SettingsSheetState extends State<SettingsSheet> {
                     ('Bundle ID', _ids?.bundleId ?? '…'),
                     ('Team ID', _ids?.teamId ?? '…'),
                   ])
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Text(label, style: TextStyle(color: p.textSecondary)),
-                      Flexible(
-                        child: Text(value,
-                            textAlign: TextAlign.end, style: TextStyle(color: p.text)),
-                      ),
-                    ]),
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(label, style: TextStyle(color: p.textSecondary)),
+                          Flexible(
+                            child: Text(value,
+                                textAlign: TextAlign.end,
+                                style: TextStyle(color: p.text)),
+                          ),
+                        ]),
                 ]),
-              ],
+              ]),
             ),
           ),
         ),

@@ -105,7 +105,8 @@ class FakeHost implements OnramperHostApi {
   Future<void> dispose() async => journal.add('$tag.dispose');
 
   @override
-  Future<void> provideRefreshedSession(SessionCredentialsDto credentials) async {}
+  Future<void> provideRefreshedSession(
+      SessionCredentialsDto credentials) async {}
 
   @override
   Future<void> failRefreshedSession(String reason) async {}
