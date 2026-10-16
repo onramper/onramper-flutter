@@ -117,7 +117,7 @@ jobs:
 
       - name: Start publish
         run: |
-          gh workflow run publish.yml --ref "v${VERSION}"
+          gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "v${VERSION}"
           {
             echo "### Tagged v${VERSION}"
             echo
