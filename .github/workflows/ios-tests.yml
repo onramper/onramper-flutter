@@ -16,12 +16,17 @@ jobs:
           flutter-version: '3.22.0'
           channel: stable
       - run: flutter pub get
-      - name: pod lib lint
-        # onramper/onramper-ios is public; the podspec's prepare_command
-        # can fetch the xcframework anonymously. The token below is
-        # passed through when RELEASE_REPO_TOKEN is set (bumps GitHub's
-        # anonymous rate limit from 60/h to 5000/h) but the lint works
-        # even if the secret is absent.
+      - name: Prepare OnramperSDK
+        # Ensure the vendored framework exists before lint checks file patterns.
+        # Reuse the podspec's pinned download and checksum instead of duplicating
+        # them here. The public release also works without a repository secret.
         env:
-          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN || github.token }}
+        run: |
+          pod ipc spec ios/onramper_flutter.podspec \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["prepare_command"])' \
+            > "$RUNNER_TEMP/prepare-onramper-sdk.sh"
+          (cd ios && bash "$RUNNER_TEMP/prepare-onramper-sdk.sh")
+          test -d ios/Frameworks/OnramperSDK.xcframework
+      - name: pod lib lint
         run: pod lib lint ios/onramper_flutter.podspec --allow-warnings
