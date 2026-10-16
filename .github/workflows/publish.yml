@@ -1,12 +1,18 @@
-# Auto-publish to pub.dev via OIDC trusted publisher.
+# Publishes to pub.dev via OIDC trusted publishing, then creates the GitHub
+# release. Triggered by the `v<version>` tag that `release.yml` pushes.
 #
-# Fires automatically on every version tag (`v*.*.*`) pushed by release.yml.
-# Uses pub.dev's OIDC "trusted publisher" flow — no long-lived credentials.
+# Not the dart-lang/setup-dart reusable publish workflow: that one installs
+# only the Dart SDK, and this package depends on `sdk: flutter`.
 #
-# Trusted publisher configured at:
+# One-time setup:
 #   pub.dev/packages/onramper_flutter/admin → Automated publishing
-#   Repository:   onramper/onramper-flutter
-#   Tag pattern:  v{{version}}
+#     Repository:            onramper/onramper-flutter
+#     Tag pattern:           v{{version}}
+#     Require environment:   pub.dev
+#   GitHub → Settings → Environments → `pub.dev`
+#     Required reviewers:    release approvers (the human gate before going
+#                            live; a pub.dev version cannot be deleted)
+#     Deployment tags:       v*
 
 name: publish
 
@@ -17,7 +23,46 @@ on:
 
 jobs:
   publish:
+    runs-on: ubuntu-latest
+    environment: pub.dev
     permissions:
       # Required for pub.dev OIDC token exchange. Do not remove.
       id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+      # Create the GitHub release.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Registers the GitHub OIDC token with pub for https://pub.dev. Must run
+      # before flutter-action so `flutter pub publish` picks up the token.
+      - uses: dart-lang/setup-dart@v1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+
+      - name: Verify tag matches pubspec
+        run: |
+          PUBSPEC=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)
+          if [ "v${PUBSPEC}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match pubspec.yaml version ${PUBSPEC}."; exit 1
+          fi
+
+      - run: flutter pub get
+      - run: flutter pub publish --force
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # This version's CHANGELOG section, without its heading.
+          awk -v v="$VERSION" '
+            $0 ~ "^## " { if (found) exit; if ($0 == "## " v || index($0, "## " v " ") == 1) { found = 1; next } }
+            found
+          ' CHANGELOG.md > release-notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag

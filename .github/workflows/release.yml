@@ -1,66 +1,107 @@
 name: release
 
-# Manual-dispatch release cutter. Bumps versions in pubspec.yaml and the
-# podspec, verifies pub.dev would accept the package, then commits, tags,
-# and pushes. Automated pub.dev publication is left to a separate workflow
-# — see `publish.yml`.
+# Manual-dispatch release cutter. Versions are bumped in PRs (pubspec.yaml,
+# the podspec, CHANGELOG.md); this workflow only verifies that master is
+# ready to ship as the given version, then pushes the `v<version>` tag.
+#
+# Publication itself happens in `publish.yml`, which the tag push triggers.
+# pub.dev's OIDC trusted publishing only accepts runs started by a tag push,
+# so publishing cannot live in this workflow_dispatch run.
+#
+# The tag is pushed with RELEASE_REPO_TOKEN, not GITHUB_TOKEN: GitHub does
+# not start workflows from events created by GITHUB_TOKEN, so a tag pushed
+# with it would never trigger `publish.yml`. The token needs Contents:
+# read & write on onramper/onramper-flutter.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Plugin version (e.g. 1.1.0). Must match onramper-ios SDK version.'
+        description: 'Plugin version to release (e.g. 1.3.1). Must equal pubspec.yaml and the bundled onramper-ios SDK version.'
         required: true
 
 jobs:
   release:
-    runs-on: macos-15
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
     permissions:
-      # Push the release commit + tag, create the GitHub release.
-      contents: write
+      contents: read
     env:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
           channel: stable
 
-      - name: Update pubspec version
+      - name: Validate version format
         run: |
-          sed -i '' "s/^version:.*/version: ${VERSION}/" pubspec.yaml
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' must be X.Y.Z."; exit 1
+          fi
 
-      - name: Update podspec version
+      - name: Verify versions match
         run: |
-          sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_flutter.podspec
+          set -euo pipefail
+          PUBSPEC=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)
+          PODSPEC=$(sed -n "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'\(.*\)'.*/\1/p" ios/onramper_flutter.podspec)
+          IOS_SDK=$(sed -n 's/^[[:space:]]*ONRAMPER_SDK_VERSION="v\(.*\)".*/\1/p' ios/onramper_flutter.podspec)
+          echo "pubspec=$PUBSPEC podspec=$PODSPEC ios-sdk=$IOS_SDK"
+          FAIL=0
+          [ "$PUBSPEC" = "$VERSION" ] || { echo "::error::pubspec.yaml is $PUBSPEC, not $VERSION."; FAIL=1; }
+          [ "$PODSPEC" = "$VERSION" ] || { echo "::error::podspec s.version is $PODSPEC, not $VERSION."; FAIL=1; }
+          [ "$IOS_SDK" = "$VERSION" ] || { echo "::error::Bundled onramper-ios SDK is v$IOS_SDK, not v$VERSION."; FAIL=1; }
+          grep -qE "^## ${VERSION//./\\.}( |$)" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no '## $VERSION' section."; FAIL=1; }
+          exit $FAIL
 
-      - name: flutter pub get
-        run: flutter pub get
-
-      # Dry-run publish gates tag creation on pub.dev acceptance. If pub.dev
-      # would reject the package (bad metadata, dependency issues, format
-      # violations), this step fails and the tag is never pushed. Cheap
-      # safety net — running it here means we find out before creating a
-      # permanent tag rather than after.
-      - name: dart pub publish --dry-run
-        run: dart pub publish --dry-run
-
-      - name: Configure git
+      - name: Verify iOS release exists
         run: |
-          git config user.name 'github-actions'
-          git config user.email 'actions@github.com'
+          curl -fsSIL -o /dev/null \
+            "https://github.com/onramper/onramper-ios/releases/download/v${VERSION}/OnramperSDK.xcframework.zip" \
+            || { echo "::error::No onramper-ios release asset for v${VERSION}."; exit 1; }
 
-      - name: Commit + tag + push
+      - name: Refuse if already on pub.dev
         run: |
-          git commit -am "chore: release v${VERSION}"
-          git tag "v${VERSION}"
-          git push origin master "v${VERSION}"
+          if curl -fsS https://pub.dev/api/packages/onramper_flutter \
+            | jq -e --arg v "$VERSION" '.versions[] | select(.version == $v)' >/dev/null; then
+            echo "::error::onramper_flutter $VERSION is already on pub.dev."; exit 1
+          fi
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          generate_release_notes: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze
+      - run: flutter test
+
+      # Gates the tag on pub.dev acceptance (metadata, dependencies, layout).
+      - run: flutter pub publish --dry-run
+
+      - name: Push tag
+        env:
+          TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Idempotent: a previous run may already have pushed the tag. If the
+          # publish then failed, re-run the `publish` workflow run instead.
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::notice::Tag v${VERSION} already exists; nothing to push."
+            exit 0
+          fi
+          if [ -z "$TOKEN" ]; then
+            echo "::error::RELEASE_REPO_TOKEN is not set; a GITHUB_TOKEN push would not trigger publish.yml."
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "v${VERSION}" -m "onramper_flutter v${VERSION}"
+          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/v${VERSION}"
+          {
+            echo "### Tagged v${VERSION}"
+            echo
+            echo "The \`publish\` workflow will start and wait for approval on the \`pub.dev\` environment."
+          } >> "$GITHUB_STEP_SUMMARY"
