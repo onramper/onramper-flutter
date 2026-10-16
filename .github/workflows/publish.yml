@@ -1,23 +1,90 @@
-# Auto-publish to pub.dev via OIDC trusted publisher.
+# Publishes to pub.dev via OIDC trusted publishing, then creates the GitHub
+# release. Dispatched by `release.yml` on the `v<version>` tag it pushes;
+# don't run it by hand unless re-publishing a tag whose publish failed (pick
+# the tag, not a branch, in "Use workflow from").
 #
-# Fires automatically on every version tag (`v*.*.*`) pushed by release.yml.
-# Uses pub.dev's OIDC "trusted publisher" flow — no long-lived credentials.
+# Not the dart-lang/setup-dart reusable publish workflow: that one installs
+# only the Dart SDK, and this package depends on `sdk: flutter`.
 #
-# Trusted publisher configured at:
+# One-time setup:
 #   pub.dev/packages/onramper_flutter/admin → Automated publishing
-#   Repository:   onramper/onramper-flutter
-#   Tag pattern:  v{{version}}
+#     Repository:            onramper/onramper-flutter
+#     Tag pattern:           v{{version}}
+#     Events:                workflow_dispatch enabled (push may stay off)
+#     Require environment:   pub.dev
+#   GitHub → Settings → Environments → `pub.dev`
+#     Required reviewers:    release approvers (the human gate before going
+#                            live; a pub.dev version cannot be deleted)
+#     Deployment tags:       v*
 
 name: publish
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  # Dispatched by release.yml with `--ref v<version>`.
+  workflow_dispatch:
 
 jobs:
   publish:
+    # pub.dev rejects tokens whose ref is not a tag; fail early with a clear
+    # reason if someone dispatches this from a branch.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment: pub.dev
     permissions:
       # Required for pub.dev OIDC token exchange. Do not remove.
       id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag is on master
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master \
+            || { echo "::error::${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on master."; exit 1; }
+
+      # Registers the GitHub OIDC token with pub for https://pub.dev. Must run
+      # before flutter-action so `flutter pub publish` picks up the token.
+      - uses: dart-lang/setup-dart@v1
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+
+      - name: Verify tag matches pubspec
+        run: |
+          PUBSPEC=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)
+          if [ "v${PUBSPEC}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match pubspec.yaml version ${PUBSPEC}."; exit 1
+          fi
+
+      - run: flutter pub get
+      - run: flutter pub publish --force
+
+  # Separate job so only this one gets contents: write, and the job holding
+  # the pub.dev OIDC permission runs no step that can write to the repo.
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # This version's CHANGELOG section, without its heading.
+          awk -v v="$VERSION" '
+            $0 ~ "^## " { if (found) exit; if ($0 == "## " v || index($0, "## " v " ") == 1) { found = 1; next } }
+            found
+          ' CHANGELOG.md > release-notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag

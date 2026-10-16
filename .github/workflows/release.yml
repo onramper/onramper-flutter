@@ -1,66 +1,127 @@
 name: release
 
-# Manual-dispatch release cutter. Bumps versions in pubspec.yaml and the
-# podspec, verifies pub.dev would accept the package, then commits, tags,
-# and pushes. Automated pub.dev publication is left to a separate workflow
-# — see `publish.yml`.
+# Manual-dispatch release cutter. Versions are bumped in PRs (pubspec.yaml,
+# the podspec, CHANGELOG.md); this workflow only verifies that master is
+# ready to ship as the given version, pushes the `v<version>` tag, and
+# starts `publish.yml` on that tag.
+#
+# Publication cannot live in this run: pub.dev's OIDC trusted publishing
+# only accepts tokens whose ref is a tag matching the pattern, and this run's
+# ref is master. A tag pushed with GITHUB_TOKEN does not trigger `on: push`
+# workflows, but a workflow_dispatch made with it does, so `publish.yml` is
+# dispatched explicitly with `--ref v<version>`. No PAT is needed.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Plugin version (e.g. 1.1.0). Must match onramper-ios SDK version.'
+        description: 'Plugin version to release (e.g. 1.3.1). Must equal pubspec.yaml and the bundled onramper-ios SDK version.'
         required: true
 
 jobs:
-  release:
-    runs-on: macos-15
+  # Read-only: runs Flutter and dependency code (pub get, analyze, test).
+  verify:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
     permissions:
-      # Push the release commit + tag, create the GitHub release.
-      contents: write
+      contents: read
     env:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: '3.22.0'
           channel: stable
 
-      - name: Update pubspec version
+      - name: Validate version format
         run: |
-          sed -i '' "s/^version:.*/version: ${VERSION}/" pubspec.yaml
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' must be X.Y.Z."; exit 1
+          fi
 
-      - name: Update podspec version
+      - name: Verify versions match
         run: |
-          sed -i '' "s/s\.version[[:space:]]*=.*'.*'/s.version          = '${VERSION}'/" ios/onramper_flutter.podspec
+          set -euo pipefail
+          PUBSPEC=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)
+          PODSPEC=$(sed -n "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'\(.*\)'.*/\1/p" ios/onramper_flutter.podspec)
+          IOS_SDK=$(sed -n 's/^[[:space:]]*ONRAMPER_SDK_VERSION="v\(.*\)".*/\1/p' ios/onramper_flutter.podspec)
+          echo "pubspec=$PUBSPEC podspec=$PODSPEC ios-sdk=$IOS_SDK"
+          FAIL=0
+          [ "$PUBSPEC" = "$VERSION" ] || { echo "::error::pubspec.yaml is $PUBSPEC, not $VERSION."; FAIL=1; }
+          [ "$PODSPEC" = "$VERSION" ] || { echo "::error::podspec s.version is $PODSPEC, not $VERSION."; FAIL=1; }
+          [ "$IOS_SDK" = "$VERSION" ] || { echo "::error::Bundled onramper-ios SDK is v$IOS_SDK, not v$VERSION."; FAIL=1; }
+          grep -qE "^## ${VERSION//./\\.}( |$)" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no '## $VERSION' section."; FAIL=1; }
+          exit $FAIL
 
-      - name: flutter pub get
-        run: flutter pub get
-
-      # Dry-run publish gates tag creation on pub.dev acceptance. If pub.dev
-      # would reject the package (bad metadata, dependency issues, format
-      # violations), this step fails and the tag is never pushed. Cheap
-      # safety net — running it here means we find out before creating a
-      # permanent tag rather than after.
-      - name: dart pub publish --dry-run
-        run: dart pub publish --dry-run
-
-      - name: Configure git
+      - name: Verify iOS release exists
         run: |
-          git config user.name 'github-actions'
-          git config user.email 'actions@github.com'
+          curl -fsSIL -o /dev/null \
+            "https://github.com/onramper/onramper-ios/releases/download/v${VERSION}/OnramperSDK.xcframework.zip" \
+            || { echo "::error::No onramper-ios release asset for v${VERSION}."; exit 1; }
 
-      - name: Commit + tag + push
+      - name: Refuse if already on pub.dev
         run: |
-          git commit -am "chore: release v${VERSION}"
-          git tag "v${VERSION}"
-          git push origin master "v${VERSION}"
+          set -euo pipefail
+          PACKAGE=$(curl -fsS https://pub.dev/api/packages/onramper_flutter)
+          MATCHES=$(jq -e --arg v "$VERSION" '[.versions[] | select(.version == $v)] | length' <<< "$PACKAGE")
+          if [ "$MATCHES" -gt 0 ]; then
+            echo "::error::onramper_flutter $VERSION is already on pub.dev."; exit 1
+          fi
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          generate_release_notes: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze
+      - run: flutter test
+
+      # Gates the tag on pub.dev acceptance (metadata, dependencies, layout).
+      - run: flutter pub publish --dry-run
+
+  # Holds the write permissions; runs no checkout and no dependency code,
+  # only GitHub API calls.
+  tag:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      # Create the tag.
+      contents: write
+      # Dispatch publish.yml.
+      actions: write
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Create tag
+        run: |
+          set -euo pipefail
+          # Idempotent: a previous run may already have created the tag (e.g.
+          # its publish failed). Reuse it only if it points at the commit
+          # `verify` just checked; otherwise its contents are unverified.
+          if REF=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" 2>/dev/null); then
+            TAG_SHA=$(jq -r '.object.sha' <<<"$REF")
+            if [ "$(jq -r '.object.type' <<<"$REF")" = "tag" ]; then
+              TAG_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_SHA}" --jq '.object.sha')
+            fi
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag v${VERSION} points at ${TAG_SHA}, not the verified ${GITHUB_SHA}. Re-run the failed publish run for that tag, or delete the tag and release again."
+              exit 1
+            fi
+            echo "::notice::Tag v${VERSION} already exists on the verified commit; reusing it."
+            exit 0
+          fi
+          # Tags exactly the commit `verify` checked.
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/v${VERSION}" -f sha="${GITHUB_SHA}" >/dev/null
+
+      - name: Start publish
+        run: |
+          gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "v${VERSION}"
+          {
+            echo "### Tagged v${VERSION}"
+            echo
+            echo "The \`publish\` workflow is starting on the tag and will wait for approval on the \`pub.dev\` environment."
+          } >> "$GITHUB_STEP_SUMMARY"

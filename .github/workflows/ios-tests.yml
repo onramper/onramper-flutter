@@ -21,7 +21,7 @@ jobs:
         # Reuse the podspec's pinned download and checksum instead of duplicating
         # them here. The public release also works without a repository secret.
         env:
-          ONRAMPER_IOS_READ_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN || github.token }}
+          ONRAMPER_IOS_READ_TOKEN: ${{ github.token }}
         run: |
           pod ipc spec ios/onramper_flutter.podspec \
             | python3 -c 'import json, sys; print(json.load(sys.stdin)["prepare_command"])' \
