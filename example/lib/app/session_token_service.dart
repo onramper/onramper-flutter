@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,6 +18,8 @@ class SessionTokenService {
   static Future<SessionCredentials> fetch({
     required String authToken,
     required String endpoint,
+    http.Client? client,
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     if (authToken.isEmpty) {
       throw const FormatException(
@@ -30,17 +33,25 @@ class SessionTokenService {
         : '${authToken.substring(0, 4)}…${authToken.substring(authToken.length - 4)}';
     debugPrint('SessionTokenService: POST $endpoint (token=$masked)');
 
-    final response = await http.post(
-      Uri.parse(endpoint),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $authToken',
-      },
-      body: jsonEncode({
-        'scope': ['quotes:read', 'checkout:read', 'checkout:write'],
-      }),
-    );
+    final post = client?.post ?? http.post;
+    final http.Response response;
+    try {
+      response = await post(
+        Uri.parse(endpoint),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({
+          'scope': ['quotes:read', 'checkout:read', 'checkout:write'],
+        }),
+      ).timeout(timeout);
+    } on TimeoutException {
+      // Without this a stalled network leaves the demo initializing forever.
+      throw HttpException(
+          'create-session timed out after ${timeout.inSeconds}s');
+    }
 
     if (response.statusCode != 201) {
       throw HttpException(
