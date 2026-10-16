@@ -4,6 +4,10 @@ description: "Demonstrates how to use the onramper_flutter plugin."
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
+# Build name and number for the iOS app (CFBundleShortVersionString /
+# CFBundleVersion). Bump the number after + for every TestFlight upload.
+version: 1.3.1+1
+
 environment:
   sdk: '>=3.4.0 <4.0.0'
 
