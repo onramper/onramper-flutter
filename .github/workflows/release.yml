@@ -97,10 +97,18 @@ jobs:
         run: |
           set -euo pipefail
           # Idempotent: a previous run may already have created the tag (e.g.
-          # its publish failed). Reuse it; verify already guaranteed this
-          # version is not on pub.dev.
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "::notice::Tag v${VERSION} already exists; reusing it."
+          # its publish failed). Reuse it only if it points at the commit
+          # `verify` just checked; otherwise its contents are unverified.
+          if REF=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" 2>/dev/null); then
+            TAG_SHA=$(jq -r '.object.sha' <<<"$REF")
+            if [ "$(jq -r '.object.type' <<<"$REF")" = "tag" ]; then
+              TAG_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_SHA}" --jq '.object.sha')
+            fi
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag v${VERSION} points at ${TAG_SHA}, not the verified ${GITHUB_SHA}. Re-run the failed publish run for that tag, or delete the tag and release again."
+              exit 1
+            fi
+            echo "::notice::Tag v${VERSION} already exists on the verified commit; reusing it."
             exit 0
           fi
           # Tags exactly the commit `verify` checked.

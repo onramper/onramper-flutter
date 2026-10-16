@@ -36,6 +36,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag is on master
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master \
+            || { echo "::error::${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on master."; exit 1; }
 
       # Registers the GitHub OIDC token with pub for https://pub.dev. Must run
       # before flutter-action so `flutter pub publish` picks up the token.
