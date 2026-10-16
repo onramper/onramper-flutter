@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 import 'package:onramper_flutter/src/platform/pigeon.g.dart';
@@ -34,7 +35,8 @@ void main() {
     clients = [];
   });
 
-  Future<void> pumpApp(WidgetTester tester, {Map<String, String> defines = fullDefines}) async {
+  Future<void> pumpApp(WidgetTester tester,
+      {Map<String, String> defines = fullDefines}) async {
     tester.view.physicalSize = const Size(1179, 2556);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -49,7 +51,9 @@ void main() {
         final host = FakeHost();
         hosts.add(host);
         final c = OnramperClient.forTesting(
-            configuration: config, hostApi: host, sessionExpirationHandler: onExpired);
+            configuration: config,
+            hostApi: host,
+            sessionExpirationHandler: onExpired);
         clients.add(c);
         return c;
       },
@@ -57,10 +61,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder amountField() => find.descendant(
-      of: find.widgetWithText(DemoCard, 'Amount'), matching: find.byType(TextField));
+  SystemUiOverlayStyle statusBarStyle(WidgetTester tester) => tester
+      .widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+          find.byType(AnnotatedRegion<SystemUiOverlayStyle>).first)
+      .value;
 
-  testWidgets('renders the Buy Crypto screen and quotes on launch', (tester) async {
+  Finder amountField() => find.descendant(
+      of: find.widgetWithText(DemoCard, 'Amount'),
+      matching: find.byType(TextField));
+
+  testWidgets('renders the Buy Crypto screen and quotes on launch',
+      (tester) async {
     await pumpApp(tester);
     expect(find.text('Buy Crypto'), findsOneWidget);
     expect(find.text('Development'), findsOneWidget);
@@ -71,9 +82,11 @@ void main() {
     expect(hosts.single.requirementsCalls, 1);
     expect(hosts.single.lastConfig?.theme, ThemeDto.dark);
     expect(hosts.single.lastConfig?.logLevel, LogLevelDto.debug);
+    expect(statusBarStyle(tester), SystemUiOverlayStyle.light);
   });
 
-  testWidgets('editing the amount re-quotes after the typing debounce', (tester) async {
+  testWidgets('editing the amount re-quotes after the typing debounce',
+      (tester) async {
     await pumpApp(tester);
     await tester.enterText(amountField(), '250');
     await tester.pump(const Duration(milliseconds: 300));
@@ -84,7 +97,8 @@ void main() {
     expect(hosts.single.lastRequest?.transactionData.amount, 250);
   });
 
-  testWidgets('an invalid amount shows the RN hint and no quote', (tester) async {
+  testWidgets('an invalid amount shows the RN hint and no quote',
+      (tester) async {
     await pumpApp(tester);
     await tester.enterText(amountField(), '0');
     await tester.pump(const Duration(milliseconds: 450));
@@ -115,27 +129,42 @@ void main() {
     expect(find.text('quoteUnavailable — No quotes'), findsOneWidget);
   });
 
-  testWidgets('Settings opens with every RN section, and dark mode re-initializes',
+  testWidgets(
+      'Settings opens with every RN section, and dark mode re-initializes',
       (tester) async {
     await pumpApp(tester);
     await tester.tap(find.text('⚙︎'));
     await tester.pumpAndSettle();
-    for (final text in ['Settings', 'Environment', 'Clear local sessions', 'Appearance',
-        'Diagnostic logs', 'About', 'Library', 'OnramperSDK', 'Bundle ID', 'Team ID']) {
+    for (final text in [
+      'Settings',
+      'Environment',
+      'Clear local sessions',
+      'Appearance',
+      'Diagnostic logs',
+      'About',
+      'Library',
+      'OnramperSDK',
+      'Bundle ID',
+      'Team ID'
+    ]) {
       await tester.scrollUntilVisible(find.text(text).last, 100,
           scrollable: find.byType(Scrollable).last);
       expect(find.text(text), findsWidgets, reason: text);
     }
     await tester.scrollUntilVisible(find.text('Dark mode'), -100,
         scrollable: find.byType(Scrollable).last);
-    await tester.tap(find.descendant(
-        of: find.ancestor(of: find.text('Dark mode'), matching: find.byType(Row)),
-        matching: find.byType(Switch)).first);
+    await tester.tap(find
+        .descendant(
+            of: find.ancestor(
+                of: find.text('Dark mode'), matching: find.byType(Row)),
+            matching: find.byType(Switch))
+        .first);
     await tester.pumpAndSettle();
     expect(hosts.length, 2);
     expect(hosts.last.lastConfig?.theme, ThemeDto.light);
     final theme = tester.widget<DemoTheme>(find.byType(DemoTheme).first);
     expect(theme.palette.isDark, isFalse);
+    expect(statusBarStyle(tester), SystemUiOverlayStyle.dark);
   });
 
   testWidgets('Save SDK logs off stops file writes', (tester) async {

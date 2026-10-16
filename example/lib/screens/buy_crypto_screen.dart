@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
 
 import '../app/demo_controller.dart';
@@ -140,7 +141,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
       final d = describeError(e);
       if (!mounted) return;
       setState(() => _actionError = '$label failed: ${d.code} — ${d.message}');
-      _demo.eventLog.add(EventLevel.error, '$label failed: ${d.code} — ${d.message}');
+      _demo.eventLog
+          .add(EventLevel.error, '$label failed: ${d.code} — ${d.message}');
     }
   }
 
@@ -164,83 +166,96 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
   Widget build(BuildContext context) {
     final p = DemoTheme.of(context);
     final insets = MediaQuery.paddingOf(context);
-    return Scaffold(
-      backgroundColor: p.contentBg,
-      body: Column(children: [
-        _header(p, insets.top),
-        Expanded(
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(16, 16, 16, insets.bottom + 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
-              children: [
-                _countryCard(),
-                DemoCard(title: 'Select currency', children: [
-                  TileRow(children: [
-                    for (final c in DemoCrypto.values)
-                      Tile(
-                        label: c.symbol,
-                        sublabel: c.displayName,
-                        selected: c == _form.crypto,
-                        onTap: () => _setForm(_form.withCrypto(c)),
-                        leading: Container(
-                          width: 20,
-                          height: 20,
-                          decoration:
-                              BoxDecoration(color: c.color, shape: BoxShape.circle),
+    // The header is custom (no AppBar), so set the status bar style here.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: p.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: p.contentBg,
+        body: Column(children: [
+          _header(p, insets.top),
+          Expanded(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(16, 16, 16, insets.bottom + 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 16,
+                children: [
+                  _countryCard(),
+                  DemoCard(title: 'Select currency', children: [
+                    TileRow(children: [
+                      for (final c in DemoCrypto.values)
+                        Tile(
+                          label: c.symbol,
+                          sublabel: c.displayName,
+                          selected: c == _form.crypto,
+                          onTap: () => _setForm(_form.withCrypto(c)),
+                          leading: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                                color: c.color, shape: BoxShape.circle),
+                          ),
                         ),
-                      ),
+                    ]),
                   ]),
-                ]),
-                DemoCard(title: 'Wallet address (${_form.crypto.network})', children: [
-                  DemoField(
-                    controller: _wallet.controller,
-                    mono: true,
-                    placeholder: 'Wallet address',
-                    onChanged: _wallet.onChanged,
-                  ),
-                ]),
-                _amountCard(p),
-                DemoCard(title: 'Payment method', children: [
-                  TileRow(children: [
-                    for (final m in DemoPaymentMethod.values)
-                      Tile(
-                        label: m.label,
-                        selected: m == _form.paymentMethod,
-                        onTap: () => _setForm(_form.copyWith(paymentMethod: m)),
-                      ),
+                  DemoCard(
+                      title: 'Wallet address (${_form.crypto.network})',
+                      children: [
+                        DemoField(
+                          controller: _wallet.controller,
+                          mono: true,
+                          placeholder: 'Wallet address',
+                          onChanged: _wallet.onChanged,
+                        ),
+                      ]),
+                  _amountCard(p),
+                  DemoCard(title: 'Payment method', children: [
+                    TileRow(children: [
+                      for (final m in DemoPaymentMethod.values)
+                        Tile(
+                          label: m.label,
+                          selected: m == _form.paymentMethod,
+                          onTap: () =>
+                              _setForm(_form.copyWith(paymentMethod: m)),
+                        ),
+                    ]),
                   ]),
-                ]),
-                DemoCard(title: 'Onramp', children: [
-                  DemoDropdown<String?>(
-                    label: 'Onramp',
-                    options: [for (final (id, label) in onrampOptions) SegmentOption(id, label)],
-                    value: _form.onramp,
-                    onChanged: (v) => _setForm(_form.copyWith(onramp: () => v)),
+                  DemoCard(title: 'Onramp', children: [
+                    DemoDropdown<String?>(
+                      label: 'Onramp',
+                      options: [
+                        for (final (id, label) in onrampOptions)
+                          SegmentOption(id, label)
+                      ],
+                      value: _form.onramp,
+                      onChanged: (v) =>
+                          _setForm(_form.copyWith(onramp: () => v)),
+                    ),
+                  ]),
+                  PrefillCard(value: _prefillDraft, onChanged: _changePrefill),
+                  _checkoutSection(p),
+                  Row(spacing: 8, children: [
+                    _actionButton('Reset', p.danger,
+                        () => _runAction('reset', (c) => c.reset())),
+                    _actionButton('Log out', p.warning,
+                        () => _runAction('sign out', (c) => c.signOut())),
+                  ]),
+                  Text(
+                    'SDK: ${_demo.status == InitStatus.ready ? _demo.sdkState.name : _demo.status.name}',
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 12,
+                        fontFamily: kMonoFont),
                   ),
-                ]),
-                PrefillCard(value: _prefillDraft, onChanged: _changePrefill),
-                _checkoutSection(p),
-                Row(spacing: 8, children: [
-                  _actionButton('Reset', p.danger,
-                      () => _runAction('reset', (c) => c.reset())),
-                  _actionButton('Log out', p.warning,
-                      () => _runAction('sign out', (c) => c.signOut())),
-                ]),
-                Text(
-                  'SDK: ${_demo.status == InitStatus.ready ? _demo.sdkState.name : _demo.status.name}',
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: 12, fontFamily: kMonoFont),
-                ),
-                ..._statusBoxes(),
-                EventLogCard(log: _demo.eventLog),
-              ],
+                  ..._statusBoxes(),
+                  EventLogCard(log: _demo.eventLog),
+                ],
+              ),
             ),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 
@@ -265,7 +280,9 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                 color: p.accent, borderRadius: BorderRadius.circular(8)),
             child: Text(_demo.environment.label,
                 style: TextStyle(
-                    color: p.onAccent, fontSize: 11, fontWeight: FontWeight.w700)),
+                    color: p.onAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700)),
           ),
           Semantics(
             button: true,
@@ -274,7 +291,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
               behavior: HitTestBehavior.opaque,
               onTap: _openSettings,
               child: ExcludeSemantics(
-                child: Text('⚙︎', style: TextStyle(color: p.text, fontSize: 24)),
+                child:
+                    Text('⚙︎', style: TextStyle(color: p.text, fontSize: 24)),
               ),
             ),
           ),
@@ -290,7 +308,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
         if (_form.countryOverride)
           Segmented<DemoCountry>(
             options: [
-              for (final c in DemoCountry.values) SegmentOption(c, '${c.flag} ${c.label}'),
+              for (final c in DemoCountry.values)
+                SegmentOption(c, '${c.flag} ${c.label}'),
             ],
             value: _form.country,
             onChanged: (c) => _setForm(_form.withCountry(c)),
@@ -308,7 +327,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
               context,
               title: 'US state',
               options: [
-                for (final s in usStates) SegmentOption(s.code, '${s.name} (${s.code})'),
+                for (final s in usStates)
+                  SegmentOption(s.code, '${s.name} (${s.code})'),
               ],
               selected: _form.usState,
               onSelect: (code) => _setForm(_form.copyWith(usState: code)),
@@ -337,7 +357,9 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
         SizedBox(
           width: 180,
           child: Segmented<DemoFiat>(
-            options: [for (final f in DemoFiat.values) SegmentOption(f, f.label)],
+            options: [
+              for (final f in DemoFiat.values) SegmentOption(f, f.label)
+            ],
             value: _form.fiat,
             onChanged: (f) => _setForm(_form.copyWith(fiat: f)),
           ),
@@ -353,28 +375,32 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
     if (result != null && request != null) {
       final needsRecovery = _demo.sdkState == OnramperStateKind.failed &&
           !_demo.hasFinalizedCheckout;
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
-        QuoteCard(
-          quote: result.quote,
-          amount: request.transactionData.amount,
-          fiat: _form.fiat.name,
-          cryptoSymbol: _form.crypto.symbol,
-        ),
-        if (needsRecovery)
-          StatusBox(
-            tone: StatusTone.error,
-            title: 'Couldn’t start checkout',
-            body: _demo.lastFailure ?? 'Fetch a fresh quote to try checkout again.',
-            actionLabel: 'Get a new quote',
-            onAction: _recoverCheckout,
-          )
-        else
-          OnramperCheckoutButton(
-            key: ValueKey(result.buttonHandle),
-            requirements: result,
-            style: checkoutButtonStyle(p),
-          ),
-      ]);
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 16,
+          children: [
+            QuoteCard(
+              quote: result.quote,
+              amount: request.transactionData.amount,
+              fiat: _form.fiat.name,
+              cryptoSymbol: _form.crypto.symbol,
+            ),
+            if (needsRecovery)
+              StatusBox(
+                tone: StatusTone.error,
+                title: 'Couldn’t start checkout',
+                body: _demo.lastFailure ??
+                    'Fetch a fresh quote to try checkout again.',
+                actionLabel: 'Get a new quote',
+                onAction: _recoverCheckout,
+              )
+            else
+              OnramperCheckoutButton(
+                key: ValueKey(result.buttonHandle),
+                requirements: result,
+                style: checkoutButtonStyle(p),
+              ),
+          ]);
     }
     if (_checkout.loading ||
         (request != null && _demo.status == InitStatus.initializing)) {
@@ -390,10 +416,13 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
       height: 56,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-          color: p.border, borderRadius: BorderRadius.circular(DemoRadius.button)),
+          color: p.border,
+          borderRadius: BorderRadius.circular(DemoRadius.button)),
       child: Text('Buy',
           style: TextStyle(
-              color: p.textSecondary, fontSize: 17, fontWeight: FontWeight.w600)),
+              color: p.textSecondary,
+              fontSize: 17,
+              fontWeight: FontWeight.w600)),
     );
   }
 
@@ -441,7 +470,8 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
         StatusBox(
           tone: StatusTone.info,
           title: 'Payment processing',
-          body: 'Your payment was accepted and is awaiting settlement. Track it before '
+          body:
+              'Your payment was accepted and is awaiting settlement. Track it before '
               'starting another payment.\n${_demo.transactionId ?? ''}',
           selectableBody: true,
         ),

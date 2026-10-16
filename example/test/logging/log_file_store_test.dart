@@ -104,9 +104,9 @@ void main() {
   });
 
   test('deletes oldest files while over the size cap', () async {
-    seed('2026-10-14', 'a' * 59 + '\n');
-    seed('2026-10-15', 'b' * 59 + '\n');
-    await store(maxBytes: 100).write(
+    seed('2026-10-14', 'a' * 199 + '\n');
+    seed('2026-10-15', 'b' * 199 + '\n');
+    await store(maxBytes: 350).write(
         at: DateTime.utc(2026, 10, 16),
         level: 'info',
         category: 'c',
@@ -118,7 +118,7 @@ void main() {
   test('tail-trims a single oversized file with a notice', () async {
     seed('2026-10-16',
         '${List.generate(40, (i) => 'line-${i.toString().padLeft(3, '0')}').join('\n')}\n');
-    await store(maxBytes: 100).write(
+    await store(maxBytes: 300).write(
         at: DateTime.utc(2026, 10, 16),
         level: 'info',
         category: 'c',
@@ -127,6 +127,19 @@ void main() {
     expect(text, startsWith('… trimmed to the newest entries …\n'));
     expect(text, isNot(contains('line-000')));
     expect(text, contains('line-039'));
+  });
+
+  test('enforces the size cap while writing, not only at launch', () async {
+    final s = store(maxBytes: 300);
+    for (var i = 0; i < 50; i++) {
+      await s.write(
+          at: DateTime.utc(2026, 10, 16, 10, 0, i),
+          level: 'info',
+          category: 'c',
+          message: 'record-$i');
+    }
+    expect(day('2026-10-16').lengthSync(), lessThanOrEqualTo(360));
+    expect(day('2026-10-16').readAsStringSync(), contains('record-49'));
   });
 
   test('lists newest first and ignores other files', () async {

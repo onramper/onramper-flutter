@@ -65,6 +65,9 @@ class LogFileStore {
   Future<void> _tail = Future.value();
   Directory? _dir;
   String? _day;
+
+  /// Running size of all log files; pruning recomputes it.
+  int _totalBytes = 0;
   bool _headerWritten = false;
 
   Future<T> _serial<T>(Future<T> Function() op) {
@@ -104,8 +107,12 @@ class LogFileStore {
           final line = _line(at, level, category, message);
           if (utf8.encode(line).length <= maxRecordBytes) buffer.writeln(line);
           if (buffer.isEmpty) return;
+          final text = buffer.toString();
           await File('${dir.path}/onramper-sdk-$day.log')
-              .writeAsString(buffer.toString(), mode: FileMode.append);
+              .writeAsString(text, mode: FileMode.append);
+          // Enforce the cap during the session too, as RN does per append.
+          _totalBytes += utf8.encode(text).length;
+          if (_totalBytes > maxBytes) await _prune(dir, day);
         } catch (e) {
           debugPrint('LogFileStore: write failed: $e');
         }
@@ -186,16 +193,23 @@ class LogFileStore {
       await oldest.file.delete();
       total -= oldest.sizeBytes;
     }
-    if (total > maxBytes && files.length == 1) await _trim(files.single);
+    if (total > maxBytes && files.length == 1) {
+      total = await _trim(files.single);
+    }
+    _totalBytes = total;
   }
 
-  Future<void> _trim(LogFile f) async {
+  /// Keeps the newest ~90% of the cap, so the next trim is some way off
+  /// rather than on every following write. Returns the new size.
+  Future<int> _trim(LogFile f) async {
     final bytes = await f.file.readAsBytes();
     final notice = utf8.encode(trimNotice);
-    var keep = bytes.sublist(bytes.length - (maxBytes - notice.length));
+    var keep =
+        bytes.sublist(bytes.length - (maxBytes * 9 ~/ 10 - notice.length));
     final newline = keep.indexOf(10);
     if (newline >= 0) keep = keep.sublist(newline + 1);
     await f.file.writeAsBytes([...notice, ...keep], flush: true);
+    return notice.length + keep.length;
   }
 
   Future<List<LogFile>> _scan(Directory dir) async {

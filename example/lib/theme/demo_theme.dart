@@ -94,8 +94,8 @@ class DemoTheme extends InheritedWidget {
   bool updateShouldNotify(DemoTheme oldWidget) => oldWidget.palette != palette;
 }
 
-/// Keeps platform-drawn pieces (status bar, dialogs, selection) in step with
-/// the palette — the Flutter side of RN's `Appearance.setColorScheme`.
+/// Keeps Material-drawn pieces (dialogs, selection) in step with the palette.
+/// The status bar follows the palette via BuyCryptoScreen's AnnotatedRegion.
 ThemeData buildMaterialTheme(DemoPalette p) => ThemeData(
       brightness: p.brightness,
       scaffoldBackgroundColor: p.contentBg,
