@@ -20,6 +20,12 @@ Official Flutter plugin for the [Onramper](https://onramper.com) crypto on-ramp.
 
 `onramper_flutter` X.Y.Z bundles `OnramperSDK` X.Y.Z. Wrapper-only patch releases ship as `X.Y.Z+N` where `N` is the patch counter.
 
+For a wrapper-only release such as `1.3.1+1`, use that full version in
+`pubspec.yaml`, `OnramperClient.wrapperVersion`, the changelog heading, and the
+Git tag (`v1.3.1+1`). Set the podspec's `s.version` to `1.3.1.1` (replace `+`
+with `.` for CocoaPods), while keeping the bundled iOS SDK at `v1.3.1`.
+The release workflow validates these versions and downloads the base SDK asset.
+
 ## Requirements
 
 - Flutter 3.22+, Dart 3.4+.

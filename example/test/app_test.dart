@@ -74,6 +74,72 @@ void main() {
       of: find.widgetWithText(DemoCard, 'Amount'),
       matching: find.byType(TextField));
 
+  for (final field in ['amount', 'wallet']) {
+    testWidgets('$field drafts block checkout until the new quote arrives',
+        (tester) async {
+      await pumpApp(tester);
+      final input = field == 'amount'
+          ? amountField()
+          : find.descendant(
+              of: find.widgetWithText(DemoCard, 'Wallet address (solana)'),
+              matching: find.byType(TextField));
+      final button = find.byType(OnramperCheckoutButton);
+      final originalElement = tester.element(button);
+      final gate = Completer<void>();
+      hosts.single.requirementsGates.add(gate);
+
+      await tester.enterText(input, field == 'amount' ? '250' : 'new-wallet');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(hosts.single.requirementsCalls, 1);
+      expect(tester.element(button), same(originalElement));
+      final blocker =
+          find.ancestor(of: button, matching: find.byType(AbsorbPointer));
+      expect(
+          tester
+              .widgetList<AbsorbPointer>(blocker)
+              .any((widget) => widget.absorbing),
+          isTrue);
+
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(hosts.single.requirementsCalls, 2);
+      expect(button, findsNothing);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<OnramperCheckoutButton>(button)
+              .requirements
+              .buttonHandle,
+          'button-2');
+      expect(
+          tester
+              .widgetList<AbsorbPointer>(find.ancestor(
+                  of: button, matching: find.byType(AbsorbPointer)))
+              .any((widget) => widget.absorbing),
+          isFalse);
+    });
+  }
+
+  testWidgets('reverting a draft re-enables the same mounted checkout',
+      (tester) async {
+    await pumpApp(tester);
+    final button = find.byType(OnramperCheckoutButton);
+    final originalElement = tester.element(button);
+    await tester.enterText(amountField(), '250');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(amountField(), '100');
+    await tester.pumpAndSettle();
+    expect(hosts.single.requirementsCalls, 1);
+    expect(tester.element(button), same(originalElement));
+    expect(
+        tester
+            .widgetList<AbsorbPointer>(
+                find.ancestor(of: button, matching: find.byType(AbsorbPointer)))
+            .any((widget) => widget.absorbing),
+        isFalse);
+  });
+
   for (final action in ['Reset', 'Log out']) {
     for (final environmentChange in [false, true]) {
       for (final fails in [false, true]) {

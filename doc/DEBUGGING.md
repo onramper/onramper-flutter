@@ -236,15 +236,20 @@ cd ios && pod install && cd ..
 flutter run --dart-define-from-file=.env --release
 ```
 
-3. Pick a log level in the app (changing it rebuilds the client, so request a new quote afterwards).
-4. Tap the log icon in the app bar to browse records, expand their context, **Clear** them, or **Copy all** as JSON lines.
+3. Tap the settings gear and scroll to **Diagnostic logs**. The demo uses the
+   SDK's debug log level. **Save SDK logs** controls whether records are saved
+   to local files; changing it does not rebuild the client.
+4. Tap a file name to preview its text, use **Share** to export a snapshot,
+   or **Delete all logs** to remove saved files after confirmation. Provider
+   messages may contain personal information; review logs before sharing.
 
 The Environment selector switches between Development and Production, using
 separate credentials and demo session endpoints; it rebuilds the client.
-Purchase-form edits clear the displayed quote, so request a new one. Completed
-and pending payments remain in an outcome panel after the sheet closes, with a
-copyable transaction id and a **New transaction** reset action. Track pending
-payments before starting another payment.
+Purchase-form edits request a new quote automatically. Checkout is disabled
+immediately while text edits settle, then the quote refreshes after a short
+typing debounce. Completed and pending payments appear in status panels with
+selectable transaction information. Use **Reset** to clear the current checkout
+and request a fresh quote. Track pending payments before starting another payment.
 
 ---
 

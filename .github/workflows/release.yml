@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Plugin version to release (e.g. 1.3.1). Must equal pubspec.yaml and the bundled onramper-ios SDK version.'
+        description: 'Plugin version from pubspec.yaml (e.g. 1.3.1 or wrapper-only 1.3.1+1). Bundles the base iOS SDK version.'
         required: true
 
 jobs:
@@ -45,8 +45,8 @@ jobs:
 
       - name: Validate version format
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Version '$VERSION' must be X.Y.Z."; exit 1
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\+[1-9][0-9]*)?$ ]]; then
+            echo "::error::Version '$VERSION' must be X.Y.Z or X.Y.Z+N (positive patch counter)."; exit 1
           fi
 
       - name: Verify versions match
@@ -55,20 +55,24 @@ jobs:
           PUBSPEC=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)
           PODSPEC=$(sed -n "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'\(.*\)'.*/\1/p" ios/onramper_flutter.podspec)
           IOS_SDK=$(sed -n 's/^[[:space:]]*ONRAMPER_SDK_VERSION="v\(.*\)".*/\1/p' ios/onramper_flutter.podspec)
+          # CocoaPods uses RubyGems versions, which cannot contain '+'.
+          EXPECTED_PODSPEC="${VERSION/+/.}"
+          EXPECTED_IOS_SDK="${VERSION%%+*}"
           echo "pubspec=$PUBSPEC podspec=$PODSPEC ios-sdk=$IOS_SDK"
           FAIL=0
           [ "$PUBSPEC" = "$VERSION" ] || { echo "::error::pubspec.yaml is $PUBSPEC, not $VERSION."; FAIL=1; }
-          [ "$PODSPEC" = "$VERSION" ] || { echo "::error::podspec s.version is $PODSPEC, not $VERSION."; FAIL=1; }
-          [ "$IOS_SDK" = "$VERSION" ] || { echo "::error::Bundled onramper-ios SDK is v$IOS_SDK, not v$VERSION."; FAIL=1; }
-          grep -qE "^## ${VERSION//./\\.}( |$)" CHANGELOG.md \
+          [ "$PODSPEC" = "$EXPECTED_PODSPEC" ] || { echo "::error::podspec s.version is $PODSPEC, not $EXPECTED_PODSPEC."; FAIL=1; }
+          [ "$IOS_SDK" = "$EXPECTED_IOS_SDK" ] || { echo "::error::Bundled onramper-ios SDK is v$IOS_SDK, not v$EXPECTED_IOS_SDK."; FAIL=1; }
+          awk -v version="$VERSION" '$0 == "## " version || index($0, "## " version " ") == 1 { found = 1 } END { exit !found }' CHANGELOG.md \
             || { echo "::error::CHANGELOG.md has no '## $VERSION' section."; FAIL=1; }
           exit $FAIL
 
       - name: Verify iOS release exists
         run: |
+          IOS_SDK="${VERSION%%+*}"
           curl -fsSIL -o /dev/null \
-            "https://github.com/onramper/onramper-ios/releases/download/v${VERSION}/OnramperSDK.xcframework.zip" \
-            || { echo "::error::No onramper-ios release asset for v${VERSION}."; exit 1; }
+            "https://github.com/onramper/onramper-ios/releases/download/v${IOS_SDK}/OnramperSDK.xcframework.zip" \
+            || { echo "::error::No onramper-ios release asset for v${IOS_SDK}."; exit 1; }
 
       - name: Refuse if already on pub.dev
         run: |

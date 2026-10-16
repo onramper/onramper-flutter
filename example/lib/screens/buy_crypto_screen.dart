@@ -71,6 +71,11 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
 
   DemoController get _demo => widget.demo;
 
+  bool get _hasPendingEdits =>
+      _amount.controller.text != _form.amount ||
+      _wallet.controller.text != _form.wallet ||
+      _prefillDraft != _prefill;
+
   @override
   void initState() {
     super.initState();
@@ -209,7 +214,10 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                           controller: _wallet.controller,
                           mono: true,
                           placeholder: 'Wallet address',
-                          onChanged: _wallet.onChanged,
+                          onChanged: (v) {
+                            _wallet.onChanged(v);
+                            setState(() {});
+                          },
                         ),
                       ]),
                   _amountCard(p),
@@ -405,10 +413,21 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
                 onAction: _recoverCheckout,
               )
             else
-              OnramperCheckoutButton(
-                key: ValueKey(result.buttonHandle),
-                requirements: result,
-                style: checkoutButtonStyle(p),
+              // Keep the single-use native handle mounted while a draft is
+              // pending, but block both touch and accessibility activation.
+              AbsorbPointer(
+                absorbing: _hasPendingEdits,
+                child: ExcludeSemantics(
+                  excluding: _hasPendingEdits,
+                  child: Opacity(
+                    opacity: _hasPendingEdits ? 0.5 : 1,
+                    child: OnramperCheckoutButton(
+                      key: ValueKey(result.buttonHandle),
+                      requirements: result,
+                      style: checkoutButtonStyle(p),
+                    ),
+                  ),
+                ),
               ),
           ]));
     }

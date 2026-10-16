@@ -15,7 +15,8 @@ void main() {
     final podVersion =
         RegExp(r"s\.version\s*=\s*'([^']+)'").firstMatch(podspec)!;
     expect(OnramperClient.wrapperVersion, pubVersion.group(1));
-    expect(OnramperClient.wrapperVersion, podVersion.group(1));
+    expect(OnramperClient.wrapperVersion.replaceAll('+', '.'),
+        podVersion.group(1));
   });
 
   test('sdkVersion normalizes a missing native channel', () async {

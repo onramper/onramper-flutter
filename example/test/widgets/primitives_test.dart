@@ -1,5 +1,3 @@
-import 'dart:ui' show SemanticsAction, SemanticsFlag;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,12 +80,17 @@ void main() {
             onChanged: (value) => changed = value,
           )));
           final node = tester.getSemantics(find.byType(Switch));
-          final data = node.getSemanticsData();
-          expect(data.label, 'Dark mode');
-          expect(data.hasFlag(SemanticsFlag.hasToggledState), isTrue);
-          expect(data.hasFlag(SemanticsFlag.isToggled), !disabled);
-          expect(data.hasFlag(SemanticsFlag.isEnabled), !disabled);
-          expect(data.hasAction(SemanticsAction.tap), !disabled);
+          expect(
+              node,
+              // isSemantics is unavailable on the supported Flutter 3.22.
+              // ignore: deprecated_member_use
+              containsSemantics(
+                label: 'Dark mode',
+                hasToggledState: true,
+                isToggled: !disabled,
+                isEnabled: !disabled,
+                hasTapAction: !disabled,
+              ));
           if (!disabled) {
             await tester.tap(find.byType(Switch));
             await tester.pump();

@@ -137,18 +137,18 @@ released separately; their changes are included here.
 - Pending payments are shown separately; errors show `userMessage` and the
   support code.
 - Shows plugin and SDK versions and the current transaction id.
-- **Prefill (optional)** form and a **New quote** button. Purchase-form edits
-  invalidate the displayed quote and hide its checkout button until a new
-  quote is requested.
+- **Prefill (optional)** form and automatic quotes. Purchase-form edits
+  disable checkout immediately while text edits settle, then refresh the
+  quote after a short typing debounce.
 - Development / Production selector with separate credentials and demo
   session endpoints, missing-key feedback, and client rebuild on switching.
   Includes crypto, amount, wallet, fiat, country/state and onramp controls,
   plus a dark-mode switch that rebuilds the client with the selected theme.
-- Persistent **Transaction complete** / **Payment processing** panel with
-  the transaction id captured at the outcome (tap to copy, or "unavailable"
-  when absent). It remains after the payment sheet closes. **New transaction**
-  resets the client; a pending payment must be tracked before another payment.
-- SDK log viewer (app-bar icon) with a log-level picker, Clear and Copy all.
+- **Transaction complete** / **Payment processing** status panels with
+  selectable transaction information. **Reset** clears the current checkout
+  and requests a fresh quote; track pending payments before another payment.
+- **Settings → Diagnostic logs** with a Save SDK logs switch, file previews,
+  sharing, and deletion. The demo uses the SDK's debug log level.
 
 ## 1.1.2 — License correction
 
