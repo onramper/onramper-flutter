@@ -21,13 +21,19 @@ on:
 jobs:
   # Read-only: runs Flutter and dependency code (pub get, analyze, test).
   verify:
-    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
       VERSION: ${{ inputs.version }}
     steps:
+      # A job-level `if` would skip the run and leave it green.
+      - name: Require master
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+            echo "::error::Run release from master, not ${GITHUB_REF}."; exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -77,6 +83,9 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
       - run: flutter test
+      - name: Example tests
+        run: flutter test
+        working-directory: example
 
       # Gates the tag on pub.dev acceptance (metadata, dependencies, layout).
       - run: flutter pub publish --dry-run

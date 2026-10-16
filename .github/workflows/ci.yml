@@ -18,6 +18,9 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
       - run: flutter test
+      - name: Example tests
+        run: flutter test
+        working-directory: example
       - name: Pigeon drift check
         # Pigeon emits code in its own style, then we run dart format on the
         # generated Dart file to match the repo's format. Both steps together
