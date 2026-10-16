@@ -197,6 +197,25 @@ void main() {
     expect(await s.listFiles(), isEmpty);
   });
 
+  test('a file started after Delete all gets the launch header again',
+      () async {
+    final s = store();
+    await s.write(
+        at: DateTime.utc(2026, 10, 16, 10),
+        level: 'info',
+        category: 'c',
+        message: 'before');
+    await s.deleteAll();
+    await s.write(
+        at: DateTime.utc(2026, 10, 16, 11),
+        level: 'info',
+        category: 'c',
+        message: 'after');
+    final lines = day('2026-10-16').readAsLinesSync();
+    expect(lines.first, contains('app.launch'));
+    expect(lines.last, endsWith(' c after'));
+  });
+
   test('excludes the directory from backup once and survives failures',
       () async {
     final excluded = <String>[];

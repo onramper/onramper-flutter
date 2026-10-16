@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:onramper_flutter/onramper_flutter.dart';
@@ -92,21 +93,21 @@ class LogFileStore {
             _day = day;
             await _prune(dir, day);
           }
-          final buffer = StringBuffer();
+          final out = BytesBuilder(copy: false);
           if (!_headerWritten) {
             _headerWritten = true;
             final header = await _header();
-            buffer.writeln(_line(at, 'info', 'DemoApp',
-                header.isEmpty ? 'app.launch' : 'app.launch $header'));
+            out.add(utf8.encode(
+                '${_line(at, 'info', 'DemoApp', header.isEmpty ? 'app.launch' : 'app.launch $header')}\n'));
           }
-          final line = _line(at, level, category, message);
-          if (utf8.encode(line).length <= maxRecordBytes) buffer.writeln(line);
-          if (buffer.isEmpty) return;
-          final text = buffer.toString();
+          final line = utf8.encode('${_line(at, level, category, message)}\n');
+          if (line.length - 1 <= maxRecordBytes) out.add(line);
+          if (out.isEmpty) return;
+          final bytes = out.takeBytes();
           await File('${dir.path}/onramper-sdk-$day.log')
-              .writeAsString(text, mode: FileMode.append);
+              .writeAsBytes(bytes, mode: FileMode.append);
           // Enforce the cap during the session too, as RN does per append.
-          _totalBytes += utf8.encode(text).length;
+          _totalBytes += bytes.length;
           if (_totalBytes > maxBytes) await _prune(dir, day);
         } catch (e) {
           debugPrint('LogFileStore: write failed: $e');
@@ -148,6 +149,9 @@ class LogFileStore {
         for (final f in await _scan(await _ensureDir())) {
           await f.file.delete();
         }
+        // The next file starts fresh: launch line first, nothing counted yet.
+        _headerWritten = false;
+        _totalBytes = 0;
       });
 
   Future<Directory> _ensureDir() async {
