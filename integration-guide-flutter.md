@@ -24,6 +24,15 @@ Before writing any Dart code, the iOS Runner target must be configured for App A
   </plist>
   ```
 
+- **Add camera and microphone usage descriptions** to `ios/Runner/Info.plist`. Some providers run ID-document or selfie verification inside the checkout webview. Without these keys iOS turns down the webview's camera request without showing a prompt, and the app gets no Camera toggle in Settings:
+
+  ```xml
+  <key>NSCameraUsageDescription</key>
+  <string>Camera access is required for identity verification</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Microphone access is required for identity verification</string>
+  ```
+
 - **Set iOS deployment target to 16.0 or higher** in both `ios/Podfile` (`platform :ios, '16.0'`) and the Runner Xcode project (Build Settings → iOS Deployment Target).
 - **Register your Flutter app's bundle identifier with Onramper** so the attestation service accepts it. Bundle IDs are validated server-side; an unregistered bundle ID is rejected with `OnramperErrorKind.attestationFailed`.
 - **Run on a real device.** App Attest is unavailable on the iOS Simulator. Attempting to attest on a simulator surfaces as `OnramperError(kind: attestationUnavailable)` (mapped to `attestationFailed`); test on a physical device throughout integration.
