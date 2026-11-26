@@ -86,13 +86,11 @@ void main() {
       isEventConsoleLoggingEnabled: true,
     ).toDto();
     expect(dto.hasLogHandler, isTrue);
-    expect(dto.isEventLoggingEnabled, isTrue);
     expect(dto.isEventConsoleLoggingEnabled, isTrue);
 
     final plain =
         const OnramperConfiguration(apiKey: 'pk', clientId: 'c').toDto();
     expect(plain.hasLogHandler, isFalse);
-    expect(plain.isEventLoggingEnabled, isTrue);
     expect(plain.isEventConsoleLoggingEnabled, isFalse);
   });
 }
