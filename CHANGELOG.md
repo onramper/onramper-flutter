@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## Unreleased
+
+### Deprecated
+
+- `OnramperConfiguration.isEventLoggingEnabled` is deprecated and ignored.
+  Checkout telemetry is always on and controlled by Onramper. The iOS bridge
+  no longer passes the flag to the native SDK. Remove the argument;
+  `isEventConsoleLoggingEnabled` is unchanged.
+
 ## 1.3.1 — Parity with OnramperSDK for iOS 1.3.1
 
 Bundles [OnramperSDK](https://github.com/onramper/onramper-ios) **v1.3.1**

@@ -195,10 +195,9 @@ OnramperConfiguration(
 
 Each record carries `timestamp`, `level`, `category`, `event`, `context` and `message`. URLs are reduced to hosts, HTTP paths to route templates, and values resembling emails, phone numbers, card numbers or tokens are redacted. **Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data** and choose retention and sharing accordingly.
 
-Two flags, both `false` by default:
+`isEventConsoleLoggingEnabled` (`false` by default) logs provider-lifecycle events at `info` even when `logLevel` is lower, including `off`.
 
-- `isEventLoggingEnabled` mirrors provider-lifecycle events to Onramper's backend telemetry.
-- `isEventConsoleLoggingEnabled` logs provider-lifecycle events at `info` even when `logLevel` is lower, including `off`.
+`isEventLoggingEnabled` is deprecated and ignored: checkout telemetry is always on and controlled by Onramper.
 
 For native-side logs, open the Xcode console (⌘ + Shift + C) while the app is running. The native SDK logs with the subsystem `com.onramper.sdk`.
 

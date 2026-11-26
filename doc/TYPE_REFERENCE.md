@@ -20,7 +20,7 @@ Passed to `OnramperClient(configuration:)`.
 | `theme` | `OnramperTheme` | No | `system` | Visual theme applied to native checkout UI. |
 | `logLevel` | `OnramperLogLevel` | No | `off` | Verbosity of SDK logging to the device console. |
 | `logHandler` | `OnramperLogHandler?` | No | `null` | Receives structured `OnramperLogRecord`s at or above `logLevel`, in addition to Console output. Exceptions it throws are reported via `FlutterError.reportError` and don't interrupt checkout. |
-| `isEventLoggingEnabled` | `bool` | No | `false` | Mirrors provider-lifecycle events to Onramper's backend telemetry. |
+| `isEventLoggingEnabled` | `bool` | No | `false` | **Deprecated and ignored.** Checkout telemetry is always on and controlled by Onramper. |
 | `isEventConsoleLoggingEnabled` | `bool` | No | `false` | Emits provider-lifecycle events at `info` even when `logLevel` is lower, including `off`. |
 
 ### `OnramperEnvironment`

@@ -83,7 +83,6 @@ void main() {
       apiKey: 'pk',
       clientId: 'c',
       logHandler: (_) {},
-      isEventLoggingEnabled: true,
       isEventConsoleLoggingEnabled: true,
     ).toDto();
     expect(dto.hasLogHandler, isTrue);
@@ -93,7 +92,7 @@ void main() {
     final plain =
         const OnramperConfiguration(apiKey: 'pk', clientId: 'c').toDto();
     expect(plain.hasLogHandler, isFalse);
-    expect(plain.isEventLoggingEnabled, isFalse);
+    expect(plain.isEventLoggingEnabled, isTrue);
     expect(plain.isEventConsoleLoggingEnabled, isFalse);
   });
 }

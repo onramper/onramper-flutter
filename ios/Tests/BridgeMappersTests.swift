@@ -967,7 +967,6 @@ final class BridgeMappersTests: XCTestCase {
                                    logLevel: .info, hasLogHandler: true,
                                    isEventLoggingEnabled: true, isEventConsoleLoggingEnabled: true)
         let native = BridgeMappers.toNative(dto, logHandler: { _ in }, sessionExpirationHandler: { fatalError() })
-        XCTAssertTrue(native.isEventLoggingEnabled)
         XCTAssertTrue(native.isEventConsoleLoggingEnabled)
         XCTAssertNotNil(native.logHandler)
     }

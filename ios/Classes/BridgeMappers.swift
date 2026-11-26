@@ -15,7 +15,6 @@ enum BridgeMappers {
             theme: toNative(dto.theme),
             logLevel: toNative(dto.logLevel),
             logHandler: logHandler,
-            isEventLoggingEnabled: dto.isEventLoggingEnabled,
             isEventConsoleLoggingEnabled: dto.isEventConsoleLoggingEnabled,
             sessionExpirationHandler: sessionExpirationHandler
         )

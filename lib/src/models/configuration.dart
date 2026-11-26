@@ -40,9 +40,12 @@ class OnramperConfiguration {
     this.theme = OnramperTheme.system,
     this.logLevel = OnramperLogLevel.off,
     this.logHandler,
-    this.isEventLoggingEnabled = false,
+    @Deprecated(_eventLoggingDeprecation) this.isEventLoggingEnabled = false,
     this.isEventConsoleLoggingEnabled = false,
   });
+
+  static const _eventLoggingDeprecation =
+      'Ignored: checkout telemetry is always on and controlled by Onramper.';
 
   final String apiKey;
   final String clientId;
@@ -54,7 +57,8 @@ class OnramperConfiguration {
   /// the native Console (os.Logger) output.
   final OnramperLogHandler? logHandler;
 
-  /// Mirrors provider-lifecycle events to Onramper's backend telemetry.
+  /// No effect. Checkout telemetry is always on and controlled by Onramper.
+  @Deprecated(_eventLoggingDeprecation)
   final bool isEventLoggingEnabled;
 
   /// Emits provider-lifecycle events at `info` even when [logLevel] is lower,
@@ -82,7 +86,7 @@ class OnramperConfiguration {
           OnramperLogLevel.trace => LogLevelDto.trace,
         },
         hasLogHandler: logHandler != null,
-        isEventLoggingEnabled: isEventLoggingEnabled,
+        isEventLoggingEnabled: true,
         isEventConsoleLoggingEnabled: isEventConsoleLoggingEnabled,
       );
 }

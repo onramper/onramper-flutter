@@ -111,7 +111,7 @@ OnramperConfiguration(
 )
 ```
 
-Each `OnramperLogRecord` carries `timestamp`, `level`, `category`, `event`, `context` and `message`. The handler runs on the UI isolate, so keep it fast; if it throws, the error is reported through `FlutterError.reportError` and checkout continues. Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data. `isEventLoggingEnabled` and `isEventConsoleLoggingEnabled` (both `false` by default) enable provider-event telemetry and provider-event console logging respectively.
+Each `OnramperLogRecord` carries `timestamp`, `level`, `category`, `event`, `context` and `message`. The handler runs on the UI isolate, so keep it fast; if it throws, the error is reported through `FlutterError.reportError` and checkout continues. Provider messages get only best-effort redaction, so treat exported logs as possibly containing personal data. `isEventConsoleLoggingEnabled` (`false` by default) enables provider-event console logging. `isEventLoggingEnabled` is deprecated and ignored: checkout telemetry is always on and controlled by Onramper.
 
 ## 4. Initialize
 
